@@ -1,0 +1,410 @@
+{
+  "players": [
+    {
+      "id": "p1",
+      "name": "Yoichi Isagi",
+      "jerseyNumber": 11,
+      "position": "Forward",
+      "team": "Blue Lock",
+      "overallRating": 87,
+      "attributes": {
+        "passing": 78,
+        "shooting": 92,
+        "dribbling": 85,
+        "defending": 45,
+        "physical": 72
+      },
+      "matchStats": [
+        {
+          "matchId": "m1",
+          "opponent": "Team World Five",
+          "date": "2024-03-15",
+          "stats": {
+            "goals": 2,
+            "assists": 1,
+            "passes": 34,
+            "passAccuracy": 87,
+            "shots": 6,
+            "shotsOnTarget": 4,
+            "interceptions": 2,
+            "tackles": 1,
+            "dribbles": 8,
+            "dribblesSuccessful": 6,
+            "distanceCovered": 10.2,
+            "sprints": 23
+          },
+          "events": [
+            { "type": "pass", "x": 45, "y": 30, "targetX": 65, "targetY": 25, "success": true, "minute": 12 },
+            { "type": "shot", "x": 82, "y": 45, "targetX": 100, "targetY": 50, "success": true, "minute": 23 },
+            { "type": "dribble", "x": 55, "y": 40, "targetX": 70, "targetY": 35, "success": true, "minute": 34 },
+            { "type": "pass", "x": 70, "y": 35, "targetX": 85, "targetY": 50, "success": true, "minute": 45 },
+            { "type": "shot", "x": 88, "y": 52, "targetX": 100, "targetY": 48, "success": true, "minute": 67 },
+            { "type": "interception", "x": 40, "y": 55, "targetX": 50, "targetY": 45, "success": true, "minute": 78 }
+          ]
+        },
+        {
+          "matchId": "m2",
+          "opponent": "England U-20",
+          "date": "2024-03-22",
+          "stats": {
+            "goals": 1,
+            "assists": 2,
+            "passes": 41,
+            "passAccuracy": 91,
+            "shots": 4,
+            "shotsOnTarget": 2,
+            "interceptions": 3,
+            "tackles": 2,
+            "dribbles": 5,
+            "dribblesSuccessful": 4,
+            "distanceCovered": 11.1,
+            "sprints": 28
+          },
+          "events": [
+            { "type": "pass", "x": 35, "y": 50, "targetX": 55, "targetY": 40, "success": true, "minute": 8 },
+            { "type": "pass", "x": 60, "y": 38, "targetX": 80, "targetY": 55, "success": true, "minute": 22 },
+            { "type": "shot", "x": 78, "y": 48, "targetX": 100, "targetY": 50, "success": true, "minute": 41 },
+            { "type": "dribble", "x": 50, "y": 45, "targetX": 65, "targetY": 40, "success": true, "minute": 56 },
+            { "type": "interception", "x": 45, "y": 60, "targetX": 55, "targetY": 50, "success": true, "minute": 72 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p2",
+      "name": "Meguru Bachira",
+      "jerseyNumber": 8,
+      "position": "Midfielder",
+      "team": "Blue Lock",
+      "overallRating": 89,
+      "attributes": {
+        "passing": 82,
+        "shooting": 78,
+        "dribbling": 98,
+        "defending": 40,
+        "physical": 68
+      },
+      "matchStats": [
+        {
+          "matchId": "m1",
+          "opponent": "Team World Five",
+          "date": "2024-03-15",
+          "stats": {
+            "goals": 1,
+            "assists": 3,
+            "passes": 52,
+            "passAccuracy": 89,
+            "shots": 3,
+            "shotsOnTarget": 2,
+            "interceptions": 1,
+            "tackles": 0,
+            "dribbles": 15,
+            "dribblesSuccessful": 13,
+            "distanceCovered": 11.8,
+            "sprints": 31
+          },
+          "events": [
+            { "type": "dribble", "x": 40, "y": 50, "targetX": 60, "targetY": 45, "success": true, "minute": 5 },
+            { "type": "dribble", "x": 60, "y": 45, "targetX": 75, "targetY": 40, "success": true, "minute": 18 },
+            { "type": "pass", "x": 75, "y": 40, "targetX": 88, "targetY": 50, "success": true, "minute": 33 },
+            { "type": "shot", "x": 70, "y": 55, "targetX": 100, "targetY": 50, "success": false, "minute": 52 },
+            { "type": "dribble", "x": 55, "y": 35, "targetX": 70, "targetY": 30, "success": true, "minute": 68 }
+          ]
+        },
+        {
+          "matchId": "m2",
+          "opponent": "England U-20",
+          "date": "2024-03-22",
+          "stats": {
+            "goals": 2,
+            "assists": 1,
+            "passes": 48,
+            "passAccuracy": 92,
+            "shots": 5,
+            "shotsOnTarget": 3,
+            "interceptions": 2,
+            "tackles": 1,
+            "dribbles": 12,
+            "dribblesSuccessful": 10,
+            "distanceCovered": 10.9,
+            "sprints": 27
+          },
+          "events": [
+            { "type": "dribble", "x": 35, "y": 55, "targetX": 55, "targetY": 50, "success": true, "minute": 11 },
+            { "type": "shot", "x": 80, "y": 48, "targetX": 100, "targetY": 50, "success": true, "minute": 29 },
+            { "type": "pass", "x": 50, "y": 45, "targetX": 70, "targetY": 40, "success": true, "minute": 44 },
+            { "type": "shot", "x": 75, "y": 42, "targetX": 100, "targetY": 48, "success": true, "minute": 77 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "name": "Rensuke Kunigami",
+      "jerseyNumber": 9,
+      "position": "Forward",
+      "team": "Blue Lock",
+      "overallRating": 85,
+      "attributes": {
+        "passing": 65,
+        "shooting": 95,
+        "dribbling": 70,
+        "defending": 50,
+        "physical": 88
+      },
+      "matchStats": [
+        {
+          "matchId": "m1",
+          "opponent": "Team World Five",
+          "date": "2024-03-15",
+          "stats": {
+            "goals": 3,
+            "assists": 0,
+            "passes": 22,
+            "passAccuracy": 78,
+            "shots": 8,
+            "shotsOnTarget": 5,
+            "interceptions": 1,
+            "tackles": 3,
+            "dribbles": 4,
+            "dribblesSuccessful": 2,
+            "distanceCovered": 9.5,
+            "sprints": 19
+          },
+          "events": [
+            { "type": "shot", "x": 85, "y": 50, "targetX": 100, "targetY": 48, "success": true, "minute": 15 },
+            { "type": "shot", "x": 78, "y": 45, "targetX": 100, "targetY": 52, "success": true, "minute": 38 },
+            { "type": "shot", "x": 90, "y": 55, "targetX": 100, "targetY": 50, "success": true, "minute": 61 },
+            { "type": "pass", "x": 60, "y": 40, "targetX": 75, "targetY": 50, "success": true, "minute": 82 }
+          ]
+        },
+        {
+          "matchId": "m2",
+          "opponent": "England U-20",
+          "date": "2024-03-22",
+          "stats": {
+            "goals": 1,
+            "assists": 1,
+            "passes": 28,
+            "passAccuracy": 82,
+            "shots": 6,
+            "shotsOnTarget": 3,
+            "interceptions": 2,
+            "tackles": 4,
+            "dribbles": 3,
+            "dribblesSuccessful": 2,
+            "distanceCovered": 10.1,
+            "sprints": 22
+          },
+          "events": [
+            { "type": "shot", "x": 82, "y": 48, "targetX": 100, "targetY": 50, "success": true, "minute": 27 },
+            { "type": "pass", "x": 55, "y": 35, "targetX": 70, "targetY": 45, "success": true, "minute": 53 },
+            { "type": "tackle", "x": 45, "y": 50, "targetX": 50, "targetY": 48, "success": true, "minute": 71 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p4",
+      "name": "Seishiro Nagi",
+      "jerseyNumber": 10,
+      "position": "Forward",
+      "team": "Blue Lock",
+      "overallRating": 94,
+      "attributes": {
+        "passing": 85,
+        "shooting": 90,
+        "dribbling": 92,
+        "defending": 35,
+        "physical": 65
+      },
+      "matchStats": [
+        {
+          "matchId": "m1",
+          "opponent": "Team World Five",
+          "date": "2024-03-15",
+          "stats": {
+            "goals": 2,
+            "assists": 2,
+            "passes": 38,
+            "passAccuracy": 94,
+            "shots": 5,
+            "shotsOnTarget": 4,
+            "interceptions": 0,
+            "tackles": 0,
+            "dribbles": 10,
+            "dribblesSuccessful": 9,
+            "distanceCovered": 8.2,
+            "sprints": 15
+          },
+          "events": [
+            { "type": "shot", "x": 88, "y": 50, "targetX": 100, "targetY": 48, "success": true, "minute": 21 },
+            { "type": "dribble", "x": 65, "y": 45, "targetX": 80, "targetY": 50, "success": true, "minute": 35 },
+            { "type": "pass", "x": 80, "y": 50, "targetX": 90, "targetY": 55, "success": true, "minute": 58 },
+            { "type": "shot", "x": 85, "y": 48, "targetX": 100, "targetY": 52, "success": true, "minute": 84 }
+          ]
+        },
+        {
+          "matchId": "m2",
+          "opponent": "England U-20",
+          "date": "2024-03-22",
+          "stats": {
+            "goals": 3,
+            "assists": 1,
+            "passes": 42,
+            "passAccuracy": 95,
+            "shots": 7,
+            "shotsOnTarget": 5,
+            "interceptions": 1,
+            "tackles": 0,
+            "dribbles": 8,
+            "dribblesSuccessful": 7,
+            "distanceCovered": 8.8,
+            "sprints": 18
+          },
+          "events": [
+            { "type": "shot", "x": 90, "y": 52, "targetX": 100, "targetY": 50, "success": true, "minute": 16 },
+            { "type": "shot", "x": 82, "y": 45, "targetX": 100, "targetY": 48, "success": true, "minute": 42 },
+            { "type": "shot", "x": 78, "y": 55, "targetX": 100, "targetY": 52, "success": true, "minute": 69 },
+            { "type": "dribble", "x": 60, "y": 50, "targetX": 78, "targetY": 48, "success": true, "minute": 88 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p5",
+      "name": "Hyoma Chigiri",
+      "jerseyNumber": 7,
+      "position": "Winger",
+      "team": "Blue Lock",
+      "overallRating": 88,
+      "attributes": {
+        "passing": 75,
+        "shooting": 80,
+        "dribbling": 88,
+        "defending": 42,
+        "physical": 95
+      },
+      "matchStats": [
+        {
+          "matchId": "m1",
+          "opponent": "Team World Five",
+          "date": "2024-03-15",
+          "stats": {
+            "goals": 1,
+            "assists": 2,
+            "passes": 29,
+            "passAccuracy": 85,
+            "shots": 4,
+            "shotsOnTarget": 2,
+            "interceptions": 2,
+            "tackles": 2,
+            "dribbles": 11,
+            "dribblesSuccessful": 9,
+            "distanceCovered": 12.5,
+            "sprints": 42
+          },
+          "events": [
+            { "type": "dribble", "x": 30, "y": 20, "targetX": 60, "targetY": 25, "success": true, "minute": 7 },
+            { "type": "pass", "x": 60, "y": 25, "targetX": 85, "targetY": 50, "success": true, "minute": 24 },
+            { "type": "shot", "x": 75, "y": 35, "targetX": 100, "targetY": 50, "success": true, "minute": 49 },
+            { "type": "dribble", "x": 45, "y": 15, "targetX": 70, "targetY": 20, "success": true, "minute": 73 }
+          ]
+        },
+        {
+          "matchId": "m2",
+          "opponent": "England U-20",
+          "date": "2024-03-22",
+          "stats": {
+            "goals": 0,
+            "assists": 3,
+            "passes": 35,
+            "passAccuracy": 88,
+            "shots": 3,
+            "shotsOnTarget": 1,
+            "interceptions": 3,
+            "tackles": 3,
+            "dribbles": 9,
+            "dribblesSuccessful": 7,
+            "distanceCovered": 13.2,
+            "sprints": 45
+          },
+          "events": [
+            { "type": "dribble", "x": 25, "y": 18, "targetX": 55, "targetY": 22, "success": true, "minute": 13 },
+            { "type": "pass", "x": 55, "y": 22, "targetX": 80, "targetY": 45, "success": true, "minute": 31 },
+            { "type": "pass", "x": 70, "y": 30, "targetX": 88, "targetY": 50, "success": true, "minute": 59 },
+            { "type": "interception", "x": 35, "y": 25, "targetX": 45, "targetY": 30, "success": true, "minute": 81 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p6",
+      "name": "Rin Itoshi",
+      "jerseyNumber": 1,
+      "position": "Forward",
+      "team": "Blue Lock",
+      "overallRating": 96,
+      "attributes": {
+        "passing": 88,
+        "shooting": 97,
+        "dribbling": 94,
+        "defending": 45,
+        "physical": 75
+      },
+      "matchStats": [
+        {
+          "matchId": "m1",
+          "opponent": "Team World Five",
+          "date": "2024-03-15",
+          "stats": {
+            "goals": 4,
+            "assists": 1,
+            "passes": 31,
+            "passAccuracy": 92,
+            "shots": 9,
+            "shotsOnTarget": 6,
+            "interceptions": 1,
+            "tackles": 1,
+            "dribbles": 7,
+            "dribblesSuccessful": 6,
+            "distanceCovered": 9.8,
+            "sprints": 25
+          },
+          "events": [
+            { "type": "shot", "x": 92, "y": 50, "targetX": 100, "targetY": 48, "success": true, "minute": 9 },
+            { "type": "shot", "x": 85, "y": 45, "targetX": 100, "targetY": 52, "success": true, "minute": 28 },
+            { "type": "shot", "x": 88, "y": 55, "targetX": 100, "targetY": 50, "success": true, "minute": 47 },
+            { "type": "shot", "x": 80, "y": 48, "targetX": 100, "targetY": 50, "success": true, "minute": 66 },
+            { "type": "dribble", "x": 70, "y": 50, "targetX": 85, "targetY": 48, "success": true, "minute": 85 }
+          ]
+        },
+        {
+          "matchId": "m2",
+          "opponent": "England U-20",
+          "date": "2024-03-22",
+          "stats": {
+            "goals": 2,
+            "assists": 2,
+            "passes": 36,
+            "passAccuracy": 94,
+            "shots": 6,
+            "shotsOnTarget": 4,
+            "interceptions": 2,
+            "tackles": 2,
+            "dribbles": 9,
+            "dribblesSuccessful": 8,
+            "distanceCovered": 10.5,
+            "sprints": 28
+          },
+          "events": [
+            { "type": "shot", "x": 88, "y": 52, "targetX": 100, "targetY": 50, "success": true, "minute": 19 },
+            { "type": "shot", "x": 82, "y": 48, "targetX": 100, "targetY": 48, "success": true, "minute": 37 },
+            { "type": "pass", "x": 75, "y": 45, "targetX": 90, "targetY": 55, "success": true, "minute": 63 },
+            { "type": "dribble", "x": 60, "y": 50, "targetX": 80, "targetY": 48, "success": true, "minute": 79 }
+          ]
+        }
+      ]
+    }
+  ]
+}
