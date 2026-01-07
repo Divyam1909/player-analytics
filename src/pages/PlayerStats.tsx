@@ -1,17 +1,17 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import RadarChart from "@/components/charts/RadarChart";
 import BarChart from "@/components/charts/BarChart";
 import LineChart from "@/components/charts/LineChart";
 import StatBar from "@/components/charts/StatBar";
+import MatchTimeline from "@/components/charts/MatchTimeline";
 import FootballField from "@/components/field/FootballField";
 import { Player, PlayerMatch } from "@/types/player";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { ArrowLeft, User, Target, Footprints, Shield, Flame, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import playersData from "@/data/players.json";
@@ -19,7 +19,6 @@ import playersData from "@/data/players.json";
 const PlayerStats = () => {
   const { id } = useParams<{ id: string }>();
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
-  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const players = playersData.players as Player[];
   const player = players.find((p) => p.id === id);
@@ -27,8 +26,8 @@ const PlayerStats = () => {
   // Default to first player if no id or player not found
   const currentPlayer = player || players[0];
 
-  // Set default selected match
-  useMemo(() => {
+  // Set default selected match - using useEffect for side effects
+  useEffect(() => {
     if (currentPlayer && currentPlayer.matchStats.length > 0 && !selectedMatchId) {
       setSelectedMatchId(currentPlayer.matchStats[0].matchId);
     }
@@ -124,7 +123,7 @@ const PlayerStats = () => {
           <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 mb-8">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full" />
-            
+
             <div className="relative flex flex-col lg:flex-row items-start lg:items-center gap-6">
               {/* Player Avatar */}
               <div className="relative flex-shrink-0">
@@ -147,7 +146,7 @@ const PlayerStats = () => {
                   </span>
                 </div>
                 <p className="text-muted-foreground mb-4">{currentPlayer.team}</p>
-                
+
                 {/* Quick Stats */}
                 <div className="flex flex-wrap gap-4">
                   <div className="flex items-center gap-2">
@@ -275,21 +274,11 @@ const PlayerStats = () => {
 
               {/* Football Field - All Events */}
               <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle className="text-lg">Touch Map (All Matches)</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="heatmap-overall"
-                      checked={showHeatmap}
-                      onCheckedChange={setShowHeatmap}
-                    />
-                    <Label htmlFor="heatmap-overall" className="text-sm text-muted-foreground">
-                      Heatmap
-                    </Label>
-                  </div>
                 </CardHeader>
                 <CardContent>
-                  <FootballField events={allEvents} showHeatmap={showHeatmap} />
+                  <FootballField events={allEvents} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -316,6 +305,15 @@ const PlayerStats = () => {
                   </Select>
                 </CardContent>
               </Card>
+
+              {/* Match Timeline */}
+              {selectedMatch && (
+                <Card className="bg-card border-border">
+                  <CardContent className="pt-6">
+                    <MatchTimeline events={selectedMatch.events} />
+                  </CardContent>
+                </Card>
+              )}
 
               {selectedMatch && (
                 <>
@@ -387,23 +385,13 @@ const PlayerStats = () => {
 
                   {/* Match Touch Map */}
                   <Card className="bg-card border-border">
-                    <CardHeader className="flex flex-row items-center justify-between">
+                    <CardHeader>
                       <CardTitle className="text-lg">
                         Touch Map vs {selectedMatch.opponent}
                       </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id="heatmap-match"
-                          checked={showHeatmap}
-                          onCheckedChange={setShowHeatmap}
-                        />
-                        <Label htmlFor="heatmap-match" className="text-sm text-muted-foreground">
-                          Heatmap
-                        </Label>
-                      </div>
                     </CardHeader>
                     <CardContent>
-                      <FootballField events={selectedMatch.events} showHeatmap={showHeatmap} />
+                      <FootballField events={selectedMatch.events} />
                     </CardContent>
                   </Card>
                 </>

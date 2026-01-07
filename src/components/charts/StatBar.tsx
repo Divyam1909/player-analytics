@@ -6,33 +6,28 @@ interface StatBarProps {
   label?: string;
   showValue?: boolean;
   size?: "sm" | "md" | "lg";
-  variant?: "default" | "success" | "warning" | "danger";
+  colorClass?: string; // Custom color class to use instead of auto-calculated
 }
 
-const StatBar = ({ 
-  value, 
-  maxValue = 100, 
-  label, 
+const StatBar = ({
+  value,
+  maxValue = 100,
+  label,
   showValue = true,
   size = "md",
-  variant = "default"
+  colorClass
 }: StatBarProps) => {
   const percentage = Math.min((value / maxValue) * 100, 100);
-  
-  const getVariantColor = () => {
-    if (variant !== "default") {
-      switch (variant) {
-        case "success": return "bg-success";
-        case "warning": return "bg-warning";
-        case "danger": return "bg-destructive";
-      }
-    }
-    
-    if (percentage >= 80) return "bg-success";
-    if (percentage >= 60) return "bg-primary";
-    if (percentage >= 40) return "bg-warning";
+
+  // Auto-calculate color based on value (aligned with getRatingColor thresholds)
+  const getAutoColor = () => {
+    if (value >= 90) return "bg-success";
+    if (value >= 80) return "bg-primary";
+    if (value >= 70) return "bg-warning";
     return "bg-destructive";
   };
+
+  const barColor = colorClass || getAutoColor();
 
   const sizeClasses = {
     sm: "h-1.5",
@@ -60,7 +55,7 @@ const StatBar = ({
         <div
           className={cn(
             "h-full rounded-full transition-all duration-500 ease-out",
-            getVariantColor()
+            barColor
           )}
           style={{ width: `${percentage}%` }}
         />

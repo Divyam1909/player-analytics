@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Player } from "@/types/player";
 import {
   Table,
@@ -11,18 +12,20 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import StatBar from "@/components/charts/StatBar";
-import { ArrowUpDown, ChevronRight, User } from "lucide-react";
+import { ArrowUpDown, ChevronRight, User, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PlayerTableProps {
   players: Player[];
+  onCompare?: (player: Player) => void;
 }
 
 type SortKey = "name" | "jerseyNumber" | "position" | "overallRating" | "passing" | "shooting" | "dribbling" | "defending" | "physical";
 
-const PlayerTable = ({ players }: PlayerTableProps) => {
+const PlayerTable = ({ players, onCompare }: PlayerTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("overallRating");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const navigate = useNavigate();
 
   const sortedPlayers = useMemo(() => {
     return [...players].sort((a, b) => {
@@ -41,7 +44,7 @@ const PlayerTable = ({ players }: PlayerTableProps) => {
       }
 
       if (typeof aValue === "string") {
-        return sortDirection === "asc" 
+        return sortDirection === "asc"
           ? aValue.localeCompare(bValue as string)
           : (bValue as string).localeCompare(aValue);
       }
@@ -57,6 +60,15 @@ const PlayerTable = ({ players }: PlayerTableProps) => {
       setSortKey(key);
       setSortDirection("desc");
     }
+  };
+
+  const handleRowClick = (playerId: string) => {
+    navigate(`/player/${playerId}`);
+  };
+
+  const handleCompareClick = (e: React.MouseEvent, player: Player) => {
+    e.stopPropagation();
+    onCompare?.(player);
   };
 
   const SortableHeader = ({ label, sortKeyValue }: { label: string; sortKeyValue: SortKey }) => (
@@ -113,15 +125,23 @@ const PlayerTable = ({ players }: PlayerTableProps) => {
             <TableHead className="text-center">
               <SortableHeader label="PHY" sortKeyValue="physical" />
             </TableHead>
+            {onCompare && (
+              <TableHead className="w-[80px] text-center">
+                <span className="text-xs font-semibold text-muted-foreground">Compare</span>
+              </TableHead>
+            )}
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedPlayers.map((player) => (
-            <TableRow 
-              key={player.id} 
+          {sortedPlayers.map((player, index) => (
+            <motion.tr
+              key={player.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.03, duration: 0.3 }}
               className="border-border hover:bg-secondary/50 cursor-pointer group"
-              onClick={() => window.location.href = `/player/${player.id}`}
+              onClick={() => handleRowClick(player.id)}
             >
               <TableCell>
                 <div className="flex items-center gap-3">
@@ -191,10 +211,23 @@ const PlayerTable = ({ players }: PlayerTableProps) => {
                   <StatBar value={player.attributes.physical} showValue={false} size="sm" />
                 </div>
               </TableCell>
+              {onCompare && (
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => handleCompareClick(e, player)}
+                    title="Compare player"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </Button>
+                </TableCell>
+              )}
               <TableCell>
                 <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </TableCell>
-            </TableRow>
+            </motion.tr>
           ))}
         </TableBody>
       </Table>
