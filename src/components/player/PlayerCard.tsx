@@ -6,13 +6,45 @@ import { Button } from "@/components/ui/button";
 import StatBar from "@/components/charts/StatBar";
 import { ChevronRight, User, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatFilterMode } from "@/pages/Overview";
 
 interface PlayerCardProps {
   player: Player;
   onCompare?: (player: Player) => void;
+  statFilter?: StatFilterMode;
 }
 
-const PlayerCard = ({ player, onCompare }: PlayerCardProps) => {
+// Helper function to calculate overall stats for a player
+const calculateOverallStats = (player: Player) => {
+  const matches = player.matchStats;
+  if (matches.length === 0) return null;
+
+  return {
+    // Passing stats
+    totalPassing: matches.reduce((a, m) => a + m.stats.passes, 0),
+    crosses: matches.reduce((a, m) => a + m.stats.crosses, 0),
+    assists: matches.reduce((a, m) => a + m.stats.assists, 0),
+
+    // Defensive stats
+    blocks: matches.reduce((a, m) => a + m.stats.blocks, 0),
+    interceptions: matches.reduce((a, m) => a + m.stats.interceptions, 0),
+    clearances: matches.reduce((a, m) => a + m.stats.clearances, 0),
+    recoveries: matches.reduce((a, m) => a + m.stats.recoveries, 0),
+
+    // Attacking stats
+    progressiveRuns: matches.reduce((a, m) => a + m.stats.progressiveRuns, 0),
+    totalDribbles: matches.reduce((a, m) => a + m.stats.dribbles, 0),
+    successfulDribbles: matches.reduce((a, m) => a + m.stats.dribblesSuccessful, 0),
+    aerialDuelsWon: matches.reduce((a, m) => a + m.stats.aerialDuelsWon, 0),
+    shots: matches.reduce((a, m) => a + m.stats.shots, 0),
+    shotsOnTarget: matches.reduce((a, m) => a + m.stats.shotsOnTarget, 0),
+    shotConversionRate: matches.reduce((a, m) => a + m.stats.shots, 0) > 0
+      ? Math.round((matches.reduce((a, m) => a + m.stats.goals, 0) / matches.reduce((a, m) => a + m.stats.shots, 0)) * 100)
+      : 0,
+  };
+};
+
+const PlayerCard = ({ player, onCompare, statFilter = "none" }: PlayerCardProps) => {
   const getRatingColor = (rating: number) => {
     if (rating >= 90) return "text-success";
     if (rating >= 80) return "text-primary";
@@ -25,6 +57,41 @@ const PlayerCard = ({ player, onCompare }: PlayerCardProps) => {
     e.stopPropagation();
     onCompare?.(player);
   };
+
+  const stats = calculateOverallStats(player);
+
+  // Get stats display based on filter
+  const getFilteredStats = () => {
+    if (!stats) return [];
+
+    switch (statFilter) {
+      case "passing":
+        return [
+          { label: "Total Pass", value: stats.totalPassing },
+          { label: "Crosses", value: stats.crosses },
+          { label: "Assists", value: stats.assists },
+        ];
+      case "defending":
+        return [
+          { label: "Blocks", value: stats.blocks },
+          { label: "Intercept", value: stats.interceptions },
+          { label: "Clear", value: stats.clearances },
+          { label: "Recover", value: stats.recoveries },
+        ];
+      case "attacking":
+        return [
+          { label: "Prog Runs", value: stats.progressiveRuns },
+          { label: "Dribbles", value: stats.totalDribbles },
+          { label: "Success", value: stats.successfulDribbles },
+          { label: "Aerial", value: stats.aerialDuelsWon },
+          { label: "Shots", value: stats.shots },
+        ];
+      default:
+        return [];
+    }
+  };
+
+  const filteredStats = getFilteredStats();
 
   return (
     <Link to={`/player/${player.id}`}>
@@ -78,26 +145,64 @@ const PlayerCard = ({ player, onCompare }: PlayerCardProps) => {
               </div>
             </div>
 
-            {/* Attributes */}
-            <div className="mt-4 grid grid-cols-5 gap-3">
-              {Object.entries(player.attributes).map(([key, value]) => (
-                <div key={key} className="text-center">
-                  <div className={cn("text-lg font-bold", getRatingColor(value))}>
-                    {value}
-                  </div>
-                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
-                    {key.slice(0, 3)}
-                  </div>
+            {/* Attributes or Filtered Stats */}
+            {statFilter === "none" ? (
+              <>
+                <div className="mt-4 grid grid-cols-5 gap-3">
+                  {Object.entries(player.attributes).map(([key, value]) => (
+                    <div key={key} className="text-center">
+                      <div className={cn("text-lg font-bold", getRatingColor(value))}>
+                        {value}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                        {key.slice(0, 3)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Stats Bars */}
-            <div className="mt-4 space-y-2">
-              <StatBar value={player.attributes.passing} label="Passing" size="sm" />
-              <StatBar value={player.attributes.shooting} label="Shooting" size="sm" />
-              <StatBar value={player.attributes.dribbling} label="Dribbling" size="sm" />
-            </div>
+                {/* Stats Bars */}
+                <div className="mt-4 space-y-2">
+                  <StatBar value={player.attributes.passing} label="Passing" size="sm" />
+                  <StatBar value={player.attributes.shooting} label="Shooting" size="sm" />
+                  <StatBar value={player.attributes.dribbling} label="Dribbling" size="sm" />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Filtered Stats Grid */}
+                <div className={cn(
+                  "mt-4 grid gap-3",
+                  filteredStats.length <= 3 ? "grid-cols-3" :
+                    filteredStats.length <= 4 ? "grid-cols-4" : "grid-cols-5"
+                )}>
+                  {filteredStats.map((stat) => (
+                    <div key={stat.label} className="text-center">
+                      <div className="text-lg font-bold text-primary">
+                        {stat.value}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                        {stat.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Category Label */}
+                <div className="mt-4 flex justify-center">
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-xs font-medium",
+                    statFilter === "passing" && "bg-primary/20 text-primary",
+                    statFilter === "attacking" && "bg-destructive/20 text-destructive",
+                    statFilter === "defending" && "bg-success/20 text-success"
+                  )}>
+                    {statFilter === "passing" && "Passing Stats"}
+                    {statFilter === "attacking" && "Attacking Stats"}
+                    {statFilter === "defending" && "Defensive Stats"}
+                  </span>
+                </div>
+              </>
+            )}
 
             {/* Actions */}
             <div className="mt-4 flex items-center justify-between">

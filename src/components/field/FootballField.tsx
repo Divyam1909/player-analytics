@@ -577,7 +577,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
                     variant={selectedEvent.success ? "default" : "destructive"}
                     className="text-[10px] h-5"
                   >
-                    {selectedEvent.success ? "✓ Success" : "✗ Failed"}
+                    {selectedEvent.success ? "Success" : "Failed"}
                   </Badge>
                 </div>
               </div>

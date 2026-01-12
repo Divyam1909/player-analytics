@@ -7,16 +7,34 @@ export interface PlayerAttributes {
 }
 
 export interface MatchStats {
+  // Passing stats
   goals: number;
   assists: number;
   passes: number;
   passAccuracy: number;
-  shots: number;
-  shotsOnTarget: number;
+  keyPasses: number;
+  passesInFinalThird: number;
+  passesInBox: number;
+  crosses: number;
+  progressivePassing: number;
+
+  // Defensive stats
+  blocks: number;
   interceptions: number;
+  clearances: number;
+  recoveries: number;
   tackles: number;
+
+  // Attacking stats
+  progressiveRuns: number;
   dribbles: number;
   dribblesSuccessful: number;
+  aerialDuelsWon: number;
+  shots: number;
+  shotsOnTarget: number;
+  ballTouches: number;
+
+  // Physical stats
   distanceCovered: number;
   sprints: number;
 }
@@ -29,12 +47,19 @@ export interface MatchEvent {
   targetY: number;
   success: boolean;
   minute: number;
+  // Advanced analytics properties
+  passTarget?: string; // Target player ID for passing network
+  isBigChance?: boolean; // Analyst-marked big chance
+  isGoal?: boolean; // Whether shot resulted in goal
+  xG?: number; // Expected goals value for shots
+  shotOutcome?: 'missed' | 'saved' | 'blocked' | 'goal'; // Detailed shot outcome
 }
 
 export interface PlayerMatch {
   matchId: string;
   opponent: string;
   date: string;
+  minutesPlayed: number;
   stats: MatchStats;
   events: MatchEvent[];
 }

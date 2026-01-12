@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -21,6 +21,7 @@ import {
     Pause,
     SkipForward,
     RotateCcw,
+    CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import playersData from "@/data/players.json";
@@ -123,21 +124,23 @@ const TeamAnalytics = () => {
 
     // Aggregate team stats
     const teamStats = useMemo(() => {
-        const totalGoals = players.reduce(
-            (acc, p) => acc + p.matchStats.reduce((a, m) => a + m.stats.goals, 0),
-            0
+        const relevantStats = players.flatMap(p =>
+            p.matchStats.filter(m => selectedMatch === "all" || m.matchId === selectedMatch)
         );
-        const totalAssists = players.reduce(
-            (acc, p) => acc + p.matchStats.reduce((a, m) => a + m.stats.assists, 0),
-            0
-        );
+
+        const totalGoals = relevantStats.reduce((a, m) => a + m.stats.goals, 0);
+        const totalAssists = relevantStats.reduce((a, m) => a + m.stats.assists, 0);
+
         const avgRating = Math.round(
             players.reduce((acc, p) => acc + p.overallRating, 0) / players.length
         );
-        const totalMatches = Math.max(...players.map((p) => p.matchStats.length));
+
+        const totalMatches = selectedMatch === "all"
+            ? Math.max(...players.map((p) => p.matchStats.length))
+            : 1;
 
         return { totalGoals, totalAssists, avgRating, totalMatches };
-    }, [players]);
+    }, [players, selectedMatch]);
 
     // Position distribution for pie chart
     const positionData = useMemo(() => {
@@ -189,8 +192,13 @@ const TeamAnalytics = () => {
         }));
     }, [players]);
 
-    // Generate dynamic formation positions for ALL players
-    const formationPlayers = useMemo(() => generatePositions(players), [players]);
+    // Generate dynamic formation positions
+    const formationPlayers = useMemo(() => {
+        const activePlayers = selectedMatch === "all"
+            ? players
+            : players.filter(p => p.matchStats.some(m => m.matchId === selectedMatch));
+        return generatePositions(activePlayers);
+    }, [players, selectedMatch]);
 
     // Get all goal moments (shots that were successful)
     const goalMoments = useMemo(() => {
@@ -237,8 +245,14 @@ const TeamAnalytics = () => {
         setIsPlaying(false);
     };
 
+    // Reset index when match changes
+    useEffect(() => {
+        setCurrentGoalIndex(0);
+        setIsPlaying(false);
+    }, [selectedMatch]);
+
     // Auto-play effect
-    useState(() => {
+    useEffect(() => {
         if (isPlaying && filteredGoals.length > 0) {
             const interval = setInterval(() => {
                 setCurrentGoalIndex((prev) => {
@@ -252,7 +266,7 @@ const TeamAnalytics = () => {
             }, 2000);
             return () => clearInterval(interval);
         }
-    });
+    }, [isPlaying, filteredGoals.length]);
 
     const statCards = [
         { label: "Total Players", value: players.length, icon: Users, color: "text-primary" },
@@ -280,6 +294,69 @@ const TeamAnalytics = () => {
                         <p className="text-muted-foreground">
                             Comprehensive overview of your team's collective performance
                         </p>
+                    </motion.div>
+
+                    {/* Match Selector */}
+                    <motion.div
+                        className="mb-8"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                    >
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {/* All Matches Option */}
+                            <motion.div
+                                onClick={() => setSelectedMatch("all")}
+                                className={cn(
+                                    "relative p-3 rounded-lg border cursor-pointer transition-all duration-200",
+                                    selectedMatch === "all"
+                                        ? "bg-primary/10 border-primary shadow-md"
+                                        : "bg-secondary/50 border-border hover:border-primary/50 hover:bg-secondary"
+                                )}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="text-sm font-bold">All Matches</span>
+                                    {selectedMatch === "all" && (
+                                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-2">
+                                    <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Season Overview</span>
+                                </div>
+                            </motion.div>
+
+                            {/* Individual Matches */}
+                            {matches.map((match) => (
+                                <motion.div
+                                    key={match.id}
+                                    onClick={() => setSelectedMatch(match.id)}
+                                    className={cn(
+                                        "relative p-3 rounded-lg border cursor-pointer transition-all duration-200",
+                                        selectedMatch === match.id
+                                            ? "bg-primary/10 border-primary shadow-md"
+                                            : "bg-secondary/50 border-border hover:border-primary/50 hover:bg-secondary"
+                                    )}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="text-sm font-bold truncate pr-2">vs {match.opponent}</span>
+                                        {selectedMatch === match.id && (
+                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-2">
+                                        <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
+                                        <span className="text-xs text-muted-foreground">
+                                            {new Date(match.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </span>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
                     </motion.div>
 
                     {/* Stat Cards */}
@@ -520,19 +597,7 @@ const TeamAnalytics = () => {
                                     Goal Replay ({filteredGoals.length} Goals)
                                 </CardTitle>
                                 <div className="flex items-center gap-3">
-                                    <Select value={selectedMatch} onValueChange={setSelectedMatch}>
-                                        <SelectTrigger className="w-48 bg-secondary border-border">
-                                            <SelectValue placeholder="Select match" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-popover border-border">
-                                            <SelectItem value="all">All Matches</SelectItem>
-                                            {matches.map((m) => (
-                                                <SelectItem key={m.id} value={m.id}>
-                                                    vs {m.opponent}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    {/* Removed Select dropdown as we have global selector now */}
                                     <div className="flex items-center gap-1">
                                         <Button
                                             variant="outline"
@@ -636,7 +701,7 @@ const TeamAnalytics = () => {
                                                         animate={{ scale: 1, y: 0 }}
                                                         transition={{ delay: 0.6, type: "spring" }}
                                                     >
-                                                        <div className="text-2xl">⚽</div>
+                                                        <div className="w-5 h-5 rounded-full bg-white border-2 border-primary shadow-sm" />
                                                     </motion.div>
                                                 </motion.div>
                                             )}

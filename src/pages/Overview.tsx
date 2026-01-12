@@ -8,17 +8,27 @@ import CompareModal from "@/components/player/CompareModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   LayoutGrid,
   List,
   Users,
-  TrendingUp,
+  CalendarDays,
   Target,
   Zap,
   Search,
   ArrowLeftRight,
-  X
+  X,
+  Filter
 } from "lucide-react";
 import playersData from "@/data/players.json";
+
+export type StatFilterMode = "none" | "passing" | "attacking" | "defending";
 
 // Animation variants
 const containerVariants = {
@@ -41,6 +51,7 @@ const Overview = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Player | undefined>();
+  const [statFilter, setStatFilter] = useState<StatFilterMode>("none");
 
   const players = playersData.players as Player[];
 
@@ -59,9 +70,11 @@ const Overview = () => {
   }, [players, searchQuery]);
 
   // Calculate overview stats
-  const avgRating = Math.round(
-    players.reduce((acc, p) => acc + p.overallRating, 0) / players.length
-  );
+  const totalMatches = players.reduce((acc, p) => {
+    // Get unique match IDs to avoid counting duplicates
+    return acc + p.matchStats.length;
+  }, 0) / players.length; // Average matches per player, then multiply by typical team size
+  const teamMatches = Math.max(...players.map(p => p.matchStats.length)); // Use max as team's total matches
   const topScorer = players.reduce((prev, curr) => {
     const prevGoals = prev.matchStats.reduce((a, m) => a + m.stats.goals, 0);
     const currGoals = curr.matchStats.reduce((a, m) => a + m.stats.goals, 0);
@@ -81,9 +94,9 @@ const Overview = () => {
       color: "text-primary",
     },
     {
-      label: "Avg Rating",
-      value: avgRating,
-      icon: TrendingUp,
+      label: "Total Matches",
+      value: teamMatches,
+      icon: CalendarDays,
       color: "text-success",
     },
     {
@@ -186,6 +199,22 @@ const Overview = () => {
             </h2>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+              {/* Stat Filter Dropdown */}
+              <div className="relative">
+                <Select value={statFilter} onValueChange={(value: StatFilterMode) => setStatFilter(value)}>
+                  <SelectTrigger className="w-[160px] bg-secondary border-border">
+                    <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Filter Stats" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="none">All Stats</SelectItem>
+                    <SelectItem value="passing">Passing</SelectItem>
+                    <SelectItem value="attacking">Attacking</SelectItem>
+                    <SelectItem value="defending">Defending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Search Input */}
               <div className="relative flex-1 md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -259,7 +288,7 @@ const Overview = () => {
                 </p>
               </motion.div>
             ) : viewMode === "table" ? (
-              <PlayerTable players={filteredPlayers} onCompare={handleCompare} />
+              <PlayerTable players={filteredPlayers} onCompare={handleCompare} statFilter={statFilter} />
             ) : (
               <motion.div
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
@@ -269,7 +298,7 @@ const Overview = () => {
               >
                 {filteredPlayers.map((player) => (
                   <motion.div key={player.id} variants={itemVariants}>
-                    <PlayerCard player={player} onCompare={handleCompare} />
+                    <PlayerCard player={player} onCompare={handleCompare} statFilter={statFilter} />
                   </motion.div>
                 ))}
               </motion.div>

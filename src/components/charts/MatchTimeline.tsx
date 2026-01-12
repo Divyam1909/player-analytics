@@ -19,31 +19,31 @@ const EVENT_CONFIG: Record<
     { icon: string; label: string; color: string; bgColor: string }
 > = {
     pass: {
-        icon: "🎯",
+        icon: "P",
         label: "Pass",
         color: "text-primary",
         bgColor: "bg-primary/20",
     },
     shot: {
-        icon: "⚽",
+        icon: "S",
         label: "Shot",
         color: "text-destructive",
         bgColor: "bg-destructive/20",
     },
     dribble: {
-        icon: "💨",
+        icon: "D",
         label: "Dribble",
         color: "text-warning",
         bgColor: "bg-warning/20",
     },
     interception: {
-        icon: "🛡️",
+        icon: "I",
         label: "Interception",
         color: "text-success",
         bgColor: "bg-success/20",
     },
     tackle: {
-        icon: "🦶",
+        icon: "T",
         label: "Tackle",
         color: "text-chart-4",
         bgColor: "bg-chart-4/20",
@@ -111,9 +111,9 @@ const MatchTimeline = ({ events, className }: MatchTimelineProps) => {
             </div>
 
             {/* Timeline Bar */}
-            <div className="relative">
+            <div className="relative pt-4 pb-2">
                 {/* Background track */}
-                <div className="h-12 bg-secondary rounded-lg relative overflow-hidden">
+                <div className="h-10 bg-secondary rounded-lg relative overflow-hidden">
                     {/* Gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent" />
 
@@ -131,9 +131,11 @@ const MatchTimeline = ({ events, className }: MatchTimelineProps) => {
                             </span>
                         ))}
                     </div>
+                </div>
 
-                    {/* Event dots */}
-                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
+                {/* Event dots - positioned outside overflow container */}
+                <div className="absolute inset-x-0 top-4 h-10 pointer-events-none">
+                    <div className="relative h-full">
                         {significantMinutes.map((minute) => {
                             const minuteEvents = significantByMinute.get(minute) || [];
                             const leftPercent = (minute / 90) * 100;
@@ -141,10 +143,10 @@ const MatchTimeline = ({ events, className }: MatchTimelineProps) => {
                             return (
                                 <div
                                     key={minute}
-                                    className="absolute flex flex-col items-center gap-0.5"
+                                    className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 pointer-events-auto"
                                     style={{
                                         left: `${leftPercent}%`,
-                                        transform: "translateX(-50%)",
+                                        transform: "translateX(-50%) translateY(-50%)",
                                     }}
                                 >
                                     {minuteEvents.map((event, idx) => {
@@ -154,11 +156,12 @@ const MatchTimeline = ({ events, className }: MatchTimelineProps) => {
                                                 <TooltipTrigger asChild>
                                                     <motion.div
                                                         className={cn(
-                                                            "w-6 h-6 rounded-full flex items-center justify-center text-xs cursor-pointer",
-                                                            "border-2 border-background shadow-sm",
+                                                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer",
+                                                            "border-2 border-background shadow-md",
                                                             config.bgColor,
+                                                            config.color,
                                                             event.success
-                                                                ? "ring-1 ring-success/50"
+                                                                ? "ring-2 ring-success/50"
                                                                 : "opacity-70"
                                                         )}
                                                         initial={{ scale: 0, opacity: 0 }}
@@ -202,21 +205,27 @@ const MatchTimeline = ({ events, className }: MatchTimelineProps) => {
                         })}
                     </div>
                 </div>
+            </div>
 
-                {/* Period labels */}
-                <div className="flex justify-between mt-1 px-2">
-                    <span className="text-xs text-muted-foreground">First Half</span>
-                    <span className="text-xs text-muted-foreground">Second Half</span>
-                </div>
+            {/* Period labels */}
+            <div className="flex justify-between mt-1 px-2">
+                <span className="text-xs text-muted-foreground">First Half</span>
+                <span className="text-xs text-muted-foreground">Second Half</span>
             </div>
 
             {/* Legend */}
-            <div className="flex flex-wrap gap-3 justify-center pt-2">
+            <div className="flex flex-wrap gap-4 justify-center pt-2">
                 {Object.entries(EVENT_CONFIG)
                     .filter(([key]) => key !== "pass")
                     .map(([type, config]) => (
                         <div key={type} className="flex items-center gap-1.5">
-                            <span className="text-sm">{config.icon}</span>
+                            <span className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                config.bgColor,
+                                config.color
+                            )}>
+                                {config.icon}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                                 {config.label}
                             </span>
@@ -228,3 +237,4 @@ const MatchTimeline = ({ events, className }: MatchTimelineProps) => {
 };
 
 export default MatchTimeline;
+

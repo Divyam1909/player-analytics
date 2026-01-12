@@ -24,22 +24,22 @@ const RadarChart = ({ attributes, size = "md" }: RadarChartProps) => {
   return (
     <div style={{ width: sizeMap[size].width, height: sizeMap[size].height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <RechartsRadarChart data={data} cx="50%" cy="50%" outerRadius="70%">
-          <PolarGrid 
-            stroke="hsl(var(--border))" 
+        <RechartsRadarChart data={data} cx="50%" cy="50%" outerRadius="55%">
+          <PolarGrid
+            stroke="hsl(var(--border))"
             strokeOpacity={0.5}
           />
-          <PolarAngleAxis 
-            dataKey="attribute" 
-            tick={{ 
-              fill: "hsl(var(--muted-foreground))", 
+          <PolarAngleAxis
+            dataKey="attribute"
+            tick={{
+              fill: "hsl(var(--muted-foreground))",
               fontSize: size === "sm" ? 10 : 12,
               fontWeight: 500
             }}
           />
-          <PolarRadiusAxis 
-            angle={90} 
-            domain={[0, 100]} 
+          <PolarRadiusAxis
+            angle={90}
+            domain={[0, 100]}
             tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
             tickCount={5}
           />
