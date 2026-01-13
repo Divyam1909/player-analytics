@@ -94,11 +94,13 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
         ];
       case "attacking":
         return [
-          { label: "Goals", key: "goals", suffix: "" },
+          { label: "Prog Runs", key: "progressiveRuns", suffix: "" },
+          { label: "Dribbles", key: "totalDribbles", suffix: "" },
+          { label: "Succ Drib", key: "successfulDribbles", suffix: "" },
+          { label: "Aerial", key: "aerialDuelsWon", suffix: "" },
           { label: "Shots", key: "shots", suffix: "" },
           { label: "On Target", key: "shotsOnTarget", suffix: "" },
           { label: "Conv %", key: "shotConversionRate", suffix: "%" },
-          { label: "Dribbles", key: "totalDribbles", suffix: "" },
         ];
       default:
         return [

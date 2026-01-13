@@ -85,6 +85,8 @@ const PlayerCard = ({ player, onCompare, statFilter = "none" }: PlayerCardProps)
           { label: "Success", value: stats.successfulDribbles },
           { label: "Aerial", value: stats.aerialDuelsWon },
           { label: "Shots", value: stats.shots },
+          { label: "On Target", value: stats.shotsOnTarget },
+          { label: "Conv %", value: `${stats.shotConversionRate}%` },
         ];
       default:
         return [];

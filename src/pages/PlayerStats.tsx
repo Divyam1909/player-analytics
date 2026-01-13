@@ -295,17 +295,19 @@ const PlayerStats = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
                         { label: "Total Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passes, 0) },
-                        { label: "Accuracy", value: `${Math.round(currentPlayer.matchStats.reduce((a, m) => a + m.stats.passAccuracy, 0) / currentPlayer.matchStats.length)}%` },
+                        { label: "Pass Accuracy", value: `${Math.round(currentPlayer.matchStats.reduce((a, m) => a + m.stats.passAccuracy, 0) / currentPlayer.matchStats.length)}%` },
                         { label: "Key Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.keyPasses, 0) },
-                        { label: "Assists", value: aggregatedStats?.assists || 0 },
+                        { label: "Final Third", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passesInFinalThird, 0) },
+                        { label: "In Box", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passesInBox, 0) },
                         { label: "Crosses", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.crosses, 0) },
-                        { label: "Prog. Passing", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressivePassing, 0) },
+                        { label: "Assists", value: aggregatedStats?.assists || 0 },
+                        { label: "Prog. Pass", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressivePassing, 0) },
                       ].map((stat) => (
-                        <div key={stat.label} className="text-center p-2 rounded bg-secondary/50">
-                          <p className="text-lg font-bold text-primary">{stat.value}</p>
+                        <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
+                          <p className="text-xl font-bold text-primary">{stat.value}</p>
                           <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
                         </div>
                       ))}
@@ -328,11 +330,9 @@ const PlayerStats = () => {
                         { label: "Interceptions", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.interceptions, 0) },
                         { label: "Clearances", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.clearances, 0) },
                         { label: "Recoveries", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.recoveries, 0) },
-                        { label: "Tackles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.tackles, 0) },
-                        { label: "Aerial Duels", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.aerialDuelsWon, 0) },
                       ].map((stat) => (
-                        <div key={stat.label} className="text-center p-2 rounded bg-secondary/50">
-                          <p className="text-lg font-bold text-success">{stat.value}</p>
+                        <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
+                          <p className="text-xl font-bold text-success">{stat.value}</p>
                           <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
                         </div>
                       ))}
@@ -349,17 +349,19 @@ const PlayerStats = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { label: "Goals", value: aggregatedStats?.goals || 0 },
-                        { label: "Shots", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0) },
-                        { label: "On Target", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shotsOnTarget, 0) },
-                        { label: "Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribbles, 0) },
-                        { label: "Successful", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribblesSuccessful, 0) },
                         { label: "Prog. Runs", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressiveRuns, 0) },
+                        { label: "Total Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribbles, 0) },
+                        { label: "Successful Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribblesSuccessful, 0) },
+                        { label: "Aerial Duels Won", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.aerialDuelsWon, 0) },
+                        { label: "Shots", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0) },
+                        { label: "Shots on Target", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shotsOnTarget, 0) },
+                        { label: "Shot Conv. Rate", value: (() => { const shots = currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0); const goals = aggregatedStats?.goals || 0; return shots > 0 ? `${Math.round((goals / shots) * 100)}%` : '0%'; })() },
+                        { label: "Ball Touches", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.ballTouches, 0) },
                       ].map((stat) => (
-                        <div key={stat.label} className="text-center p-2 rounded bg-secondary/50">
-                          <p className="text-lg font-bold text-destructive">{stat.value}</p>
+                        <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
+                          <p className="text-xl font-bold text-destructive">{stat.value}</p>
                           <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
                         </div>
                       ))}

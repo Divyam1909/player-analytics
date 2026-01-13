@@ -61,13 +61,15 @@ const generatePositions = (players: Player[]) => {
         groups[pos].push(p);
     });
 
-    // Position zones (y coordinate ranges)
+    // Position zones (y coordinate ranges for half-field, viewBox height is 60)
+    // Goal is at top (y=0), so goalkeeper is closest to goal, forwards are furthest
+    // Leave padding at bottom for player labels
     const zones: Record<string, { y: number; order: number }> = {
-        Goalkeeper: { y: 92, order: 5 },
-        Defender: { y: 75, order: 4 },
-        Midfielder: { y: 50, order: 3 },
-        Winger: { y: 35, order: 2 },
-        Forward: { y: 18, order: 1 },
+        Goalkeeper: { y: 8, order: 1 },
+        Defender: { y: 18, order: 2 },
+        Midfielder: { y: 28, order: 3 },
+        Winger: { y: 38, order: 4 },
+        Forward: { y: 48, order: 5 },
     };
 
     const result: { player: Player; position: { x: number; y: number }; color: string }[] = [];
@@ -424,32 +426,28 @@ const TeamAnalytics = () => {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="relative aspect-[4/3] bg-gradient-to-b from-emerald-900/40 to-emerald-800/40 rounded-xl border border-emerald-700/30 overflow-hidden">
-                                        {/* Field markings */}
+                                    <div className="relative aspect-[16/10] bg-gradient-to-b from-emerald-900/40 to-emerald-800/40 rounded-xl border border-emerald-700/30 overflow-hidden">
+                                        {/* Field markings - Half pitch */}
                                         <svg
-                                            viewBox="0 0 100 100"
+                                            viewBox="0 0 100 60"
                                             className="absolute inset-0 w-full h-full"
                                             preserveAspectRatio="xMidYMid meet"
                                         >
-                                            {/* Center line */}
-                                            <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" />
-                                            {/* Center circle */}
-                                            <circle cx="50" cy="50" r="10" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            <circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.3)" />
-                                            {/* Penalty areas */}
-                                            <rect x="25" y="0" width="50" height="14" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            <rect x="25" y="86" width="50" height="14" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            {/* Goal areas */}
-                                            <rect x="37" y="0" width="26" height="6" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            <rect x="37" y="94" width="26" height="6" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            {/* Goals */}
-                                            <rect x="42" y="0" width="16" height="2" fill="rgba(255,255,255,0.1)" />
-                                            <rect x="42" y="98" width="16" height="2" fill="rgba(255,255,255,0.1)" />
+                                            {/* Penalty area */}
+                                            <rect x="25" y="0" width="50" height="18" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" fill="none" />
+                                            {/* Goal area */}
+                                            <rect x="37" y="0" width="26" height="8" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" fill="none" />
+                                            {/* Goal */}
+                                            <rect x="40" y="0" width="20" height="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="0.3" />
+                                            {/* Penalty arc */}
+                                            <path d="M 32 18 A 12 12 0 0 0 68 18" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
+                                            {/* Penalty spot */}
+                                            <circle cx="50" cy="14" r="0.8" fill="rgba(255,255,255,0.4)" />
+                                            {/* Halfway line (at bottom) */}
+                                            <line x1="0" y1="60" x2="100" y2="60" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" />
                                             {/* Corner arcs */}
                                             <path d="M 0 3 A 3 3 0 0 1 3 0" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
                                             <path d="M 97 0 A 3 3 0 0 1 100 3" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            <path d="M 0 97 A 3 3 0 0 0 3 100" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            <path d="M 100 97 A 3 3 0 0 1 97 100" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
                                         </svg>
 
                                         {/* Players - ALL visible now */}
@@ -458,7 +456,7 @@ const TeamAnalytics = () => {
                                                 key={player.id}
                                                 to={`/player/${player.id}`}
                                                 className="absolute transform -translate-x-1/2 -translate-y-1/2 group/player z-10"
-                                                style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                                                style={{ left: `${position.x}%`, top: `${(position.y / 60) * 100}%` }}
                                             >
                                                 <motion.div
                                                     className="flex flex-col items-center"
