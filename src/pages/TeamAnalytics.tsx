@@ -105,9 +105,14 @@ interface GoalMoment {
     event: MatchEvent;
 }
 
-const TeamAnalytics = () => {
+interface TeamAnalyticsProps {
+    embedded?: boolean;
+    defaultMatchId?: string;
+}
+
+const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps) => {
     const players = playersData.players as Player[];
-    const [selectedMatch, setSelectedMatch] = useState<string>("all");
+    const [selectedMatch, setSelectedMatch] = useState<string>(defaultMatchId || "all");
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
 
@@ -278,10 +283,10 @@ const TeamAnalytics = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-background">
-            <Header />
+        <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+            {!embedded && <Header />}
 
-            <main className="pt-24 pb-12 px-6">
+            <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6"}>
                 <div className="container mx-auto">
                     {/* Page Header */}
                     <motion.div

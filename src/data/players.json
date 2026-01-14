@@ -52,7 +52,8 @@
               "targetX": 65,
               "targetY": 25,
               "success": true,
-              "minute": 12
+              "minute": 12,
+              "passTarget": "Ego"
             },
             {
               "type": "shot",
@@ -79,7 +80,8 @@
               "targetX": 85,
               "targetY": 50,
               "success": true,
-              "minute": 45
+              "minute": 45,
+              "passTarget": "Kunigami"
             },
             {
               "type": "shot",
@@ -139,7 +141,8 @@
               "targetX": 55,
               "targetY": 40,
               "success": true,
-              "minute": 8
+              "minute": 8,
+              "passTarget": "Sae"
             },
             {
               "type": "pass",
@@ -148,7 +151,8 @@
               "targetX": 80,
               "targetY": 55,
               "success": true,
-              "minute": 22
+              "minute": 22,
+              "passTarget": "Kunigami"
             },
             {
               "type": "shot",
@@ -252,7 +256,8 @@
               "targetX": 88,
               "targetY": 50,
               "success": true,
-              "minute": 33
+              "minute": 33,
+              "passTarget": "Isagi"
             },
             {
               "type": "shot",
@@ -330,7 +335,8 @@
               "targetX": 70,
               "targetY": 40,
               "success": true,
-              "minute": 44
+              "minute": 44,
+              "passTarget": "Nagi"
             },
             {
               "type": "shot",
@@ -425,7 +431,8 @@
               "targetX": 75,
               "targetY": 50,
               "success": true,
-              "minute": 82
+              "minute": 82,
+              "passTarget": "Kunigami"
             }
           ],
           "minutesPlayed": 68
@@ -476,7 +483,8 @@
               "targetX": 70,
               "targetY": 45,
               "success": true,
-              "minute": 53
+              "minute": 53,
+              "passTarget": "Ego"
             },
             {
               "type": "tackle",
@@ -562,7 +570,8 @@
               "targetX": 90,
               "targetY": 55,
               "success": true,
-              "minute": 58
+              "minute": 58,
+              "passTarget": "Bachira"
             },
             {
               "type": "shot",
@@ -708,7 +717,8 @@
               "targetX": 85,
               "targetY": 50,
               "success": true,
-              "minute": 24
+              "minute": 24,
+              "passTarget": "Nagi"
             },
             {
               "type": "shot",
@@ -777,7 +787,8 @@
               "targetX": 80,
               "targetY": 45,
               "success": true,
-              "minute": 31
+              "minute": 31,
+              "passTarget": "Bachira"
             },
             {
               "type": "pass",
@@ -786,7 +797,8 @@
               "targetX": 88,
               "targetY": 50,
               "success": true,
-              "minute": 59
+              "minute": 59,
+              "passTarget": "Sae"
             },
             {
               "type": "interception",
@@ -950,7 +962,8 @@
               "targetX": 90,
               "targetY": 55,
               "success": true,
-              "minute": 63
+              "minute": 63,
+              "passTarget": "Chigiri"
             },
             {
               "type": "dribble",
@@ -1036,7 +1049,8 @@
               "targetX": 50,
               "targetY": 45,
               "success": true,
-              "minute": 45
+              "minute": 45,
+              "passTarget": "Chigiri"
             },
             {
               "type": "tackle",
@@ -1105,7 +1119,8 @@
               "targetX": 60,
               "targetY": 55,
               "success": true,
-              "minute": 56
+              "minute": 56,
+              "passTarget": "Nagi"
             },
             {
               "type": "tackle",
@@ -1173,7 +1188,8 @@
               "targetX": 75,
               "targetY": 45,
               "success": true,
-              "minute": 10
+              "minute": 10,
+              "passTarget": "Chigiri"
             },
             {
               "type": "pass",
@@ -1182,7 +1198,8 @@
               "targetX": 85,
               "targetY": 50,
               "success": true,
-              "minute": 25
+              "minute": 25,
+              "passTarget": "Nagi"
             },
             {
               "type": "shot",
@@ -1200,7 +1217,8 @@
               "targetX": 82,
               "targetY": 48,
               "success": true,
-              "minute": 65
+              "minute": 65,
+              "passTarget": "Nagi"
             },
             {
               "type": "dribble",
@@ -1251,7 +1269,8 @@
               "targetX": 70,
               "targetY": 42,
               "success": true,
-              "minute": 8
+              "minute": 8,
+              "passTarget": "Ego"
             },
             {
               "type": "pass",
@@ -1260,7 +1279,8 @@
               "targetX": 80,
               "targetY": 55,
               "success": true,
-              "minute": 32
+              "minute": 32,
+              "passTarget": "Isagi"
             },
             {
               "type": "dribble",
@@ -1278,7 +1298,8 @@
               "targetX": 88,
               "targetY": 48,
               "success": true,
-              "minute": 70
+              "minute": 70,
+              "passTarget": "Nagi"
             }
           ],
           "minutesPlayed": 90

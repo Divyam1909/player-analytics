@@ -46,7 +46,11 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
-const Overview = () => {
+interface OverviewProps {
+  embedded?: boolean;
+}
+
+const Overview = ({ embedded = false }: OverviewProps) => {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCompareOpen, setIsCompareOpen] = useState(false);
@@ -121,10 +125,10 @@ const Overview = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+      {!embedded && <Header />}
 
-      <main className="pt-24 pb-12 px-6">
+      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6"}>
         <div className="container mx-auto">
           {/* Page Header */}
           <motion.div

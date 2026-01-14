@@ -1,5 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
-import { Activity, Users, BarChart3, Moon, Sun, Monitor, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BarChart3, Moon, Sun, Monitor, User, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
@@ -12,14 +12,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 const Header = () => {
-  const location = useLocation();
   const { theme, setTheme, resolvedTheme } = useTheme();
-
-  const navItems = [
-    { path: "/", label: "Overview", icon: Users },
-    { path: "/player", label: "Player Stats", icon: Activity },
-    { path: "/team", label: "Team Stats", icon: Shield },
-  ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -47,43 +40,44 @@ const Header = () => {
             </div>
           </Link>
 
-          {/* Navigation */}
-          <nav className="flex items-center gap-1">
-            {navItems.map((item) => {
-              const isActive = item.path === "/"
-                ? location.pathname === "/"
-                : location.pathname.startsWith(item.path);
-              const Icon = item.icon;
+          {/* Right Side Icons */}
+          <div className="flex items-center gap-1">
+            {/* Profile */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
+                  <User className="w-7 h-7" />
+                  <span className="sr-only">Profile</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover border-border">
+                <div className="px-4 py-3 text-center text-muted-foreground">
+                  <p className="text-sm">Profile settings</p>
+                  <p className="text-xs">Coming soon</p>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                    isActive
-                      ? "text-primary bg-primary/10 border border-primary/30"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {item.label}
-                  {isActive && (
-                    <motion.div
-                      className="absolute -bottom-[9px] left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full"
-                      layoutId="activeTab"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                </Link>
-              );
-            })}
+            {/* Settings */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
+                  <Settings className="w-7 h-7" />
+                  <span className="sr-only">Settings</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover border-border">
+                <div className="px-4 py-3 text-center text-muted-foreground">
+                  <p className="text-sm">App settings</p>
+                  <p className="text-xs">Coming soon</p>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Theme Toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="ml-2">
+                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={resolvedTheme}
@@ -93,9 +87,9 @@ const Header = () => {
                       transition={{ duration: 0.2 }}
                     >
                       {resolvedTheme === "dark" ? (
-                        <Moon className="w-5 h-5" />
+                        <Moon className="w-7 h-7" />
                       ) : (
-                        <Sun className="w-5 h-5" />
+                        <Sun className="w-7 h-7" />
                       )}
                     </motion.div>
                   </AnimatePresence>
@@ -126,7 +120,7 @@ const Header = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </nav>
+          </div>
         </div>
       </div>
     </header>

@@ -12,14 +12,19 @@ import ShotMap from "@/components/analytics/ShotMap";
 import { Player, PlayerMatch } from "@/types/player";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, User, Target, Footprints, Flame, Activity, ArrowRightLeft, Crosshair, CalendarDays } from "lucide-react";
+import { ArrowLeft, User, Target, Footprints, Flame, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import playersData from "@/data/players.json";
 
 // Valid tab values
 const VALID_TABS = ["overall", "match", "passing", "shots"];
 
-const PlayerStats = () => {
+interface PlayerStatsProps {
+  embedded?: boolean;
+  defaultMatchId?: string;
+}
+
+const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -32,6 +37,7 @@ const PlayerStats = () => {
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
+  const [matchSearch, setMatchSearch] = useState<string>("");
 
   const players = playersData.players as Player[];
   const player = players.find((p) => p.id === id);
@@ -41,10 +47,12 @@ const PlayerStats = () => {
 
   // Set default selected match - using useEffect for side effects
   useEffect(() => {
-    if (currentPlayer && currentPlayer.matchStats.length > 0 && !selectedMatchId) {
+    if (defaultMatchId) {
+      setSelectedMatchId(defaultMatchId);
+    } else if (currentPlayer && currentPlayer.matchStats.length > 0 && !selectedMatchId) {
       setSelectedMatchId(currentPlayer.matchStats[0].matchId);
     }
-  }, [currentPlayer, selectedMatchId]);
+  }, [currentPlayer, selectedMatchId, defaultMatchId]);
 
   const selectedMatch = currentPlayer?.matchStats.find(
     (m) => m.matchId === selectedMatchId
@@ -102,19 +110,21 @@ const PlayerStats = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+      {!embedded && <Header />}
 
-      <main className="pt-24 pb-12 px-6">
+      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6"}>
         <div className="container mx-auto">
           {/* Back Button */}
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Overview
-          </Link>
+          {!embedded && (
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Overview
+            </Link>
+          )}
 
           {/* Player Header */}
           <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 mb-8">
@@ -401,63 +411,68 @@ const PlayerStats = () => {
 
             {/* Match-Wise Stats Tab */}
             <TabsContent value="match" className="space-y-6">
-              {/* Match Selector - Table Style */}
+              {/* Match Selector - Compact List Style */}
               <Card className="bg-card border-border">
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Select Match</CardTitle>
+                  {/* Search Bar */}
+                  <div className="relative mt-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search by opponent..."
+                      value={matchSearch}
+                      onChange={(e) => setMatchSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 text-sm rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {currentPlayer.matchStats.map((match) => (
-                      <motion.div
-                        key={match.matchId}
-                        onClick={() => setSelectedMatchId(match.matchId)}
-                        className={cn(
-                          "relative p-4 rounded-lg border cursor-pointer transition-all duration-200",
-                          selectedMatchId === match.matchId
-                            ? "bg-primary/10 border-primary shadow-md"
-                            : "bg-secondary/50 border-border hover:border-primary/50 hover:bg-secondary"
-                        )}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        {/* Selection Indicator */}
-                        {selectedMatchId === match.matchId && (
-                          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary" />
-                        )}
-
-                        {/* Match Info */}
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-semibold text-foreground">vs {match.opponent}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(match.date).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
+                  <div className="max-h-64 overflow-y-auto space-y-1">
+                    {currentPlayer.matchStats
+                      .filter((match) =>
+                        match.opponent.toLowerCase().includes(matchSearch.toLowerCase())
+                      )
+                      .map((match) => (
+                        <motion.div
+                          key={match.matchId}
+                          onClick={() => setSelectedMatchId(match.matchId)}
+                          className={cn(
+                            "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-all duration-200",
+                            selectedMatchId === match.matchId
+                              ? "bg-primary/15 border-l-2 border-primary"
+                              : "hover:bg-secondary/80"
+                          )}
+                          whileHover={{ x: 4 }}
+                          whileTap={{ scale: 0.99 }}
+                        >
+                          <div className="flex items-center gap-3">
+                            {selectedMatchId === match.matchId && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                            )}
+                            <span className={cn(
+                              "font-medium text-sm",
+                              selectedMatchId === match.matchId ? "text-primary" : "text-foreground"
+                            )}>
+                              vs {match.opponent}
+                            </span>
                           </div>
-                        </div>
-
-                        {/* Quick Stats */}
-                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
-                          <div className="flex items-center gap-1">
-                            <Target className="w-3 h-3 text-destructive" />
-                            <span className="text-sm font-medium">{match.stats.goals}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Footprints className="w-3 h-3 text-warning" />
-                            <span className="text-sm font-medium">{match.stats.assists}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Activity className="w-3 h-3 text-primary" />
-                            <span className="text-sm font-medium">{match.stats.passes}</span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(match.date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </motion.div>
+                      ))}
+                    {currentPlayer.matchStats.filter((match) =>
+                      match.opponent.toLowerCase().includes(matchSearch.toLowerCase())
+                    ).length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No matches found
+                        </p>
+                      )}
                   </div>
                 </CardContent>
               </Card>

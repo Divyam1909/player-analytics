@@ -206,25 +206,25 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
 
                 {/* Pass Connection Lines */}
                 {showConnections && (
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
                         <defs>
-                            <marker id={`arrow-success-${uniqueId}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                                <polygon points="0 0, 6 3, 0 6" fill="hsl(142, 76%, 36%)" />
+                            <marker id={`arrow-success-${uniqueId}`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                                <polygon points="0 0, 8 4, 0 8" fill="hsl(142, 76%, 36%)" />
                             </marker>
-                            <marker id={`arrow-fail-${uniqueId}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                                <polygon points="0 0, 6 3, 0 6" fill="hsl(0, 72%, 50%)" />
+                            <marker id={`arrow-fail-${uniqueId}`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                                <polygon points="0 0, 8 4, 0 8" fill="hsl(0, 72%, 50%)" />
                             </marker>
                         </defs>
                         {filteredPasses.map((pass, index) => (
                             <motion.line
                                 key={`pass-${index}`}
                                 x1={`${pass.x}%`}
-                                y1={`${(pass.y / 100) * 100}%`}
+                                y1={`${pass.y}%`}
                                 x2={`${pass.targetX}%`}
-                                y2={`${(pass.targetY / 100) * 100}%`}
+                                y2={`${pass.targetY}%`}
                                 stroke={pass.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
                                 strokeWidth={pass.success ? "2" : "1.5"}
-                                strokeOpacity={pass.success ? 0.6 : 0.4}
+                                strokeOpacity={pass.success ? 0.7 : 0.5}
                                 strokeDasharray={pass.success ? "none" : "4,2"}
                                 markerEnd={`url(#${pass.success ? `arrow-success-${uniqueId}` : `arrow-fail-${uniqueId}`})`}
                                 initial={{ pathLength: 0, opacity: 0 }}
@@ -240,12 +240,12 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
                     <motion.div
                         key={`point-${index}`}
                         className={cn(
-                            "absolute w-3 h-3 rounded-full",
+                            "absolute w-3 h-3 rounded-full z-10",
                             pass.success ? "bg-success" : "bg-destructive"
                         )}
                         style={{
                             left: `${pass.x}%`,
-                            top: `${(pass.y / 100) * 100}%`,
+                            top: `${pass.y}%`,
                             transform: "translate(-50%, -50%)",
                         }}
                         initial={{ scale: 0 }}
@@ -253,10 +253,39 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
                         transition={{ delay: index * 0.02 }}
                     />
                 ))}
+
+                {/* Pass Destination Points (Receivers) */}
+                {showConnections && filteredPasses.filter(p => p.success).map((pass, index) => (
+                    <motion.div
+                        key={`target-${index}`}
+                        className="absolute flex flex-col items-center z-10"
+                        style={{
+                            left: `${pass.targetX}%`,
+                            top: `${pass.targetY}%`,
+                            transform: "translate(-50%, -50%)",
+                        }}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: index * 0.02 + 0.1 }}
+                    >
+                        <div className="w-2.5 h-2.5 rounded-full bg-primary border border-white/50" />
+                        <span className="text-[8px] text-white bg-black/60 px-1 rounded mt-0.5 whitespace-nowrap">
+                            {pass.passTarget || `${pass.minute}'`}
+                        </span>
+                    </motion.div>
+                ))}
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-6 text-sm">
+            <div className="flex items-center justify-center gap-6 text-sm flex-wrap">
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-success" />
+                    <span className="text-muted-foreground">Pass Origin</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary border border-white/50" />
+                    <span className="text-muted-foreground">Pass Target</span>
+                </div>
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-0.5 bg-success" />
                     <span className="text-muted-foreground">Successful Pass</span>
