@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
+import AuthHeader from "@/components/layout/AuthHeader";
+import Sidebar from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Calendar, Eye, ChevronRight, Search } from "lucide-react";
 import playersData from "@/data/players.json";
@@ -83,9 +84,10 @@ const MatchSelection = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            <Header />
+            <AuthHeader title="Match Center" />
+            <Sidebar />
 
-            <main className="pt-24 pb-12 px-6">
+            <main className="pt-24 pb-12 px-6 ml-64">
                 <div className="container mx-auto">
                     {/* Page Header */}
                     <motion.div

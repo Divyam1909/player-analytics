@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Player } from "@/types/player";
-import Header from "@/components/layout/Header";
+import AuthHeader from "@/components/layout/AuthHeader";
+import Sidebar from "@/components/layout/Sidebar";
 import PlayerTable from "@/components/player/PlayerTable";
 import PlayerCard from "@/components/player/PlayerCard";
 import CompareModal from "@/components/player/CompareModal";
@@ -126,9 +127,10 @@ const Overview = ({ embedded = false }: OverviewProps) => {
 
   return (
     <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
-      {!embedded && <Header />}
+      {!embedded && <AuthHeader title="Squad Overview" />}
+      {!embedded && <Sidebar />}
 
-      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6"}>
+      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 ml-64"}>
         <div className="container mx-auto">
           {/* Page Header */}
           <motion.div

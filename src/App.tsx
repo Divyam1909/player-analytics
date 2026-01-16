@@ -2,15 +2,32 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+
+// Pages
 import MatchSelection from "./pages/MatchSelection";
 import MatchDetails from "./pages/MatchDetails";
 import Overview from "./pages/Overview";
 import PlayerStats from "./pages/PlayerStats";
 import TeamAnalytics from "./pages/TeamAnalytics";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
+import UpcomingMatches from "./pages/UpcomingMatches";
+import MatchSchedule from "./pages/MatchSchedule";
+
+// Auth Pages
+import LoginSelection from "./pages/auth/LoginSelection";
+import AdminLogin from "./pages/auth/AdminLogin";
+import CoachLogin from "./pages/auth/CoachLogin";
+import PlayerLogin from "./pages/auth/PlayerLogin";
+
+// Dashboard Pages
+import CoachDashboard from "./pages/CoachDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +55,27 @@ const pageVariants = {
   },
 } as const;
 
+// Component to handle root redirect based on auth state
+function RootRedirect() {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect based on role
+  switch (user?.role) {
+    case 'admin':
+      return <Navigate to="/admin" replace />;
+    case 'coach':
+      return <Navigate to="/dashboard" replace />;
+    case 'player':
+      return <Navigate to={`/player/${user.playerId}`} replace />;
+    default:
+      return <Navigate to="/login" replace />;
+  }
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
 
@@ -51,13 +89,124 @@ function AnimatedRoutes() {
         variants={pageVariants}
       >
         <Routes location={location}>
-          <Route path="/" element={<MatchSelection />} />
-          <Route path="/match/:matchId" element={<MatchDetails />} />
-          <Route path="/overview" element={<Overview />} />
-          <Route path="/player" element={<PlayerStats />} />
-          <Route path="/player/:id" element={<PlayerStats />} />
-          <Route path="/team" element={<TeamAnalytics />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          {/* Root - redirects based on auth */}
+          <Route path="/" element={<RootRedirect />} />
+
+          {/* Public Auth Routes */}
+          <Route path="/login" element={<LoginSelection />} />
+          <Route path="/login/admin" element={<AdminLogin />} />
+          <Route path="/login/coach" element={<CoachLogin />} />
+          <Route path="/login/player" element={<PlayerLogin />} />
+
+          {/* Admin Routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Coach Dashboard */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <CoachDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Match Selection - Coach and Admin */}
+          <Route
+            path="/matches"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <MatchSelection />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Upcoming Matches - Coach and Admin */}
+          <Route
+            path="/matches/upcoming"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <UpcomingMatches />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Match Schedule - Coach and Admin */}
+          <Route
+            path="/matches/schedule"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <MatchSchedule />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Match Details - Coach and Admin */}
+          <Route
+            path="/match/:matchId"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <MatchDetails />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profile - Coach and Admin */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Overview - Coach and Admin */}
+          <Route
+            path="/overview"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <Overview />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Player Stats - All authenticated users */}
+          <Route
+            path="/player"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach', 'player']}>
+                <PlayerStats />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/player/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach', 'player']}>
+                <PlayerStats />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Team Analytics - Coach and Admin */}
+          <Route
+            path="/team"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <TeamAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </motion.div>
@@ -72,7 +221,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AnimatedRoutes />
+          <AuthProvider>
+            <AnimatedRoutes />
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
@@ -80,4 +231,3 @@ const App = () => (
 );
 
 export default App;
-

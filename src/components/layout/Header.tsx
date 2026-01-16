@@ -32,10 +32,10 @@ const Header = () => {
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight text-foreground">
-                Player<span className="text-primary">Stats</span>
+                Thinking <span className="text-primary">Engines</span>
               </span>
               <span className="block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Analytics Dashboard
+                Player Analytics
               </span>
             </div>
           </Link>

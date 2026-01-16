@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
+import AuthHeader from "@/components/layout/AuthHeader";
+import Sidebar from "@/components/layout/Sidebar";
 import RadarChart from "@/components/charts/RadarChart";
 import LineChart from "@/components/charts/LineChart";
 import StatBar from "@/components/charts/StatBar";
@@ -111,19 +112,20 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
 
   return (
     <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
-      {!embedded && <Header />}
+      {!embedded && <AuthHeader title="Player Stats" />}
+      {!embedded && <Sidebar />}
 
-      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6"}>
+      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 ml-64"}>
         <div className="container mx-auto">
           {/* Back Button */}
           {!embedded && (
-            <Link
-              to="/"
+            <button
+              onClick={() => navigate(-1)}
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Overview
-            </Link>
+              Back
+            </button>
           )}
 
           {/* Player Header */}
@@ -201,7 +203,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             }}
             className="space-y-6"
           >
-            <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1">
+            <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1 sticky top-16 z-30">
               <TabsTrigger value="overall" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Overall Stats
               </TabsTrigger>

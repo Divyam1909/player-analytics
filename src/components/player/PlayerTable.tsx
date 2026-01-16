@@ -227,11 +227,11 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
-            <TableHead className="w-[220px]">
-              <SortableHeader label="Player" sortKeyValue="name" />
-            </TableHead>
             <TableHead className="w-[50px] text-center">
               <SortableHeader label="#" sortKeyValue="jerseyNumber" />
+            </TableHead>
+            <TableHead className="w-[220px]">
+              <SortableHeader label="Player" sortKeyValue="name" />
             </TableHead>
             <TableHead className="w-[80px]">
               <SortableHeader label="Pos" sortKeyValue="position" />
@@ -262,6 +262,11 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
               className="border-border hover:bg-secondary/50 cursor-pointer group"
               onClick={() => handleRowClick(player.id)}
             >
+              <TableCell className="text-center">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary font-bold text-xs">
+                  {player.jerseyNumber}
+                </span>
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center border border-border group-hover:border-primary/30 transition-colors">
@@ -274,11 +279,6 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
                     <div className="text-xs text-muted-foreground">{player.team}</div>
                   </div>
                 </div>
-              </TableCell>
-              <TableCell className="text-center">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary font-bold text-xs">
-                  {player.jerseyNumber}
-                </span>
               </TableCell>
               <TableCell>
                 <span className="px-1.5 py-0.5 rounded bg-secondary text-xs font-medium text-secondary-foreground">

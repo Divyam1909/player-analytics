@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
+import AuthHeader from "@/components/layout/AuthHeader";
+import Sidebar from "@/components/layout/Sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, BarChart3, Users, Activity, FileText, PlayCircle, Video } from "lucide-react";
+import { ArrowLeft, BarChart3, Users, FileText, PlayCircle, Video } from "lucide-react";
 import playersData from "@/data/players.json";
 import { Player } from "@/types/player";
 
@@ -12,6 +13,7 @@ import { Player } from "@/types/player";
 import TeamAnalytics from "./TeamAnalytics";
 import Overview from "./Overview";
 import PlayerStats from "./PlayerStats";
+import MatchAnnotation from "@/components/analytics/MatchAnnotation";
 
 const MatchDetails = () => {
     const { matchId } = useParams<{ matchId: string }>();
@@ -19,7 +21,7 @@ const MatchDetails = () => {
     const navigate = useNavigate();
 
     // Valid tab values
-    const VALID_TABS = ["overview", "player-overview", "player-stats", "annotation", "pre-match", "match-video"];
+    const VALID_TABS = ["overview", "player-overview", "annotation", "pre-match", "match-video"];
 
     // Get initial tab from URL hash or default to "overview"
     const getInitialTab = () => {
@@ -84,17 +86,18 @@ const MatchDetails = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            <Header />
+            <AuthHeader title="Match Details" />
+            <Sidebar />
 
-            <main className="pt-24 pb-12 px-6">
+            <main className="pt-24 pb-12 px-6 ml-64">
                 <div className="container mx-auto">
                     {/* Back Button */}
                     <Link
-                        to="/"
+                        to="/dashboard"
                         className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        Back to Matches
+                        Back to Dashboard
                     </Link>
 
                     {/* Match Header */}
@@ -159,7 +162,7 @@ const MatchDetails = () => {
 
                     {/* Tabs */}
                     <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                        <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1">
+                        <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1 sticky top-16 z-30">
                             <TabsTrigger
                                 value="overview"
                                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
@@ -174,13 +177,7 @@ const MatchDetails = () => {
                                 <Users className="w-4 h-4" />
                                 Player Overview
                             </TabsTrigger>
-                            <TabsTrigger
-                                value="player-stats"
-                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
-                            >
-                                <Activity className="w-4 h-4" />
-                                Player Stats
-                            </TabsTrigger>
+
                             <TabsTrigger
                                 value="annotation"
                                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
@@ -214,22 +211,11 @@ const MatchDetails = () => {
                             <Overview embedded />
                         </TabsContent>
 
-                        {/* Player Stats Tab - PlayerStats Page */}
-                        <TabsContent value="player-stats" className="mt-0">
-                            <PlayerStats embedded defaultMatchId={matchId} />
-                        </TabsContent>
 
-                        {/* Annotation Tab - Placeholder */}
+
+                        {/* Annotation Tab - Full Featured */}
                         <TabsContent value="annotation" className="space-y-6">
-                            <Card className="bg-card border-border">
-                                <CardContent className="flex flex-col items-center justify-center py-16">
-                                    <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
-                                    <h3 className="text-xl font-semibold text-foreground mb-2">Annotation</h3>
-                                    <p className="text-muted-foreground text-center max-w-md">
-                                        Match annotation features coming soon. You'll be able to add notes and markers to key moments.
-                                    </p>
-                                </CardContent>
-                            </Card>
+                            <MatchAnnotation matchId={matchId} />
                         </TabsContent>
 
                         {/* Pre Match Tab - Placeholder */}
