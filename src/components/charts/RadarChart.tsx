@@ -7,12 +7,19 @@ interface RadarChartProps {
 }
 
 const RadarChart = ({ attributes, size = "md" }: RadarChartProps) => {
+  // Check if any attribute data is available
+  const hasData = attributes.passing !== null ||
+    attributes.shooting !== null ||
+    attributes.dribbling !== null ||
+    attributes.defending !== null ||
+    attributes.physical !== null;
+
   const data = [
-    { attribute: "Passing", value: attributes.passing, fullMark: 100 },
-    { attribute: "Shooting", value: attributes.shooting, fullMark: 100 },
-    { attribute: "Dribbling", value: attributes.dribbling, fullMark: 100 },
-    { attribute: "Defending", value: attributes.defending, fullMark: 100 },
-    { attribute: "Physical", value: attributes.physical, fullMark: 100 },
+    { attribute: "Passing", value: attributes.passing ?? 0, fullMark: 100 },
+    { attribute: "Shooting", value: attributes.shooting ?? 0, fullMark: 100 },
+    { attribute: "Dribbling", value: attributes.dribbling ?? 0, fullMark: 100 },
+    { attribute: "Defending", value: attributes.defending ?? 0, fullMark: 100 },
+    { attribute: "Physical", value: attributes.physical ?? 0, fullMark: 100 },
   ];
 
   const sizeMap = {
@@ -20,6 +27,21 @@ const RadarChart = ({ attributes, size = "md" }: RadarChartProps) => {
     md: { width: 300, height: 300 },
     lg: { width: 400, height: 400 },
   };
+
+  // Show message if no data available
+  if (!hasData) {
+    return (
+      <div
+        style={{ width: sizeMap[size].width, height: sizeMap[size].height }}
+        className="flex items-center justify-center text-muted-foreground text-sm"
+      >
+        <div className="text-center">
+          <p>Attribute data not available</p>
+          <p className="text-xs mt-1">Add player_attributes table to database</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: sizeMap[size].width, height: sizeMap[size].height }}>

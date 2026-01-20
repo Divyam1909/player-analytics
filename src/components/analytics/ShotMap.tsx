@@ -167,46 +167,37 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
                 ))}
             </div>
 
-            {/* Half-Field Shot Map (attacking half only) */}
-            <div className="relative w-full max-w-2xl mx-auto aspect-[10/10] rounded-xl overflow-hidden border border-border shadow-xl">
-                {/* Field Background */}
-                <div className="absolute inset-0 bg-gradient-to-b from-emerald-800 via-emerald-900 to-emerald-800 dark:from-[#1a4a1a] dark:via-[#1a3a1a] dark:to-[#1a4a1a]" />
-
-                {/* Grass Pattern */}
+            {/* Half-Field Shot Map (attacking half only - Goal Top) */}
+            <div
+                className="relative w-full max-w-6xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl bg-muted/20"
+                style={{
+                    aspectRatio: '1.26796',
+                }}
+            >
+                {/* Properly rotated background - Swapping dimensions to prevent cropping and stretching */}
                 <div
-                    className="absolute inset-0 opacity-30"
+                    className="absolute top-1/2 left-1/2"
                     style={{
-                        backgroundImage: `repeating-linear-gradient(
-              90deg,
-              transparent,
-              transparent 10%,
-              rgba(255,255,255,0.03) 10%,
-              rgba(255,255,255,0.03) 20%
-            )`
+                        width: '78.867%',   // (3549/4500) * 100% / ratio
+                        height: '126.796%', // ratio * 100%
+                        backgroundImage: 'url(/half-field.jpg)',
+                        backgroundSize: '100% 100%',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        transform: 'translate(-50%, -50%) rotate(90deg)',
                     }}
                 />
-
-                {/* Field markings SVG - Attacking Half */}
-                <svg viewBox="0 0 55 100" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                    {/* Penalty area */}
-                    <rect x="2" y="20" width="33" height="60" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-                    {/* Goal area */}
-                    <rect x="2" y="35" width="11" height="30" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-                    {/* Goal */}
-                    <rect x="0" y="42" width="2" height="16" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="0.6" />
-                    {/* Penalty arc */}
-                    <path d="M 35 35 A 18 18 0 0 1 35 65" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-                    {/* Penalty spot */}
-                    <circle cx="24" cy="50" r="1" fill="rgba(255,255,255,0.7)" />
-                    {/* Center line */}
-                    <line x1="55" y1="0" x2="55" y2="100" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-                </svg>
+                {/* Subtle overlay for better visibility of markers */}
+                <div className="absolute inset-0 bg-black/10" />
 
                 {/* Shot Markers */}
                 {filteredShots.map((shot, index) => {
-                    // Transform coordinates for half-field view (x: 50-100 -> 0-55, y: 0-100 -> 0-100)
-                    const displayX = ((100 - shot.x) / 50) * 55;
-                    const displayY = shot.y;
+                    // Transform for Goal Top view:
+                    // Data X (50 Mid -> 100 Goal) maps to Screen Y (100% Bottom -> 0% Top)
+                    // Data Y (0 -> 100) maps to Screen X (0% Left -> 100% Right)
+
+                    const displayY = (100 - shot.x) * 2; // 100->0, 50->100
+                    const displayX = shot.y; // 0->0, 100->100
                     const shotXG = shot.xG || calculateXG(shot.x, shot.y);
 
                     return (

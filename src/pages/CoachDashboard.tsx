@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthHeader from '@/components/layout/AuthHeader';
 import Sidebar from '@/components/layout/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Player } from '@/types/player';
-import playersData from '@/data/players.json';
 import {
     Trophy,
     Target,
@@ -47,72 +47,67 @@ interface MatchData {
 
 const CoachDashboard = () => {
     const { user } = useAuth();
-    const players = playersData.players as Player[];
 
     // Extract matches and calculate stats
-    const { matches, stats } = useMemo(() => {
-        const matchMap = new Map<string, MatchData>();
+    const { data: matches = [], isLoading } = useQuery({
+        queryKey: ['dashboard-matches'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('matches')
+                .select(`
+                    id,
+                    match_date,
+                    competition_name,
+                    home_score,
+                    away_score,
+                    home_team:home_team_id(team_name),
+                    away_team:away_team_id(team_name)
+                `)
+                .order('match_date', { ascending: false });
+
+            if (error) throw error;
+
+            return ((data as any[]) || []).map(m => ({
+                matchId: m.id,
+                opponent: (m.away_team as any)?.team_name || 'Opponent',
+                date: m.match_date,
+                teamName: (m.home_team as any)?.team_name || 'Team',
+                tournament: m.competition_name,
+                tier: undefined,
+                homeScore: m.home_score,
+                awayScore: m.away_score,
+                status: 'completed' as const,
+            }));
+        }
+    });
+
+    const stats = useMemo(() => {
+        let wins = 0, draws = 0, losses = 0;
         let totalGoalsScored = 0;
         let totalGoalsConceded = 0;
 
-        players.forEach((player) => {
-            player.matchStats.forEach((match) => {
-                if (!matchMap.has(match.matchId)) {
-                    // Calculate team score
-                    const teamGoals = players.reduce((total, p) => {
-                        const playerMatch = p.matchStats.find(m => m.matchId === match.matchId);
-                        return total + (playerMatch?.stats.goals || 0);
-                    }, 0);
-
-                    // Simulated opponent score for demo
-                    const opponentScore = Math.floor(Math.random() * 5);
-
-                    matchMap.set(match.matchId, {
-                        matchId: match.matchId,
-                        opponent: match.opponent,
-                        date: match.date,
-                        teamName: player.team,
-                        tournament: 'MFA Men\'s Premiere League',
-                        tier: match.matchId === 'm2' ? 'MFA Men\'s Premiere League (Tier 1)' : undefined,
-                        homeScore: teamGoals,
-                        awayScore: opponentScore,
-                        status: 'registered',
-                    });
-
-                    totalGoalsScored += teamGoals;
-                    totalGoalsConceded += opponentScore;
-                }
-            });
-        });
-
-        const matchesArray = Array.from(matchMap.values()).sort((a, b) =>
-            new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-
-        // Calculate wins, draws, losses
-        let wins = 0, draws = 0, losses = 0;
-        matchesArray.forEach(m => {
+        matches.forEach(m => {
             if (m.homeScore > m.awayScore) wins++;
             else if (m.homeScore < m.awayScore) losses++;
             else draws++;
+
+            totalGoalsScored += m.homeScore;
+            totalGoalsConceded += m.awayScore;
         });
 
         return {
-            matches: matchesArray,
-            stats: {
-                totalMatches: matchesArray.length,
-                wins,
-                draws,
-                losses,
-                goalsScored: totalGoalsScored,
-                goalsConceded: totalGoalsConceded,
-                goalDifference: totalGoalsScored - totalGoalsConceded,
-                recentForm: matchesArray.slice(0, 4).map(m =>
-                    m.homeScore > m.awayScore ? 'W' : m.homeScore < m.awayScore ? 'L' : 'D'
-                ),
-            },
+            totalMatches: matches.length,
+            wins,
+            draws,
+            losses,
+            goalsScored: totalGoalsScored,
+            goalsConceded: totalGoalsConceded,
+            goalDifference: totalGoalsScored - totalGoalsConceded,
+            recentForm: matches.slice(0, 4).map(m =>
+                m.homeScore > m.awayScore ? 'W' : m.homeScore < m.awayScore ? 'L' : 'D'
+            ),
         };
-    }, [players]);
+    }, [matches]);
 
     const coachName = user?.name || 'Coach';
     const teamName = user?.team || 'Bombay Gymkhana Men';
@@ -132,7 +127,7 @@ const CoachDashboard = () => {
                         transition={{ duration: 0.4 }}
                     >
                         <h1 className="text-3xl font-bold text-foreground">
-                            Welcome Coach {coachName} to Thinking Engines!
+                            Welcome Coach {coachName}!
                         </h1>
                         <p className="text-muted-foreground mt-1">
                             Managing {teamName}
@@ -271,8 +266,15 @@ const CoachDashboard = () => {
                                         >
                                             <motion.div
                                                 variants={itemVariants}
-                                                className="flex items-center justify-between p-4 rounded-lg hover:bg-secondary/50 transition-colors border border-border cursor-pointer group"
+                                                className="relative overflow-hidden flex items-center justify-between p-4 rounded-lg hover:bg-secondary/50 transition-colors border border-border cursor-pointer group"
                                             >
+                                                {/* Win/Loss Indicator Bar */}
+                                                <div className={cn(
+                                                    "absolute left-0 top-0 bottom-0 w-1.5",
+                                                    isWin && "bg-emerald-500",
+                                                    isLoss && "bg-red-500",
+                                                    !isWin && !isLoss && "bg-gray-500"
+                                                )} />
                                                 <div className="flex-1">
                                                     <p className="font-medium text-foreground group-hover:text-primary transition-colors">
                                                         {teamName} vs {match.opponent}

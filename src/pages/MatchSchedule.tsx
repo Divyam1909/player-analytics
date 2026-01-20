@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthHeader from '@/components/layout/AuthHeader';
 import Sidebar from '@/components/layout/Sidebar';
@@ -17,18 +18,17 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Sample schedule data
+// Sample schedule data - IDs match Supabase match IDs for navigation
 const scheduleData = [
-    { date: '2026-01-10', opponent: 'England U-20', venue: 'Home', tournament: 'Friendly', result: 'W 4-1', type: 'past' },
-    { date: '2026-01-15', opponent: 'Kalina Rangers', venue: 'Home', tournament: 'Friendly', result: 'W 2-0', type: 'past' },
-    { date: '2026-01-20', opponent: 'Delhi FC', venue: 'Away', tournament: 'ISL League', result: 'D 2-2', type: 'past' },
-    { date: '2026-01-25', opponent: 'Mumbai City FC', venue: 'Away', tournament: 'ISL League', type: 'upcoming' },
-    { date: '2026-02-01', opponent: 'Bengaluru FC', venue: 'Away', tournament: 'ISL League', type: 'upcoming' },
-    { date: '2026-02-08', opponent: 'Kolkata United', venue: 'Away', tournament: 'Cup Quarterfinal', type: 'upcoming' },
-    { date: '2026-02-15', opponent: 'Goa FC', venue: 'Home', tournament: 'ISL League', type: 'upcoming' },
-    { date: '2026-02-22', opponent: 'Chennai City', venue: 'Home', tournament: 'ISL League', type: 'upcoming' },
-    { date: '2026-03-01', opponent: 'Hyderabad FC', venue: 'Away', tournament: 'ISL League', type: 'upcoming' },
-    { date: '2026-03-08', opponent: 'Pune City', venue: 'Home', tournament: 'Cup Semi', type: 'upcoming' },
+    { id: '22222222-0000-0000-0000-000000000002', date: '2024-03-22', opponent: 'England U-20', venue: 'Home', tournament: 'International Friendly', result: 'W 7-1', type: 'past' },
+    { id: '22222222-0000-0000-0000-000000000001', date: '2024-03-15', opponent: 'Team World Five', venue: 'Home', tournament: 'Blue Lock Project Match', result: 'W 9-2', type: 'past' },
+    { id: 'match-4', date: '2026-01-25', opponent: 'Mumbai City FC', venue: 'Away', tournament: 'ISL League', type: 'upcoming' },
+    { id: 'match-5', date: '2026-02-01', opponent: 'Bengaluru FC', venue: 'Away', tournament: 'ISL League', type: 'upcoming' },
+    { id: 'match-6', date: '2026-02-08', opponent: 'Kolkata United', venue: 'Away', tournament: 'Cup Quarterfinal', type: 'upcoming' },
+    { id: 'match-7', date: '2026-02-15', opponent: 'Goa FC', venue: 'Home', tournament: 'ISL League', type: 'upcoming' },
+    { id: 'match-8', date: '2026-02-22', opponent: 'Chennai City', venue: 'Home', tournament: 'ISL League', type: 'upcoming' },
+    { id: 'match-9', date: '2026-03-01', opponent: 'Hyderabad FC', venue: 'Away', tournament: 'ISL League', type: 'upcoming' },
+    { id: 'match-10', date: '2026-03-08', opponent: 'Pune City', venue: 'Home', tournament: 'Cup Semi', type: 'upcoming' },
 ];
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -48,6 +48,7 @@ const itemVariants = {
 };
 
 const MatchSchedule = () => {
+    const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 1)); // January 2026
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
@@ -206,11 +207,17 @@ const MatchSchedule = () => {
                                                 <motion.div
                                                     key={index}
                                                     variants={itemVariants}
+                                                    onClick={() => {
+                                                        if (match && match.type === 'past') {
+                                                            navigate(`/match/${match.id}`);
+                                                        }
+                                                    }}
                                                     className={cn(
                                                         "min-h-[90px] rounded-lg p-2 border transition-all",
                                                         day ? "bg-secondary/20 border-border hover:border-primary/50 cursor-pointer" : "bg-transparent border-transparent",
                                                         isToday && "ring-2 ring-primary",
-                                                        match && "bg-primary/10 border-primary/30"
+                                                        match && "bg-primary/10 border-primary/30",
+                                                        match && match.type === 'past' && "hover:bg-primary/20"
                                                     )}
                                                 >
                                                     {day && (
@@ -256,10 +263,19 @@ const MatchSchedule = () => {
                             className="space-y-3"
                         >
                             {scheduleData.map((match, index) => (
-                                <motion.div key={match.date} variants={itemVariants}>
+                                <motion.div
+                                    key={match.date}
+                                    variants={itemVariants}
+                                    onClick={() => {
+                                        if (match.type === 'past') {
+                                            navigate(`/match/${match.id}`);
+                                        }
+                                    }}
+                                    className={match.type === 'past' ? 'cursor-pointer' : ''}
+                                >
                                     <Card className={cn(
                                         "bg-card border-border overflow-hidden",
-                                        match.type === 'past' && "opacity-75"
+                                        match.type === 'past' && "opacity-75 hover:opacity-100 hover:border-primary/50 transition-all"
                                     )}>
                                         <CardContent className="p-0">
                                             <div className="flex items-center">

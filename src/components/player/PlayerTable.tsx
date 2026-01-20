@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import StatBar from "@/components/charts/StatBar";
-import { ArrowUpDown, ChevronRight, User, ArrowLeftRight } from "lucide-react";
+import { ArrowUpDown, User, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatFilterMode } from "@/pages/Overview";
 
@@ -20,14 +20,19 @@ interface PlayerTableProps {
   players: Player[];
   onCompare?: (player: Player) => void;
   statFilter?: StatFilterMode;
+  matchId?: string; // If provided, only show stats from this match
 }
 
 // Dynamic sort key type
 type SortKey = string;
 
-// Helper function to calculate overall stats for a player
-const calculateOverallStats = (player: Player) => {
-  const matches = player.matchStats;
+// Helper function to calculate stats for a player - optionally filters by matchId
+const calculateOverallStats = (player: Player, matchId?: string) => {
+  // If matchId is provided, only use stats from that specific match
+  const matches = matchId
+    ? player.matchStats.filter(ms => ms.matchId === matchId)
+    : player.matchStats;
+
   if (matches.length === 0) return null;
 
   // Calculate total minutes played from actual data
@@ -44,13 +49,13 @@ const calculateOverallStats = (player: Player) => {
     assists: matches.reduce((a, m) => a + m.stats.assists, 0),
 
     // Defensive stats
-    blocks: matches.reduce((a, m) => a + m.stats.blocks, 0),
-    interceptions: matches.reduce((a, m) => a + m.stats.interceptions, 0),
-    clearances: matches.reduce((a, m) => a + m.stats.clearances, 0),
-    recoveries: matches.reduce((a, m) => a + m.stats.recoveries, 0),
+    blocks: matches.reduce((a, m) => a + (m.stats.blocks || 0), 0),
+    interceptions: matches.reduce((a, m) => a + (m.stats.interceptions || 0), 0),
+    clearances: matches.reduce((a, m) => a + (m.stats.clearances || 0), 0),
+    recoveries: matches.reduce((a, m) => a + (m.stats.recoveries || 0), 0),
 
     // Attacking stats
-    progressiveRuns: matches.reduce((a, m) => a + m.stats.progressiveRuns, 0),
+    progressiveRuns: matches.reduce((a, m) => a + (m.stats.progressiveRuns || 0), 0),
     totalDribbles: matches.reduce((a, m) => a + m.stats.dribbles, 0),
     successfulDribbles: matches.reduce((a, m) => a + m.stats.dribblesSuccessful, 0),
     aerialDuelsWon: matches.reduce((a, m) => a + m.stats.aerialDuelsWon, 0),
@@ -63,54 +68,54 @@ const calculateOverallStats = (player: Player) => {
   };
 };
 
-const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTableProps) => {
+const PlayerTable = ({ players, onCompare, statFilter = "none", matchId }: PlayerTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("overallRating");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const navigate = useNavigate();
 
-  // Calculate stats for all players
+  // Calculate stats for all players - pass matchId to filter if provided
   const playersWithStats = useMemo(() => {
     return players.map(player => ({
       player,
-      stats: calculateOverallStats(player)
+      stats: calculateOverallStats(player, matchId)
     }));
-  }, [players]);
+  }, [players, matchId]);
 
   // Get column definitions based on filter mode
   const columnDefs = useMemo(() => {
     switch (statFilter) {
       case "passing":
         return [
-          { label: "Total Pass", key: "totalPassing", suffix: "" },
-          { label: "Crosses", key: "crosses", suffix: "" },
-          { label: "Assists", key: "assists", suffix: "" },
+          { label: "Pass", fullLabel: "Total Passes", key: "totalPassing", suffix: "" },
+          { label: "Crs", fullLabel: "Crosses", key: "crosses", suffix: "" },
+          { label: "Ast", fullLabel: "Assists", key: "assists", suffix: "" },
         ];
       case "defending":
         return [
-          { label: "Blocks", key: "blocks", suffix: "" },
-          { label: "Intercept", key: "interceptions", suffix: "" },
-          { label: "Clear", key: "clearances", suffix: "" },
-          { label: "Recover", key: "recoveries", suffix: "" },
+          { label: "Blk", fullLabel: "Blocks", key: "blocks", suffix: "" },
+          { label: "Int", fullLabel: "Interceptions", key: "interceptions", suffix: "" },
+          { label: "Clr", fullLabel: "Clearances", key: "clearances", suffix: "" },
+          { label: "Rec", fullLabel: "Recoveries", key: "recoveries", suffix: "" },
         ];
       case "attacking":
         return [
-          { label: "Prog Runs", key: "progressiveRuns", suffix: "" },
-          { label: "Dribbles", key: "totalDribbles", suffix: "" },
-          { label: "Succ Drib", key: "successfulDribbles", suffix: "" },
-          { label: "Aerial", key: "aerialDuelsWon", suffix: "" },
-          { label: "Shots", key: "shots", suffix: "" },
-          { label: "On Target", key: "shotsOnTarget", suffix: "" },
-          { label: "Conv %", key: "shotConversionRate", suffix: "%" },
+          { label: "PRn", fullLabel: "Progressive Runs", key: "progressiveRuns", suffix: "" },
+          { label: "Drb", fullLabel: "Total Dribbles", key: "totalDribbles", suffix: "" },
+          { label: "SDr", fullLabel: "Successful Dribbles", key: "successfulDribbles", suffix: "" },
+          { label: "Air", fullLabel: "Aerial Duels Won", key: "aerialDuelsWon", suffix: "" },
+          { label: "Sht", fullLabel: "Shots", key: "shots", suffix: "" },
+          { label: "OT", fullLabel: "Shots On Target", key: "shotsOnTarget", suffix: "" },
+          { label: "Cv%", fullLabel: "Conversion Rate", key: "shotConversionRate", suffix: "%" },
         ];
       default:
         return [
-          { label: "Matches", key: "matchesPlayed", suffix: "" },
-          { label: "Mins", key: "totalMinutesPlayed", suffix: "" },
-          { label: "PAS", key: "passing", suffix: "" },
-          { label: "SHO", key: "shooting", suffix: "" },
-          { label: "DRI", key: "dribbling", suffix: "" },
-          { label: "DEF", key: "defending", suffix: "" },
-          { label: "PHY", key: "physical", suffix: "" },
+          { label: "M", fullLabel: "Matches Played", key: "matchesPlayed", suffix: "" },
+          { label: "Min", fullLabel: "Minutes Played", key: "totalMinutesPlayed", suffix: "" },
+          { label: "PAS", fullLabel: "Passing", key: "passing", suffix: "" },
+          { label: "SHO", fullLabel: "Shooting", key: "shooting", suffix: "" },
+          { label: "DRI", fullLabel: "Dribbling", key: "dribbling", suffix: "" },
+          { label: "DEF", fullLabel: "Defending", key: "defending", suffix: "" },
+          { label: "PHY", fullLabel: "Physical", key: "physical", suffix: "" },
         ];
     }
   }, [statFilter]);
@@ -181,6 +186,7 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
   };
 
   const handleRowClick = (playerId: string) => {
+    window.scrollTo(0, 0);
     navigate(`/player/${playerId}`);
   };
 
@@ -189,12 +195,13 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
     onCompare?.(player);
   };
 
-  const SortableHeader = ({ label, sortKeyValue }: { label: string; sortKeyValue: SortKey }) => (
+  const SortableHeader = ({ label, sortKeyValue, title }: { label: string; sortKeyValue: SortKey; title?: string }) => (
     <Button
       variant="ghost"
       size="sm"
       className="h-auto p-0 font-semibold text-muted-foreground hover:text-foreground hover:bg-transparent"
       onClick={() => handleSort(sortKeyValue)}
+      title={title || label}
     >
       {label}
       <ArrowUpDown className={cn(
@@ -223,33 +230,33 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden overflow-x-auto">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
-            <TableHead className="w-[50px] text-center">
-              <SortableHeader label="#" sortKeyValue="jerseyNumber" />
+            <TableHead className="w-[35px] px-2 text-center h-10">
+              <SortableHeader label="#" sortKeyValue="jerseyNumber" title="Jersey Number" />
             </TableHead>
-            <TableHead className="w-[220px]">
+            <TableHead className="w-[120px] px-2 h-10 text-center">
               <SortableHeader label="Player" sortKeyValue="name" />
             </TableHead>
-            <TableHead className="w-[80px]">
-              <SortableHeader label="Pos" sortKeyValue="position" />
+            <TableHead className="w-[50px] px-2 h-10 text-center">
+              <SortableHeader label="Pos" sortKeyValue="position" title="Position" />
             </TableHead>
-            <TableHead className="w-[60px] text-center">
-              <SortableHeader label="OVR" sortKeyValue="overallRating" />
+            <TableHead className="w-[45px] px-2 text-center h-10">
+              <SortableHeader label="OVR" sortKeyValue="overallRating" title="Overall Rating" />
             </TableHead>
             {columnDefs.map((col) => (
-              <TableHead key={col.key} className="text-center w-[80px]">
-                <SortableHeader label={col.label} sortKeyValue={col.key} />
+              <TableHead key={col.key} className="text-center w-[45px] px-1 h-10">
+                <SortableHeader label={col.label} sortKeyValue={col.key} title={col.fullLabel} />
               </TableHead>
             ))}
             {onCompare && (
-              <TableHead className="w-[60px] text-center">
+              <TableHead className="w-[40px] px-2 text-center h-10">
                 <span className="text-xs font-semibold text-muted-foreground">Cmp</span>
               </TableHead>
             )}
-            <TableHead className="w-[40px]"></TableHead>
+
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -262,30 +269,30 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
               className="border-border hover:bg-secondary/50 cursor-pointer group"
               onClick={() => handleRowClick(player.id)}
             >
-              <TableCell className="text-center">
+              <TableCell className="text-center py-5 px-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary font-bold text-xs">
                   {player.jerseyNumber}
                 </span>
               </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
+              <TableCell className="py-5 px-2">
+                <div className="flex items-center justify-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center border border-border group-hover:border-primary/30 transition-colors">
                     <User className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  <div>
-                    <div className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                  <div className="min-w-0 text-left">
+                    <div className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
                       {player.name}
                     </div>
-                    <div className="text-xs text-muted-foreground">{player.team}</div>
+                    <div className="text-xs text-muted-foreground truncate">{player.team}</div>
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
-                <span className="px-1.5 py-0.5 rounded bg-secondary text-xs font-medium text-secondary-foreground">
+              <TableCell className="py-5 px-2 text-center">
+                <span className="px-1.5 py-0.5 rounded bg-secondary text-xs font-medium text-secondary-foreground whitespace-nowrap">
                   {player.position}
                 </span>
               </TableCell>
-              <TableCell className="text-center">
+              <TableCell className="text-center py-5 px-2">
                 <span className={cn("font-bold", getRelativeColor(player.overallRating, 100))}>
                   {player.overallRating}
                 </span>
@@ -298,12 +305,12 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
                 const barColor = getRelativeBarColor(value, maxValue);
 
                 return (
-                  <TableCell key={col.key}>
+                  <TableCell key={col.key} className="py-5 px-1">
                     <div className="flex flex-col items-center gap-0.5">
                       <span className={cn("font-semibold text-sm", getRelativeColor(value, maxValue))}>
                         {displayValue}
                       </span>
-                      <div className="w-12">
+                      <div className="w-10">
                         <StatBar value={Math.min(barPercentage, 100)} showValue={false} size="sm" colorClass={barColor} />
                       </div>
                     </div>
@@ -311,7 +318,7 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
                 );
               })}
               {onCompare && (
-                <TableCell>
+                <TableCell className="py-5 px-2 text-center text-center">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -323,14 +330,12 @@ const PlayerTable = ({ players, onCompare, statFilter = "none" }: PlayerTablePro
                   </Button>
                 </TableCell>
               )}
-              <TableCell>
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-              </TableCell>
+
             </motion.tr>
           ))}
         </TableBody>
       </Table>
-    </div>
+    </div >
   );
 };
 

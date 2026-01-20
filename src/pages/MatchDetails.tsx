@@ -1,19 +1,30 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import AuthHeader from "@/components/layout/AuthHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, BarChart3, Users, FileText, PlayCircle, Video } from "lucide-react";
-import playersData from "@/data/players.json";
-import { Player } from "@/types/player";
+import { BarChart3, Users, FileText, PlayCircle, Video } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 // Import existing page components
 import TeamAnalytics from "./TeamAnalytics";
 import Overview from "./Overview";
 import PlayerStats from "./PlayerStats";
 import MatchAnnotation from "@/components/analytics/MatchAnnotation";
+
+
+interface MatchDetailsResponse {
+    id: string;
+    match_date: string;
+    competition_name: string;
+    home_score: number;
+    away_score: number;
+    home_team: { team_name: string } | null;
+    away_team: { team_name: string } | null;
+}
 
 const MatchDetails = () => {
     const { matchId } = useParams<{ matchId: string }>();
@@ -35,6 +46,8 @@ const MatchDetails = () => {
     const handleTabChange = (tab: string) => {
         setActiveTab(tab);
         navigate(`${location.pathname}#${tab}`, { replace: true });
+        // Reset scroll position to top when switching tabs
+        window.scrollTo(0, 0);
     };
 
     // Sync tab with URL hash on navigation
@@ -45,38 +58,58 @@ const MatchDetails = () => {
         }
     }, [location.hash]);
 
-    const players = playersData.players as Player[];
+    const { data: matchDetails, isLoading } = useQuery({
+        queryKey: ['match', matchId],
+        queryFn: async () => {
+            if (!matchId) return null;
+            const { data: rawData, error } = await supabase
+                .from('matches')
+                .select(`
+                    id,
+                    match_date,
+                    competition_name,
+                    home_score,
+                    away_score,
+                    home_team:home_team_id(team_name),
+                    away_team:away_team_id(team_name)
+                `)
+                .eq('id', matchId)
+                .single();
 
-    // Find match details
-    const matchDetails = useMemo(() => {
-        for (const player of players) {
-            const match = player.matchStats.find(m => m.matchId === matchId);
-            if (match) {
-                // Calculate team score
-                const teamGoals = players.reduce((total, p) => {
-                    const playerMatch = p.matchStats.find(m => m.matchId === matchId);
-                    return total + (playerMatch?.stats.goals || 0);
-                }, 0);
+            if (error) throw error;
+            if (!rawData) return null;
 
-                return {
-                    matchId: match.matchId,
-                    opponent: match.opponent,
-                    date: match.date,
-                    teamName: player.team,
-                    homeScore: teamGoals,
-                    awayScore: Math.floor(Math.random() * 3),
-                };
-            }
-        }
-        return null;
-    }, [matchId, players]);
+            const data = rawData as unknown as MatchDetailsResponse;
+
+            // Helper to get team name
+            const getTeamName = (team: any) => team?.team_name || 'Unknown Team';
+
+            return {
+                matchId: data.id,
+                opponent: getTeamName(data.away_team),
+                date: data.match_date,
+                teamName: getTeamName(data.home_team),
+                homeScore: data.home_score,
+                awayScore: data.away_score,
+            };
+        },
+        enabled: !!matchId
+    });
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="animate-pulse text-primary">Loading match details...</div>
+            </div>
+        );
+    }
 
     if (!matchDetails) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
                     <p className="text-muted-foreground mb-4">Match not found</p>
-                    <Link to="/" className="text-primary hover:underline">
+                    <Link to="/matches" className="text-primary hover:underline">
                         Back to Match Selection
                     </Link>
                 </div>
@@ -86,20 +119,11 @@ const MatchDetails = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            <AuthHeader title="Match Details" />
+            <AuthHeader title="Match Details" showBack />
             <Sidebar />
 
             <main className="pt-24 pb-12 px-6 ml-64">
                 <div className="container mx-auto">
-                    {/* Back Button */}
-                    <Link
-                        to="/dashboard"
-                        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Dashboard
-                    </Link>
-
                     {/* Match Header */}
                     <motion.div
                         className="relative overflow-hidden rounded-xl border border-border bg-card p-6 mb-6"
@@ -208,7 +232,7 @@ const MatchDetails = () => {
 
                         {/* Player Overview Tab - Overview Page */}
                         <TabsContent value="player-overview" className="mt-0">
-                            <Overview embedded />
+                            <Overview embedded matchId={matchId} />
                         </TabsContent>
 
 

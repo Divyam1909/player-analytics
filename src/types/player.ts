@@ -1,9 +1,9 @@
 export interface PlayerAttributes {
-  passing: number;
-  shooting: number;
-  dribbling: number;
-  defending: number;
-  physical: number;
+  passing: number | null;
+  shooting: number | null;
+  dribbling: number | null;
+  defending: number | null;
+  physical: number | null;
 }
 
 export interface MatchStats {
@@ -13,20 +13,20 @@ export interface MatchStats {
   passes: number;
   passAccuracy: number;
   keyPasses: number;
-  passesInFinalThird: number;
-  passesInBox: number;
+  passesInFinalThird: number | null;
+  passesInBox: number | null;
   crosses: number;
   progressivePassing: number;
 
   // Defensive stats
-  blocks: number;
-  interceptions: number;
-  clearances: number;
-  recoveries: number;
-  tackles: number;
+  blocks: number | null;
+  interceptions: number | null;
+  clearances: number | null;
+  recoveries: number | null;
+  tackles: number | null;
 
   // Attacking stats
-  progressiveRuns: number;
+  progressiveRuns: number | null;
   dribbles: number;
   dribblesSuccessful: number;
   aerialDuelsWon: number;
@@ -35,8 +35,8 @@ export interface MatchStats {
   ballTouches: number;
 
   // Physical stats
-  distanceCovered: number;
-  sprints: number;
+  distanceCovered: number | null;
+  sprints: number | null;
 }
 
 export interface MatchEvent {
@@ -70,7 +70,7 @@ export interface Player {
   jerseyNumber: number;
   position: string;
   team: string;
-  overallRating: number;
+  overallRating: number | null;
   attributes: PlayerAttributes;
   matchStats: PlayerMatch[];
 }

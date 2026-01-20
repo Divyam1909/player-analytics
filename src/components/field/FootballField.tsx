@@ -204,151 +204,16 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
       </div>
 
       {/* Main Field Container */}
-      <div className="relative w-full max-w-3xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-border shadow-xl">
-        {/* Field Background - Dark green gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-800 via-emerald-900 to-emerald-800 dark:from-[#1a4a1a] dark:via-[#1a3a1a] dark:to-[#1a4a1a]" />
-
-        {/* Grass Pattern Overlay */}
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: `repeating-linear-gradient(
-              90deg,
-              transparent,
-              transparent 8%,
-              rgba(255,255,255,0.03) 8%,
-              rgba(255,255,255,0.03) 16%
-            )`
-          }}
+      <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl" style={{ aspectRatio: '105/68' }}>
+        {/* Football Field Background Image */}
+        <img
+          src="/41290.jpg"
+          alt="Football field"
+          className="absolute inset-0 w-full h-full object-cover"
         />
 
-        {/* Field markings SVG */}
-        <svg
-          viewBox="0 0 100 62.5"
-          className="absolute inset-0 w-full h-full"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <filter id={`glow-${uniqueId}`}>
-              <feGaussianBlur stdDeviation="0.5" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          {/* Field outline */}
-          <rect
-            x="2"
-            y="2"
-            width="96"
-            height="58.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-            filter={`url(#glow-${uniqueId})`}
-          />
-
-          {/* Center line */}
-          <line
-            x1="50"
-            y1="2"
-            x2="50"
-            y2="60.5"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Center circle */}
-          <circle
-            cx="50"
-            cy="31.25"
-            r="9.15"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Center spot */}
-          <circle cx="50" cy="31.25" r="0.8" fill="rgba(255,255,255,0.7)" />
-
-          {/* Left penalty area */}
-          <rect
-            x="2"
-            y="13"
-            width="16.5"
-            height="36.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Left goal area */}
-          <rect
-            x="2"
-            y="21"
-            width="5.5"
-            height="20.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Left penalty arc */}
-          <path
-            d="M 18.5 22 A 9.15 9.15 0 0 1 18.5 40.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Right penalty area */}
-          <rect
-            x="81.5"
-            y="13"
-            width="16.5"
-            height="36.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Right goal area */}
-          <rect
-            x="92.5"
-            y="21"
-            width="5.5"
-            height="20.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Right penalty arc */}
-          <path
-            d="M 81.5 22 A 9.15 9.15 0 0 0 81.5 40.5"
-            fill="none"
-            stroke="rgba(255,255,255,0.5)"
-            strokeWidth="0.4"
-          />
-
-          {/* Left penalty spot */}
-          <circle cx="13" cy="31.25" r="0.5" fill="rgba(255,255,255,0.7)" />
-
-          {/* Right penalty spot */}
-          <circle cx="87" cy="31.25" r="0.5" fill="rgba(255,255,255,0.7)" />
-
-          {/* Corner arcs */}
-          <path d="M 2 4 A 2 2 0 0 0 4 2" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-          <path d="M 96 2 A 2 2 0 0 0 98 4" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-          <path d="M 2 58.5 A 2 2 0 0 1 4 60.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-          <path d="M 96 60.5 A 2 2 0 0 1 98 58.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-
-          {/* Goals */}
-          <rect x="0" y="25" width="2" height="12.5" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-          <rect x="98" y="25" width="2" height="12.5" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        </svg>
+        {/* Subtle overlay for better visibility of markers */}
+        <div className="absolute inset-0 bg-black/10" />
 
         {/* Zone View - Third Divisions */}
         <AnimatePresence>

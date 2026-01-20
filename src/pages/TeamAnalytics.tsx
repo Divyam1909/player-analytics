@@ -26,7 +26,10 @@ import {
     CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import playersData from "@/data/players.json";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { usePlayers } from "@/hooks/usePlayers";
+import { useCountUp } from "@/hooks/useCountUp";
 
 // Animation variants
 const containerVariants = {
@@ -42,6 +45,80 @@ const containerVariants = {
 const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 },
+};
+
+// Helper to check if a value exists in database (not null/undefined)
+const hasData = (value: number | null | undefined): value is number => {
+    return value !== null && value !== undefined;
+};
+
+// Helper to sum values, returning null if all values are null (no data)
+const sumWithNull = <T,>(
+    items: T[],
+    getter: (item: T) => number | null | undefined
+): number | null => {
+    const values = items.map(getter).filter(hasData);
+    if (values.length === 0) return null;
+    return values.reduce((a, b) => a + b, 0);
+};
+
+// Helper to average values, returning null if no data
+const avgWithNull = <T,>(
+    items: T[],
+    getter: (item: T) => number | null | undefined
+): number | null => {
+    const values = items.map(getter).filter(hasData);
+    if (values.length === 0) return null;
+    return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+};
+
+// Animated value component for counting up numbers - handles null
+const AnimatedValue = ({
+    value,
+    suffix = '',
+    className = '',
+    duration = 1500,
+    delay = 0
+}: {
+    value: number | null;
+    suffix?: string;
+    className?: string;
+    duration?: number;
+    delay?: number;
+}) => {
+    const count = useCountUp({ end: value ?? 0, duration, delay });
+    if (value === null) return <span className={className}>--</span>;
+    return <span className={className}>{count}{suffix}</span>;
+};
+
+// Static value display - shows -- for null
+const StatValue = ({ value, suffix = '' }: { value: number | null; suffix?: string }) => {
+    if (value === null) return <span>--</span>;
+    return <span>{value}{suffix}</span>;
+};
+
+// Animated percentage bar component - handles null
+const AnimatedBar = ({
+    value,
+    maxValue = 100,
+    color = 'bg-primary',
+    delay = 0,
+}: {
+    value: number | null;
+    maxValue?: number;
+    color?: string;
+    delay?: number;
+}) => {
+    if (value === null) return null;
+    const percentage = Math.min((value / maxValue) * 100, 100);
+    return (
+        <motion.div
+            className={cn("h-full rounded-full", color)}
+            initial={{ width: 0 }}
+            animate={{ width: `${percentage}%` }}
+            transition={{ duration: 1.2, delay, ease: "easeOut" }}
+        />
+    );
 };
 
 // Position colors for pie chart and players
@@ -112,43 +189,130 @@ interface TeamAnalyticsProps {
     defaultMatchId?: string;
 }
 
+
+interface MatchListItem {
+    id: string;
+    opponent: string;
+    date: string;
+    homeTeam: string;
+}
+
+interface MatchStatistics {
+    match_id: string;
+    team_clearances: number;
+    team_interceptions: number;
+    team_successful_dribbles: number;
+    home_ball_recoveries?: number;
+    away_ball_recoveries?: number;
+    team_chances_created: number;
+    team_chances_final_third: number;
+    team_aerial_duels_won: number;
+    team_shots_on_target: number;
+    team_fouls: number;
+    team_saves: number;
+    team_freekicks: number;
+    opponent_clearances: number;
+    opponent_interceptions: number;
+    opponent_successful_dribbles: number;
+    opponent_chances_created: number;
+    opponent_chances_final_third: number;
+    opponent_aerial_duels_won: number;
+    opponent_fouls: number;
+    opponent_saves: number;
+    opponent_freekicks: number;
+    opponent_conversion_rate: number;
+
+    // Indices
+    home_possession_control_index?: number;
+    home_chance_creation_index?: number;
+    home_shooting_efficiency?: number;
+    home_defensive_solidity?: number;
+    home_transition_progression?: number;
+    home_recovery_pressing_efficiency?: number;
+
+    away_possession_control_index?: number;
+    away_chance_creation_index?: number;
+    away_shooting_efficiency?: number;
+    away_defensive_solidity?: number;
+    away_transition_progression?: number;
+    away_recovery_pressing_efficiency?: number;
+}
+
+// ... imports moved to top
+
 const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps) => {
-    const players = playersData.players as Player[];
+    // const players = playersData.players as Player[]; // Remove
+    const { data: players = [], isLoading: isPlayersLoading } = usePlayers(); // Use hook
     const [selectedMatch, setSelectedMatch] = useState<string>(defaultMatchId || "all");
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
 
-    // All unique matches
+    // Fetch matches from Supabase
+    const { data: dbMatches = [] } = useQuery({
+        queryKey: ['matches-list'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('matches')
+                .select('id, competition_name, match_date, home_team:home_team_id(team_name), away_team:away_team_id(team_name)')
+                .order('match_date', { ascending: false });
+
+            if (error) throw error;
+            return ((data as any[]) || []).map(m => ({
+                id: m.id,
+                opponent: (m.away_team as any)?.team_name || 'Opponent',
+                date: m.match_date,
+                homeTeam: (m.home_team as any)?.team_name || 'Team'
+            })) as MatchListItem[];
+        }
+    });
+
     const matches = useMemo(() => {
-        const matchSet = new Map<string, { id: string; opponent: string; date: string }>();
-        players.forEach((p) => {
-            p.matchStats.forEach((m) => {
-                if (!matchSet.has(m.matchId)) {
-                    matchSet.set(m.matchId, { id: m.matchId, opponent: m.opponent, date: m.date });
-                }
-            });
-        });
-        return Array.from(matchSet.values());
-    }, [players]);
+        return dbMatches;
+    }, [dbMatches]);
+
+    // Fetch match statistics
+    const { data: matchStatsList = [] } = useQuery({
+        queryKey: ['match-statistics', selectedMatch],
+        queryFn: async () => {
+            let query = supabase.from('match_statistics').select('*');
+            if (selectedMatch !== "all") {
+                query = query.eq('match_id', selectedMatch);
+            }
+            const { data, error } = await query;
+            if (error) throw error;
+            return (data || []) as unknown as MatchStatistics[];
+        }
+    });
 
     // Aggregate team stats
     const teamStats = useMemo(() => {
-        const relevantStats = players.flatMap(p =>
+        // Guard against empty players array
+        if (players.length === 0) {
+            return { totalGoals: 0, totalAssists: 0, avgRating: 0, totalMatches: 0, playerCount: 0 };
+        }
+
+        // Filter players who participated in the selected match
+        const activePlayers = selectedMatch === "all"
+            ? players
+            : players.filter(p => p.matchStats.some(m => m.matchId === selectedMatch));
+
+        const relevantStats = activePlayers.flatMap(p =>
             p.matchStats.filter(m => selectedMatch === "all" || m.matchId === selectedMatch)
         );
 
         const totalGoals = relevantStats.reduce((a, m) => a + m.stats.goals, 0);
         const totalAssists = relevantStats.reduce((a, m) => a + m.stats.assists, 0);
 
-        const avgRating = Math.round(
-            players.reduce((acc, p) => acc + p.overallRating, 0) / players.length
-        );
+        // Average rating from active players only
+        const avgRating = activePlayers.length > 0
+            ? Math.round(activePlayers.reduce((acc, p) => acc + p.overallRating, 0) / activePlayers.length)
+            : 0;
 
         const totalMatches = selectedMatch === "all"
-            ? Math.max(...players.map((p) => p.matchStats.length))
+            ? Math.max(...players.map((p) => p.matchStats.length), 0)
             : 1;
 
-        return { totalGoals, totalAssists, avgRating, totalMatches };
+        return { totalGoals, totalAssists, avgRating, totalMatches, playerCount: activePlayers.length };
     }, [players, selectedMatch]);
 
     // Position distribution for pie chart
@@ -160,24 +324,56 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         return Object.entries(counts).map(([name, value]) => ({ name, value }));
     }, [players]);
 
-    // Top performers
+    // Top performers - filter by selected match
     const topPerformers = useMemo(() => {
-        const topScorer = players.reduce((prev, curr) => {
-            const prevGoals = prev.matchStats.reduce((a, m) => a + m.stats.goals, 0);
-            const currGoals = curr.matchStats.reduce((a, m) => a + m.stats.goals, 0);
+        // Guard against empty array - reduce without initial value throws on empty arrays
+        if (players.length === 0) {
+            return { topScorer: null, topAssister: null, topRated: null };
+        }
+
+        // Filter players who participated in the selected match
+        const activePlayers = selectedMatch === "all"
+            ? players
+            : players.filter(p => p.matchStats.some(m => m.matchId === selectedMatch));
+
+        if (activePlayers.length === 0) {
+            return { topScorer: null, topAssister: null, topRated: null };
+        }
+
+        // Helper to get goals for a player (filtered by match if applicable)
+        const getPlayerGoals = (player: Player) => {
+            if (selectedMatch === "all") {
+                return player.matchStats.reduce((a, m) => a + m.stats.goals, 0);
+            }
+            const matchStat = player.matchStats.find(m => m.matchId === selectedMatch);
+            return matchStat ? matchStat.stats.goals : 0;
+        };
+
+        // Helper to get assists for a player (filtered by match if applicable)
+        const getPlayerAssists = (player: Player) => {
+            if (selectedMatch === "all") {
+                return player.matchStats.reduce((a, m) => a + m.stats.assists, 0);
+            }
+            const matchStat = player.matchStats.find(m => m.matchId === selectedMatch);
+            return matchStat ? matchStat.stats.assists : 0;
+        };
+
+        const topScorer = activePlayers.reduce((prev, curr) => {
+            const prevGoals = getPlayerGoals(prev);
+            const currGoals = getPlayerGoals(curr);
             return currGoals > prevGoals ? curr : prev;
         });
-        const topAssister = players.reduce((prev, curr) => {
-            const prevAssists = prev.matchStats.reduce((a, m) => a + m.stats.assists, 0);
-            const currAssists = curr.matchStats.reduce((a, m) => a + m.stats.assists, 0);
+        const topAssister = activePlayers.reduce((prev, curr) => {
+            const prevAssists = getPlayerAssists(prev);
+            const currAssists = getPlayerAssists(curr);
             return currAssists > prevAssists ? curr : prev;
         });
-        const topRated = players.reduce((prev, curr) =>
+        const topRated = activePlayers.reduce((prev, curr) =>
             curr.overallRating > prev.overallRating ? curr : prev
         );
 
         return { topScorer, topAssister, topRated };
-    }, [players]);
+    }, [players, selectedMatch]);
 
     // Team trend data
     const teamTrendData = useMemo(() => {
@@ -278,7 +474,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     }, [isPlaying, filteredGoals.length]);
 
     const statCards = [
-        { label: "Total Players", value: players.length, icon: Users, color: "text-primary" },
+        { label: selectedMatch === "all" ? "Total Players" : "Match Players", value: teamStats.playerCount, icon: Users, color: "text-primary" },
         { label: "Total Goals", value: teamStats.totalGoals, icon: Target, color: "text-destructive" },
         { label: "Total Assists", value: teamStats.totalAssists, icon: Footprints, color: "text-warning" },
         { label: "Avg Rating", value: teamStats.avgRating, icon: TrendingUp, color: "text-success" },
@@ -376,30 +572,362 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         initial="hidden"
                         animate="show"
                     >
-                        {statCards.map((stat) => (
+                        {statCards.map((stat, index) => (
                             <motion.div
                                 key={stat.label}
                                 variants={itemVariants}
                                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                                className="relative overflow-hidden rounded-lg border border-border bg-card p-5 group hover:border-primary/30 transition-all duration-300"
+                                className="relative overflow-hidden rounded-xl glass card-glow p-5 group hover:border-primary/40 transition-all duration-300"
                             >
-                                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="flex items-start justify-between">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/15 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
+                                <div className="relative flex items-start justify-between">
                                     <div>
-                                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
                                             {stat.label}
                                         </p>
-                                        <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                                        <p className={`text-3xl font-bold ${stat.color}`}>
+                                            <AnimatedValue value={stat.value} delay={index * 100} />
+                                        </p>
                                     </div>
                                     <motion.div
-                                        className={`p-3 rounded-lg bg-secondary ${stat.color}`}
-                                        whileHover={{ rotate: 10 }}
+                                        className={`p-3 rounded-xl glass-subtle ${stat.color}`}
+                                        whileHover={{ rotate: 10, scale: 1.1 }}
                                     >
-                                        <stat.icon className="w-5 h-5" />
+                                        <stat.icon className="w-6 h-6" />
                                     </motion.div>
                                 </div>
                             </motion.div>
                         ))}
+                    </motion.div>
+
+                    {/* Advanced Statistics Section - REORDERED */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="mb-8"
+                    >
+                        <Card className="glass-strong rounded-xl">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                        <path d="M2 17l10 5 10-5" />
+                                        <path d="M2 12l10 5 10-5" />
+                                    </svg>
+                                    Advanced Statistics
+                                </CardTitle>
+                                <p className="text-sm text-muted-foreground">Detailed match performance metrics</p>
+                            </CardHeader>
+                            <CardContent>
+                                {(() => {
+                                    // Use fetched match statistics
+                                    const relevantStats = matchStatsList;
+                                    const isAggregation = selectedMatch === "all";
+
+                                    // Team stats - Use sumWithNull to preserve null for missing data
+                                    const teamClearances = sumWithNull(relevantStats, m => m.team_clearances);
+                                    const teamInterceptions = sumWithNull(relevantStats, m => m.team_interceptions);
+                                    const teamDribbles = sumWithNull(relevantStats, m => m.team_successful_dribbles);
+                                    const teamRecoveries = sumWithNull(relevantStats, m => (m as any).home_ball_recoveries);
+                                    const teamPassesInBox = sumWithNull(relevantStats, m => m.team_chances_created);
+                                    const teamPassesFinalThird = sumWithNull(relevantStats, m => m.team_chances_final_third);
+                                    const teamAerialDuels = sumWithNull(relevantStats, m => m.team_aerial_duels_won);
+                                    const teamShotsOnTarget = sumWithNull(relevantStats, m => m.team_shots_on_target);
+                                    const teamShots = teamShotsOnTarget !== null ? teamShotsOnTarget * 2 : null; // Est total shots
+
+                                    // Opponent stats
+                                    const oppClearances = sumWithNull(relevantStats, m => m.opponent_clearances);
+                                    const oppInterceptions = sumWithNull(relevantStats, m => m.opponent_interceptions);
+                                    const oppDribbles = sumWithNull(relevantStats, m => m.opponent_successful_dribbles);
+                                    const oppRecoveries = sumWithNull(relevantStats, m => (m as any).away_ball_recoveries);
+                                    const oppPassesInBox = sumWithNull(relevantStats, m => m.opponent_chances_created);
+                                    const oppPassesFinalThird = sumWithNull(relevantStats, m => m.opponent_chances_final_third);
+                                    const oppAerialDuels = sumWithNull(relevantStats, m => m.opponent_aerial_duels_won);
+
+                                    const teamFouls = sumWithNull(relevantStats, m => m.team_fouls);
+                                    const oppFouls = sumWithNull(relevantStats, m => m.opponent_fouls);
+                                    const teamSaves = sumWithNull(relevantStats, m => m.team_saves);
+                                    const oppSaves = sumWithNull(relevantStats, m => m.opponent_saves);
+                                    const teamFreeKicks = sumWithNull(relevantStats, m => m.team_freekicks);
+                                    const oppFreeKicks = sumWithNull(relevantStats, m => m.opponent_freekicks);
+
+                                    const teamConversion = teamShots !== null && teamShots > 0 && teamShotsOnTarget !== null
+                                        ? Math.round((teamShotsOnTarget / teamShots) * 100) : null;
+                                    const oppConversion = avgWithNull(relevantStats, m => m.opponent_conversion_rate ? Number(m.opponent_conversion_rate) : null);
+
+                                    // Match info for header
+                                    const currentMatchInfo = dbMatches.find(m => m.id === selectedMatch);
+                                    const teamName = currentMatchInfo?.homeTeam || "Bombay Gymkhana Men";
+                                    const opponentName = selectedMatch === "all" ? "All Opponents" : currentMatchInfo?.opponent || "Opponent";
+
+                                    const advancedStats = [
+                                        {
+                                            label: "Chances Created (In Box)",
+                                            team: teamPassesInBox,
+                                            opponent: oppPassesInBox,
+                                            icon: <TrendingUp className="w-4 h-4" />
+                                        },
+                                        {
+                                            label: "Chances Created (Final Third)",
+                                            team: teamPassesFinalThird,
+                                            opponent: oppPassesFinalThird,
+                                            icon: <TrendingUp className="w-4 h-4" />
+                                        },
+                                        {
+                                            label: "Clearances",
+                                            team: teamClearances,
+                                            opponent: oppClearances,
+                                            icon: <Shield className="w-4 h-4" />
+                                        },
+                                        {
+                                            label: "Interceptions",
+                                            team: teamInterceptions,
+                                            opponent: oppInterceptions,
+                                            icon: <Target className="w-4 h-4" />
+                                        },
+                                        {
+                                            label: "Successful Dribbles",
+                                            team: teamDribbles,
+                                            opponent: oppDribbles,
+                                            icon: <Flame className="w-4 h-4" />
+                                        },
+                                        {
+                                            label: "Ball Recoveries",
+                                            team: teamRecoveries,
+                                            opponent: oppRecoveries,
+                                            icon: <Footprints className="w-4 h-4" />
+                                        },
+                                    ];
+
+                                    const bottomStats = [
+                                        { label: "AERIAL DUELS WON", team: teamAerialDuels, opponent: oppAerialDuels },
+                                        { label: "FOULS", team: teamFouls, opponent: oppFouls },
+                                        { label: "SAVES", team: teamSaves, opponent: oppSaves },
+                                        { label: "FREE KICKS", team: teamFreeKicks, opponent: oppFreeKicks },
+                                        { label: "CONVERSION RATE", team: teamConversion !== null ? `${teamConversion}%` : "--", opponent: oppConversion !== null ? `${Math.round(oppConversion)}%` : "--" },
+                                    ];
+
+                                    // Indices from DB - use avgWithNull to preserve null for missing data
+                                    const pci = avgWithNull(relevantStats, m => (m as any).home_possession_control_index);
+                                    const cci = avgWithNull(relevantStats, m => (m as any).home_chance_creation_index);
+                                    const se = avgWithNull(relevantStats, m => (m as any).home_shooting_efficiency);
+                                    const ds = avgWithNull(relevantStats, m => (m as any).home_defensive_solidity);
+                                    const tp = avgWithNull(relevantStats, m => (m as any).home_transition_progression);
+                                    const rpe = avgWithNull(relevantStats, m => (m as any).home_recovery_pressing_efficiency);
+
+                                    // Opponent indices (using away_*)
+                                    const oppPci = avgWithNull(relevantStats, m => (m as any).away_possession_control_index);
+                                    const oppCci = avgWithNull(relevantStats, m => (m as any).away_chance_creation_index);
+                                    const oppSe = avgWithNull(relevantStats, m => (m as any).away_shooting_efficiency);
+                                    const oppDs = avgWithNull(relevantStats, m => (m as any).away_defensive_solidity);
+                                    const oppTp = avgWithNull(relevantStats, m => (m as any).away_transition_progression);
+                                    const oppRpe = avgWithNull(relevantStats, m => (m as any).away_recovery_pressing_efficiency);
+
+                                    const hexagonData = [
+                                        { label: "PCI", teamValue: pci, opponentValue: oppPci, maxValue: 100 },
+                                        { label: "CCI", teamValue: cci, opponentValue: oppCci, maxValue: 100 },
+                                        { label: "SE", teamValue: se, opponentValue: oppSe, maxValue: 100 },
+                                        { label: "DS", teamValue: ds, opponentValue: oppDs, maxValue: 100 },
+                                        { label: "T&P", teamValue: tp, opponentValue: oppTp, maxValue: 100 },
+                                        { label: "RPE", teamValue: rpe, opponentValue: oppRpe, maxValue: 100 },
+                                    ];
+
+                                    const keyIndices = [
+                                        { label: "Possession Control Index", short: "PCI", team: pci, opponent: oppPci, icon: <Target className="w-4 h-4" /> },
+                                        { label: "Chance Creation Index", short: "CCI", team: cci, opponent: oppCci, icon: <TrendingUp className="w-4 h-4" /> },
+                                        { label: "Shooting Efficiency", short: "SE", team: se, opponent: oppSe, icon: <Flame className="w-4 h-4" /> },
+                                        { label: "Defensive Solidity", short: "DS", team: ds, opponent: oppDs, icon: <Shield className="w-4 h-4" /> },
+                                        { label: "Transition & Progression", short: "T&P", team: tp, opponent: oppTp, icon: <Footprints className="w-4 h-4" /> },
+                                        { label: "Recovery & Pressing", short: "RPE", team: rpe, opponent: oppRpe, icon: <Users className="w-4 h-4" /> },
+                                    ];
+
+                                    return (
+                                        <>
+                                            {/* Team Names Header */}
+                                            <div className="flex items-center justify-center gap-4 mb-6">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full bg-primary" />
+                                                    <span className="font-medium text-foreground">{teamName}</span>
+                                                </div>
+                                                <span className="text-muted-foreground">vs</span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full bg-muted-foreground" />
+                                                    <span className="text-muted-foreground">{opponentName}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Hexagon Chart + Key Performance Indices */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                                {/* Hexagon Radar Chart */}
+                                                <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border">
+                                                    <h4 className="text-sm font-semibold text-foreground mb-4">Performance Overview</h4>
+                                                    <HexagonRadar
+                                                        data={hexagonData}
+                                                        teamName={teamName}
+                                                        opponentName={opponentName}
+                                                        size={320}
+                                                    />
+                                                </div>
+
+                                                {/* Key Performance Indices */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {keyIndices.map((stat, index) => {
+                                                        // Only compare if both values have data
+                                                        const bothHaveData = stat.team !== null && stat.opponent !== null;
+                                                        const teamLeading = bothHaveData && stat.team > stat.opponent;
+                                                        const oppLeading = bothHaveData && stat.opponent > stat.team;
+                                                        const difference = bothHaveData ? Math.abs(stat.team - stat.opponent) : 0;
+                                                        const leadPercentage = bothHaveData && stat.opponent > 0
+                                                            ? Math.round((difference / stat.opponent) * 100)
+                                                            : difference > 0 ? 100 : 0;
+                                                        const leadingTeam = bothHaveData ? (teamLeading ? teamName : (oppLeading ? opponentName : null)) : null;
+
+                                                        return (
+                                                            <motion.div
+                                                                key={stat.label}
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                transition={{ delay: index * 0.08 }}
+                                                                className="p-4 rounded-xl glass-subtle hover:border-primary/30 transition-all duration-300"
+                                                            >
+                                                                <div className="flex items-center gap-2 mb-3 text-primary">
+                                                                    {stat.icon}
+                                                                    <span className="text-xs font-semibold truncate">{stat.label}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                    <div className={cn(
+                                                                        "text-2xl font-bold px-3 py-1.5 rounded-lg text-center flex-1",
+                                                                        teamLeading
+                                                                            ? "bg-primary/20 text-primary"
+                                                                            : "text-foreground"
+                                                                    )}>
+                                                                        {stat.team !== null ? <AnimatedValue value={stat.team} delay={index * 100} suffix="%" /> : "--"}
+                                                                    </div>
+                                                                    <span className="text-sm font-medium text-muted-foreground">vs</span>
+                                                                    <div className={cn(
+                                                                        "text-2xl font-bold px-3 py-1.5 rounded-lg text-center flex-1",
+                                                                        oppLeading
+                                                                            ? "bg-primary/20 text-primary"
+                                                                            : "text-muted-foreground"
+                                                                    )}>
+                                                                        {stat.opponent !== null ? <AnimatedValue value={stat.opponent} delay={index * 100 + 150} suffix="%" /> : "--"}
+                                                                    </div>
+                                                                </div>
+                                                                {/* Animated comparison bar - only show if both values exist */}
+                                                                {bothHaveData && (
+                                                                    <div className="h-1.5 rounded-full bg-secondary overflow-hidden mb-2">
+                                                                        <motion.div
+                                                                            className="h-full bg-primary rounded-full"
+                                                                            initial={{ width: 0 }}
+                                                                            animate={{ width: `${(stat.team / (stat.team + stat.opponent)) * 100}%` }}
+                                                                            transition={{ duration: 1.2, delay: index * 0.1, ease: "easeOut" }}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                                {/* Leading indicator with percentage */}
+                                                                {leadingTeam && (
+                                                                    <div className={cn(
+                                                                        "pt-2 border-t border-border/50 text-center",
+                                                                    )}>
+                                                                        <span className={cn(
+                                                                            "text-sm font-semibold",
+                                                                            teamLeading ? "text-primary" : "text-muted-foreground"
+                                                                        )}>
+                                                                            {teamLeading ? teamName.split(" ")[0] : opponentName.split(" ")[0]} leads by {leadPercentage}%
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Match Stats Grid */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                                                {advancedStats.map((stat, index) => {
+                                                    // Only compare if both values have data
+                                                    const bothHaveData = stat.team !== null && stat.opponent !== null;
+                                                    const teamLeading = bothHaveData && stat.team > stat.opponent;
+                                                    const oppLeading = bothHaveData && stat.opponent > stat.team;
+                                                    const difference = bothHaveData ? Math.abs(stat.team - stat.opponent) : null;
+
+                                                    return (
+                                                        <motion.div
+                                                            key={stat.label}
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ delay: index * 0.05 }}
+                                                            className="p-4 rounded-xl glass-subtle hover:border-primary/30 transition-all duration-300"
+                                                        >
+                                                            <div className="flex items-center gap-2 mb-3 text-primary">
+                                                                {stat.icon}
+                                                                <span className="text-xs font-semibold">{stat.label}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 flex items-center gap-1.5">
+                                                                    <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-sm shadow-primary/50" />
+                                                                    <span className={cn(
+                                                                        "text-xl font-bold",
+                                                                        teamLeading ? "text-primary" : "text-foreground"
+                                                                    )}>
+                                                                        {stat.team !== null ? <AnimatedValue value={stat.team} delay={index * 80} duration={1200} /> : "--"}
+                                                                    </span>
+                                                                    {teamLeading && difference !== null && (
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/20 text-primary font-semibold">
+                                                                            +{difference}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-sm font-medium text-muted-foreground">vs</span>
+                                                                <div className="flex-1 flex items-center gap-1.5 justify-end">
+                                                                    {oppLeading && difference !== null && (
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
+                                                                            +{difference}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className={cn(
+                                                                        "text-xl font-bold",
+                                                                        oppLeading ? "text-foreground" : "text-muted-foreground"
+                                                                    )}>
+                                                                        {stat.opponent !== null ? <AnimatedValue value={stat.opponent} delay={index * 80 + 100} duration={1200} /> : "--"}
+                                                                    </span>
+                                                                    <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/60" />
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Bottom Stats Row */}
+                                            <div className="border-t border-border pt-4">
+                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                                    {bottomStats.map((stat) => (
+                                                        <div key={stat.label} className="text-center p-2 rounded-lg bg-secondary/20">
+                                                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                                                                {stat.label}
+                                                            </p>
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <span className="text-lg font-bold text-primary">
+                                                                    {stat.team !== null ? stat.team : "--"}
+                                                                </span>
+                                                                <span className="text-xs text-muted-foreground">vs</span>
+                                                                <span className="text-lg font-bold text-foreground">
+                                                                    {stat.opponent !== null ? stat.opponent : "--"}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </CardContent>
+                        </Card>
                     </motion.div>
 
                     {/* Main Grid */}
@@ -434,29 +962,23 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="relative aspect-[16/10] bg-gradient-to-b from-emerald-900/40 to-emerald-800/40 rounded-xl border border-emerald-700/30 overflow-hidden">
-                                        {/* Field markings - Half pitch */}
-                                        <svg
-                                            viewBox="0 0 100 60"
-                                            className="absolute inset-0 w-full h-full"
-                                            preserveAspectRatio="xMidYMid meet"
-                                        >
-                                            {/* Penalty area */}
-                                            <rect x="25" y="0" width="50" height="18" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" fill="none" />
-                                            {/* Goal area */}
-                                            <rect x="37" y="0" width="26" height="8" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" fill="none" />
-                                            {/* Goal */}
-                                            <rect x="40" y="0" width="20" height="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="0.3" />
-                                            {/* Penalty arc */}
-                                            <path d="M 32 18 A 12 12 0 0 0 68 18" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            {/* Penalty spot */}
-                                            <circle cx="50" cy="14" r="0.8" fill="rgba(255,255,255,0.4)" />
-                                            {/* Halfway line (at bottom) */}
-                                            <line x1="0" y1="60" x2="100" y2="60" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" />
-                                            {/* Corner arcs */}
-                                            <path d="M 0 3 A 3 3 0 0 1 3 0" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            <path d="M 97 0 A 3 3 0 0 1 100 3" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                        </svg>
+                                    <div className="relative w-full max-w-4xl mx-auto rounded-xl border border-white/20 overflow-hidden bg-muted/20" style={{ aspectRatio: '1.4' }}>
+                                        {/* Properly rotated background */}
+                                        <div
+                                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                                            style={{
+                                                width: '71.43%',
+                                                height: '100%',
+                                                backgroundImage: 'url(/half-field.jpg)',
+                                                backgroundSize: '100% 100%',
+                                                backgroundPosition: 'center',
+                                                backgroundRepeat: 'no-repeat',
+                                                transform: 'translate(-50%, -50%) rotate(90deg)',
+                                            }}
+                                        />
+
+                                        {/* Subtle overlay for better visibility */}
+                                        <div className="absolute inset-0 bg-black/15" />
 
                                         {/* Players - ALL visible now */}
                                         {formationPlayers.map(({ player, position, color }, index) => (
@@ -511,79 +1033,98 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {/* Top Scorer */}
-                                    <Link
-                                        to={`/player/${topPerformers.topScorer.id}`}
-                                        className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
-                                    >
-                                        <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center">
-                                            <Target className="w-6 h-6 text-destructive" />
+                                    {/* Show loading/empty state if no performers yet */}
+                                    {!topPerformers.topScorer || !topPerformers.topAssister || !topPerformers.topRated ? (
+                                        <div className="text-center py-8 text-muted-foreground">
+                                            <p>Loading top performers...</p>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                                                Top Scorer
-                                            </p>
-                                            <p className="font-semibold text-foreground truncate">
-                                                {topPerformers.topScorer.name}
-                                            </p>
-                                            <p className="text-sm text-destructive font-medium">
-                                                {topPerformers.topScorer.matchStats.reduce(
-                                                    (a, m) => a + m.stats.goals,
-                                                    0
-                                                )}{" "}
-                                                goals
-                                            </p>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                                    </Link>
+                                    ) : (
+                                        <>
+                                            {/* Top Scorer */}
+                                            <Link
+                                                to={`/player/${topPerformers.topScorer.id}`}
+                                                className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center">
+                                                    <Target className="w-6 h-6 text-destructive" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                                                        Top Scorer
+                                                    </p>
+                                                    <p className="font-semibold text-foreground truncate">
+                                                        {topPerformers.topScorer.name}
+                                                    </p>
+                                                    <p className="text-sm text-destructive font-medium">
+                                                        {selectedMatch === "all"
+                                                            ? topPerformers.topScorer.matchStats.reduce(
+                                                                (a, m) => a + m.stats.goals,
+                                                                0
+                                                            )
+                                                            : topPerformers.topScorer.matchStats
+                                                                .filter(m => m.matchId === selectedMatch)
+                                                                .reduce((a, m) => a + m.stats.goals, 0)
+                                                        }{" "}
+                                                        goals
+                                                    </p>
+                                                </div>
+                                                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                            </Link>
 
-                                    {/* Top Assister */}
-                                    <Link
-                                        to={`/player/${topPerformers.topAssister.id}`}
-                                        className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
-                                    >
-                                        <div className="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center">
-                                            <Footprints className="w-6 h-6 text-warning" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                                                Top Assister
-                                            </p>
-                                            <p className="font-semibold text-foreground truncate">
-                                                {topPerformers.topAssister.name}
-                                            </p>
-                                            <p className="text-sm text-warning font-medium">
-                                                {topPerformers.topAssister.matchStats.reduce(
-                                                    (a, m) => a + m.stats.assists,
-                                                    0
-                                                )}{" "}
-                                                assists
-                                            </p>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                                    </Link>
+                                            {/* Top Assister */}
+                                            <Link
+                                                to={`/player/${topPerformers.topAssister.id}`}
+                                                className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center">
+                                                    <Footprints className="w-6 h-6 text-warning" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                                                        Top Assister
+                                                    </p>
+                                                    <p className="font-semibold text-foreground truncate">
+                                                        {topPerformers.topAssister.name}
+                                                    </p>
+                                                    <p className="text-sm text-warning font-medium">
+                                                        {selectedMatch === "all"
+                                                            ? topPerformers.topAssister.matchStats.reduce(
+                                                                (a, m) => a + m.stats.assists,
+                                                                0
+                                                            )
+                                                            : topPerformers.topAssister.matchStats
+                                                                .filter(m => m.matchId === selectedMatch)
+                                                                .reduce((a, m) => a + m.stats.assists, 0)
+                                                        }{" "}
+                                                        assists
+                                                    </p>
+                                                </div>
+                                                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                            </Link>
 
-                                    {/* Top Rated */}
-                                    <Link
-                                        to={`/player/${topPerformers.topRated.id}`}
-                                        className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
-                                    >
-                                        <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center">
-                                            <Flame className="w-6 h-6 text-success" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                                                Highest Rated
-                                            </p>
-                                            <p className="font-semibold text-foreground truncate">
-                                                {topPerformers.topRated.name}
-                                            </p>
-                                            <p className="text-sm text-success font-medium">
-                                                {topPerformers.topRated.overallRating} rating
-                                            </p>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                                    </Link>
+                                            {/* Top Rated */}
+                                            <Link
+                                                to={`/player/${topPerformers.topRated.id}`}
+                                                className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center">
+                                                    <Flame className="w-6 h-6 text-success" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                                                        Highest Rated
+                                                    </p>
+                                                    <p className="font-semibold text-foreground truncate">
+                                                        {topPerformers.topRated.name}
+                                                    </p>
+                                                    <p className="text-sm text-success font-medium">
+                                                        {topPerformers.topRated.overallRating} rating
+                                                    </p>
+                                                </div>
+                                                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                            </Link>
+                                        </>
+                                    )}
                                 </CardContent>
                             </Card>
                         </motion.div>
@@ -635,24 +1176,23 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             <CardContent>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     {/* Goal Pitch Visualization */}
-                                    <div className="relative aspect-[16/10] bg-gradient-to-b from-emerald-900/40 to-emerald-800/40 rounded-xl border border-emerald-700/30 overflow-hidden">
-                                        {/* Field markings for goal view (half pitch) */}
-                                        <svg
-                                            viewBox="0 0 100 60"
-                                            className="absolute inset-0 w-full h-full"
-                                            preserveAspectRatio="xMidYMid meet"
-                                        >
-                                            {/* Penalty area */}
-                                            <rect x="25" y="0" width="50" height="18" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" fill="none" />
-                                            {/* Goal area */}
-                                            <rect x="37" y="0" width="26" height="8" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" fill="none" />
-                                            {/* Goal */}
-                                            <rect x="40" y="0" width="20" height="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="0.3" />
-                                            {/* Arc */}
-                                            <path d="M 32 18 A 12 12 0 0 0 68 18" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3" fill="none" />
-                                            {/* Penalty spot */}
-                                            <circle cx="50" cy="14" r="0.8" fill="rgba(255,255,255,0.4)" />
-                                        </svg>
+                                    <div className="relative w-full max-w-4xl mx-auto rounded-xl border border-white/20 overflow-hidden bg-muted/20" style={{ aspectRatio: '1.4' }}>
+                                        {/* Properly rotated background */}
+                                        <div
+                                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                                            style={{
+                                                width: '71.43%',
+                                                height: '100%',
+                                                backgroundImage: 'url(/half-field.jpg)',
+                                                backgroundSize: '100% 100%',
+                                                backgroundPosition: 'center',
+                                                backgroundRepeat: 'no-repeat',
+                                                transform: 'translate(-50%, -50%) rotate(90deg)',
+                                            }}
+                                        />
+
+                                        {/* Subtle overlay for better visibility */}
+                                        <div className="absolute inset-0 bg-black/15" />
 
                                         {/* Current Goal Animation */}
                                         <AnimatePresence mode="wait">
@@ -802,312 +1342,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         </Card>
                     </motion.div>
 
-                    {/* Advanced Statistics Section */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.45 }}
-                        className="mb-8"
-                    >
-                        <Card className="bg-card border-border">
-                            <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                                        <path d="M2 17l10 5 10-5" />
-                                        <path d="M2 12l10 5 10-5" />
-                                    </svg>
-                                    Advanced Statistics
-                                </CardTitle>
-                                <p className="text-sm text-muted-foreground">Detailed match performance metrics</p>
-                            </CardHeader>
-                            <CardContent>
-                                {(() => {
-                                    // Calculate advanced team stats
-                                    const teamName = "Bombay Gymkhana Men";
-                                    const opponentName = selectedMatch === "all"
-                                        ? "All Opponents"
-                                        : matches.find(m => m.id === selectedMatch)?.opponent || "Opponent";
 
-                                    const relevantMatches = selectedMatch === "all"
-                                        ? players.flatMap(p => p.matchStats)
-                                        : players.flatMap(p => p.matchStats.filter(m => m.matchId === selectedMatch));
-
-                                    // Team stats
-                                    const teamClearances = relevantMatches.reduce((a, m) => a + (m.stats.clearances || 0), 0);
-                                    const teamInterceptions = relevantMatches.reduce((a, m) => a + (m.stats.interceptions || 0), 0);
-                                    const teamDribbles = relevantMatches.reduce((a, m) => a + (m.stats.dribblesSuccessful || 0), 0);
-                                    const teamRecoveries = relevantMatches.reduce((a, m) => a + (m.stats.recoveries || 0), 0);
-                                    const teamPassesInBox = relevantMatches.reduce((a, m) => a + (m.stats.passesInBox || 0), 0);
-                                    const teamPassesFinalThird = relevantMatches.reduce((a, m) => a + (m.stats.passesInFinalThird || 0), 0);
-                                    const teamAerialDuels = relevantMatches.reduce((a, m) => a + (m.stats.aerialDuelsWon || 0), 0);
-                                    const teamShots = relevantMatches.reduce((a, m) => a + (m.stats.shots || 0), 0);
-                                    const teamShotsOnTarget = relevantMatches.reduce((a, m) => a + (m.stats.shotsOnTarget || 0), 0);
-
-                                    // Simulated opponent stats (for demo)
-                                    const oppClearances = Math.floor(teamClearances * 0.6);
-                                    const oppInterceptions = Math.floor(teamInterceptions * 0.68);
-                                    const oppDribbles = Math.floor(teamDribbles * 2.4);
-                                    const oppRecoveries = Math.floor(teamRecoveries * 1.36);
-                                    const oppPassesInBox = Math.floor(teamPassesInBox * 0.71);
-                                    const oppPassesFinalThird = Math.floor(teamPassesFinalThird * 1.23);
-                                    const oppAerialDuels = Math.floor(teamAerialDuels * 1.44);
-                                    const oppFouls = 14;
-                                    const teamFouls = 11;
-                                    const oppSaves = 4;
-                                    const teamSaves = 3;
-                                    const oppFreeKicks = 11;
-                                    const teamFreeKicks = 10;
-                                    const teamConversion = teamShots > 0 ? Math.round((teamShotsOnTarget / teamShots) * 100) : 0;
-                                    const oppConversion = 37;
-
-                                    const advancedStats = [
-                                        {
-                                            label: "Chances Created (In Box)",
-                                            team: teamPassesInBox,
-                                            opponent: oppPassesInBox,
-                                            icon: <TrendingUp className="w-4 h-4" />
-                                        },
-                                        {
-                                            label: "Chances Created (Final Third)",
-                                            team: teamPassesFinalThird,
-                                            opponent: oppPassesFinalThird,
-                                            icon: <TrendingUp className="w-4 h-4" />
-                                        },
-                                        {
-                                            label: "Clearances",
-                                            team: teamClearances,
-                                            opponent: oppClearances,
-                                            icon: <Shield className="w-4 h-4" />
-                                        },
-                                        {
-                                            label: "Interceptions",
-                                            team: teamInterceptions,
-                                            opponent: oppInterceptions,
-                                            icon: <Target className="w-4 h-4" />
-                                        },
-                                        {
-                                            label: "Successful Dribbles",
-                                            team: teamDribbles,
-                                            opponent: oppDribbles,
-                                            icon: <Flame className="w-4 h-4" />
-                                        },
-                                        {
-                                            label: "Ball Recoveries",
-                                            team: teamRecoveries,
-                                            opponent: oppRecoveries,
-                                            icon: <Footprints className="w-4 h-4" />
-                                        },
-                                    ];
-
-                                    const bottomStats = [
-                                        { label: "AERIAL DUELS WON", team: teamAerialDuels, opponent: oppAerialDuels },
-                                        { label: "FOULS", team: teamFouls, opponent: oppFouls },
-                                        { label: "SAVES", team: teamSaves, opponent: oppSaves },
-                                        { label: "FREE KICKS", team: teamFreeKicks, opponent: oppFreeKicks },
-                                        { label: "CONVERSION RATE", team: `${teamConversion}%`, opponent: `${oppConversion}%` },
-                                    ];
-
-                                    // Hexagon chart data (calculate performance indices)
-                                    const totalStats = relevantMatches.length > 0 ? relevantMatches.length : 1;
-                                    const totalPasses = relevantMatches.reduce((a, m) => a + (m.stats.passes || 0), 0);
-                                    const totalPassAcc = relevantMatches.reduce((a, m) => a + (m.stats.passAccuracy || 0), 0) / totalStats;
-                                    const totalGoals = relevantMatches.reduce((a, m) => a + (m.stats.goals || 0), 0);
-
-                                    // Performance indices (0-100 scale)
-                                    const pci = Math.min(100, Math.round(totalPassAcc * 0.8 + (teamRecoveries / Math.max(1, totalStats)) * 2)); // Possession Control Index
-                                    const cci = Math.min(100, Math.round((teamPassesInBox + teamPassesFinalThird) / Math.max(1, totalStats) * 5)); // Chance Creation Index
-                                    const se = teamShots > 0 ? Math.round((totalGoals / teamShots) * 100) : 0; // Shooting Efficiency
-                                    const ds = Math.min(100, Math.round((teamClearances + teamInterceptions + teamRecoveries) / Math.max(1, totalStats) * 3)); // Defensive Solidity
-                                    const tp = Math.min(100, Math.round((teamDribbles + relevantMatches.reduce((a, m) => a + (m.stats.progressiveRuns || 0), 0)) / Math.max(1, totalStats) * 4)); // Transition & Progression
-                                    const rpe = Math.min(100, Math.round(teamRecoveries / Math.max(1, totalStats) * 5)); // Recovery & Pressing Efficiency
-
-                                    // Opponent indices (simulated)
-                                    const oppPci = Math.floor(pci * 0.75);
-                                    const oppCci = Math.floor(cci * 0.68);
-                                    const oppSe = Math.floor(se * 0.85);
-                                    const oppDs = Math.floor(ds * 1.1);
-                                    const oppTp = Math.floor(tp * 0.9);
-                                    const oppRpe = Math.floor(rpe * 0.82);
-
-                                    const hexagonData = [
-                                        { label: "PCI", teamValue: pci, opponentValue: oppPci, maxValue: 100 },
-                                        { label: "CCI", teamValue: cci, opponentValue: oppCci, maxValue: 100 },
-                                        { label: "SE", teamValue: se, opponentValue: oppSe, maxValue: 100 },
-                                        { label: "DS", teamValue: ds, opponentValue: oppDs, maxValue: 100 },
-                                        { label: "T&P", teamValue: tp, opponentValue: oppTp, maxValue: 100 },
-                                        { label: "RPE", teamValue: rpe, opponentValue: oppRpe, maxValue: 100 },
-                                    ];
-
-                                    const keyIndices = [
-                                        { label: "Possession Control Index", short: "PCI", team: pci, opponent: oppPci, icon: <Target className="w-4 h-4" /> },
-                                        { label: "Chance Creation Index", short: "CCI", team: cci, opponent: oppCci, icon: <TrendingUp className="w-4 h-4" /> },
-                                        { label: "Shooting Efficiency", short: "SE", team: se, opponent: oppSe, icon: <Flame className="w-4 h-4" /> },
-                                        { label: "Defensive Solidity", short: "DS", team: ds, opponent: oppDs, icon: <Shield className="w-4 h-4" /> },
-                                        { label: "Transition & Progression", short: "T&P", team: tp, opponent: oppTp, icon: <Footprints className="w-4 h-4" /> },
-                                        { label: "Recovery & Pressing", short: "RPE", team: rpe, opponent: oppRpe, icon: <Users className="w-4 h-4" /> },
-                                    ];
-
-                                    return (
-                                        <>
-                                            {/* Team Names Header */}
-                                            <div className="flex items-center justify-center gap-4 mb-6">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full bg-primary" />
-                                                    <span className="font-medium text-foreground">{teamName}</span>
-                                                </div>
-                                                <span className="text-muted-foreground">vs</span>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full bg-muted-foreground" />
-                                                    <span className="text-muted-foreground">{opponentName}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Hexagon Chart + Key Performance Indices */}
-                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                                                {/* Hexagon Radar Chart */}
-                                                <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border">
-                                                    <h4 className="text-sm font-semibold text-foreground mb-4">Performance Overview</h4>
-                                                    <HexagonRadar
-                                                        data={hexagonData}
-                                                        teamName={teamName}
-                                                        opponentName={opponentName}
-                                                        size={320}
-                                                    />
-                                                </div>
-
-                                                {/* Key Performance Indices */}
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {keyIndices.map((stat) => {
-                                                        const teamLeading = stat.team > stat.opponent;
-                                                        const oppLeading = stat.opponent > stat.team;
-                                                        const difference = Math.abs(stat.team - stat.opponent);
-                                                        const leadPercentage = stat.opponent > 0
-                                                            ? Math.round((difference / stat.opponent) * 100)
-                                                            : difference > 0 ? 100 : 0;
-                                                        const leadingTeam = teamLeading ? teamName : (oppLeading ? opponentName : null);
-
-                                                        return (
-                                                            <div
-                                                                key={stat.label}
-                                                                className="p-3 rounded-lg bg-secondary/30 border border-border"
-                                                            >
-                                                                <div className="flex items-center gap-2 mb-2 text-primary">
-                                                                    {stat.icon}
-                                                                    <span className="text-xs font-medium truncate">{stat.label}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <div className={cn(
-                                                                        "text-xl font-bold px-2 py-1 rounded text-center flex-1",
-                                                                        teamLeading
-                                                                            ? "bg-primary/20 text-primary"
-                                                                            : "text-foreground"
-                                                                    )}>
-                                                                        {stat.team}%
-                                                                    </div>
-                                                                    <span className="text-xs text-muted-foreground">vs</span>
-                                                                    <div className={cn(
-                                                                        "text-xl font-bold px-2 py-1 rounded text-center flex-1",
-                                                                        oppLeading
-                                                                            ? "bg-primary/20 text-primary"
-                                                                            : "text-muted-foreground"
-                                                                    )}>
-                                                                        {stat.opponent}%
-                                                                    </div>
-                                                                </div>
-                                                                {/* Leading indicator with percentage */}
-                                                                {leadingTeam && (
-                                                                    <div className={cn(
-                                                                        "mt-2 pt-2 border-t border-border/50 text-center",
-                                                                    )}>
-                                                                        <span className={cn(
-                                                                            "text-[10px] font-semibold",
-                                                                            teamLeading ? "text-primary" : "text-muted-foreground"
-                                                                        )}>
-                                                                            {teamLeading ? teamName.split(" ")[0] : opponentName.split(" ")[0]} leads by {leadPercentage}%
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            {/* Match Stats Grid */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-                                                {advancedStats.map((stat) => {
-                                                    const teamLeading = stat.team > stat.opponent;
-                                                    const oppLeading = stat.opponent > stat.team;
-
-                                                    return (
-                                                        <div
-                                                            key={stat.label}
-                                                            className="p-3 rounded-lg bg-secondary/30 border border-border"
-                                                        >
-                                                            <div className="flex items-center gap-2 mb-2 text-primary">
-                                                                {stat.icon}
-                                                                <span className="text-xs font-medium">{stat.label}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="flex-1 flex items-center gap-1">
-                                                                    <div className="w-2 h-2 rounded-full bg-primary" />
-                                                                    <span className={cn(
-                                                                        "text-lg font-bold",
-                                                                        teamLeading ? "text-primary" : "text-foreground"
-                                                                    )}>
-                                                                        {stat.team}
-                                                                    </span>
-                                                                    {teamLeading && (
-                                                                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary/20 text-primary font-medium">
-                                                                            +
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <span className="text-xs text-muted-foreground">vs</span>
-                                                                <div className="flex-1 flex items-center gap-1 justify-end">
-                                                                    {oppLeading && (
-                                                                        <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-                                                                            +
-                                                                        </span>
-                                                                    )}
-                                                                    <span className={cn(
-                                                                        "text-lg font-bold",
-                                                                        oppLeading ? "text-foreground" : "text-muted-foreground"
-                                                                    )}>
-                                                                        {stat.opponent}
-                                                                    </span>
-                                                                    <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Bottom Stats Row */}
-                                            <div className="border-t border-border pt-4">
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                                    {bottomStats.map((stat) => (
-                                                        <div key={stat.label} className="text-center p-2 rounded-lg bg-secondary/20">
-                                                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                                                                {stat.label}
-                                                            </p>
-                                                            <div className="flex items-center justify-center gap-2">
-                                                                <span className="text-lg font-bold text-primary">{stat.team}</span>
-                                                                <span className="text-xs text-muted-foreground">vs</span>
-                                                                <span className="text-lg font-bold text-foreground">{stat.opponent}</span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </>
-                                    );
-                                })()}
-                            </CardContent>
-                        </Card>
-                    </motion.div>
 
                     {/* Position Distribution + Team Trend */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

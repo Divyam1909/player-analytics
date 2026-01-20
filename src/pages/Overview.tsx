@@ -27,7 +27,8 @@ import {
   X,
   Filter
 } from "lucide-react";
-import playersData from "@/data/players.json";
+import { usePlayers } from "@/hooks/usePlayers";
+import { useMatches } from "@/hooks/useSupabaseData";
 
 export type StatFilterMode = "none" | "passing" | "attacking" | "defending";
 
@@ -49,72 +50,145 @@ const itemVariants = {
 
 interface OverviewProps {
   embedded?: boolean;
+  matchId?: string;
 }
 
-const Overview = ({ embedded = false }: OverviewProps) => {
+const Overview = ({ embedded = false, matchId }: OverviewProps) => {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Player | undefined>();
   const [statFilter, setStatFilter] = useState<StatFilterMode>("none");
 
-  const players = playersData.players as Player[];
+  // Use the hooks to fetch players, matches, and teams
+  const { data: players = [], isLoading: playersLoading } = usePlayers();
+  const { data: matches = [], isLoading: matchesLoading } = useMatches();
 
-  // Filter players based on search
+  const isLoading = playersLoading || matchesLoading;
+
+  // Get selected match details (from prop if embedded, otherwise null)
+  const selectedMatch = matchId ? matches?.find(m => m.id === matchId) : null;
+
+  // Build team ID to name mapping from players (since players have team name and we can infer team IDs from match)
+  // Get the home and away team IDs from the match
+  const getMatchTeamIds = (match: any) => {
+    if (!match) return { homeTeamId: '', awayTeamId: '' };
+    return {
+      homeTeamId: match.home_team_id || '',
+      awayTeamId: match.away_team_id || ''
+    };
+  };
+
+  // Filter players based on selected match (by team_id) and search - MUST be before any early returns
   const filteredPlayers = useMemo(() => {
-    if (!searchQuery.trim()) return players;
+    if (!players.length) return [];
 
-    const query = searchQuery.toLowerCase();
-    return players.filter(
-      (player) =>
-        player.name.toLowerCase().includes(query) ||
-        player.position.toLowerCase().includes(query) ||
-        player.team.toLowerCase().includes(query) ||
-        player.jerseyNumber.toString().includes(query)
-    );
-  }, [players, searchQuery]);
+    let filtered = players;
 
-  // Calculate overview stats
-  const totalMatches = players.reduce((acc, p) => {
-    // Get unique match IDs to avoid counting duplicates
-    return acc + p.matchStats.length;
-  }, 0) / players.length; // Average matches per player, then multiply by typical team size
-  const teamMatches = Math.max(...players.map(p => p.matchStats.length)); // Use max as team's total matches
-  const topScorer = players.reduce((prev, curr) => {
-    const prevGoals = prev.matchStats.reduce((a, m) => a + m.stats.goals, 0);
-    const currGoals = curr.matchStats.reduce((a, m) => a + m.stats.goals, 0);
-    return currGoals > prevGoals ? curr : prev;
-  });
-  const topAssister = players.reduce((prev, curr) => {
-    const prevAssists = prev.matchStats.reduce((a, m) => a + m.stats.assists, 0);
-    const currAssists = curr.matchStats.reduce((a, m) => a + m.stats.assists, 0);
-    return currAssists > prevAssists ? curr : prev;
-  });
+    // First filter by match - filter players whose matchStats include this matchId
+    if (matchId && selectedMatch) {
+      // Get all unique team names from players who have stats in this match
+      const teamIds = getMatchTeamIds(selectedMatch);
+
+      // Build a set of team names that are playing in this match by checking player matchStats
+      const teamsInMatch = new Set<string>();
+
+      // Find players who have events in this match - their team is in the match
+      players.forEach(player => {
+        if (player.matchStats.some(ms => ms.matchId === matchId)) {
+          teamsInMatch.add(player.team);
+        }
+      });
+
+      // If we found teams from players with match events, filter by those
+      if (teamsInMatch.size > 0) {
+        filtered = players.filter(player => teamsInMatch.has(player.team));
+      }
+    }
+
+    // Then filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (player) =>
+          player.name.toLowerCase().includes(query) ||
+          player.position.toLowerCase().includes(query) ||
+          player.team.toLowerCase().includes(query) ||
+          player.jerseyNumber.toString().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [players, searchQuery, matchId, selectedMatch]);
+
+  // Early return AFTER all hooks
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-[500px]">Loading players...</div>;
+  }
+
+  // Helper to get stats for a player - filters by matchId if provided
+  const getPlayerGoals = (player: Player) => {
+    if (matchId) {
+      const matchStat = player.matchStats.find(ms => ms.matchId === matchId);
+      return matchStat ? matchStat.stats.goals : 0;
+    }
+    return player.matchStats.reduce((a, m) => a + m.stats.goals, 0);
+  };
+
+  const getPlayerAssists = (player: Player) => {
+    if (matchId) {
+      const matchStat = player.matchStats.find(ms => ms.matchId === matchId);
+      return matchStat ? matchStat.stats.assists : 0;
+    }
+    return player.matchStats.reduce((a, m) => a + m.stats.assists, 0);
+  };
+
+  // Calculate overview stats based on filtered players (for match view) or all players
+  const playersForStats = filteredPlayers.length > 0 ? filteredPlayers : players;
+  const teamMatches = matchId ? 1 : Math.max(...players.map(p => p.matchStats.length), 0); // 1 match when filtering by match
+
+  // Find top scorer from the relevant players
+  const topScorer = playersForStats.length > 0
+    ? playersForStats.reduce((prev, curr) => {
+      const prevGoals = getPlayerGoals(prev);
+      const currGoals = getPlayerGoals(curr);
+      return currGoals > prevGoals ? curr : prev;
+    })
+    : null;
+
+  // Find top assister from the relevant players
+  const topAssister = playersForStats.length > 0
+    ? playersForStats.reduce((prev, curr) => {
+      const prevAssists = getPlayerAssists(prev);
+      const currAssists = getPlayerAssists(curr);
+      return currAssists > prevAssists ? curr : prev;
+    })
+    : null;
 
   const statCards = [
     {
-      label: "Total Players",
-      value: players.length,
+      label: matchId ? "Match Players" : "Total Players",
+      value: filteredPlayers.length,
       icon: Users,
       color: "text-primary",
     },
     {
-      label: "Total Matches",
+      label: matchId ? "Match" : "Total Matches",
       value: teamMatches,
       icon: CalendarDays,
       color: "text-success",
     },
     {
       label: "Top Scorer",
-      value: topScorer.name.split(" ")[1],
-      subValue: `${topScorer.matchStats.reduce((a, m) => a + m.stats.goals, 0)} goals`,
+      value: topScorer ? topScorer.name.split(" ")[1] || topScorer.name : "-",
+      subValue: topScorer ? `${getPlayerGoals(topScorer)} goals` : "No data",
       icon: Target,
       color: "text-destructive",
     },
     {
       label: "Top Assister",
-      value: topAssister.name.split(" ")[1],
-      subValue: `${topAssister.matchStats.reduce((a, m) => a + m.stats.assists, 0)} assists`,
+      value: topAssister ? topAssister.name.split(" ")[1] || topAssister.name : "-",
+      subValue: topAssister ? `${getPlayerAssists(topAssister)} assists` : "No data",
       icon: Zap,
       color: "text-warning",
     },
@@ -196,15 +270,23 @@ const Overview = ({ embedded = false }: OverviewProps) => {
             transition={{ duration: 0.4, delay: 0.2 }}
           >
             <h2 className="text-xl font-semibold text-foreground">
-              All Players
-              {searchQuery && (
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  ({filteredPlayers.length} results)
-                </span>
-              )}
+              {matchId && selectedMatch ? (
+                <>
+                  Match Players
+                  {filteredPlayers.length > 0 && (
+                    <span className="text-sm font-normal text-primary ml-2">
+                      ({[...new Set(filteredPlayers.map(p => p.team))].join(' vs ')})
+                    </span>
+                  )}
+                </>
+              ) : "All Players"}
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({filteredPlayers.length} players)
+              </span>
             </h2>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+
               {/* Stat Filter Dropdown */}
               <div className="relative">
                 <Select value={statFilter} onValueChange={(value: StatFilterMode) => setStatFilter(value)}>
@@ -294,7 +376,7 @@ const Overview = ({ embedded = false }: OverviewProps) => {
                 </p>
               </motion.div>
             ) : viewMode === "table" ? (
-              <PlayerTable players={filteredPlayers} onCompare={handleCompare} statFilter={statFilter} />
+              <PlayerTable players={filteredPlayers} onCompare={handleCompare} statFilter={statFilter} matchId={matchId} />
             ) : (
               <motion.div
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
@@ -304,7 +386,7 @@ const Overview = ({ embedded = false }: OverviewProps) => {
               >
                 {filteredPlayers.map((player) => (
                   <motion.div key={player.id} variants={itemVariants}>
-                    <PlayerCard player={player} onCompare={handleCompare} statFilter={statFilter} />
+                    <PlayerCard player={player} onCompare={handleCompare} statFilter={statFilter} matchId={matchId} />
                   </motion.div>
                 ))}
               </motion.div>

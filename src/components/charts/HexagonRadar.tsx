@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface HexagonRadarProps {
     data: {
@@ -14,14 +14,25 @@ interface HexagonRadarProps {
     size?: number;
 }
 
+interface HoverInfo {
+    index: number;
+    type: 'team' | 'opponent';
+    x: number;
+    y: number;
+    label: string;
+    value: number;
+    teamName: string;
+}
+
 const HexagonRadar = ({
     data,
     teamName = "Team",
     opponentName = "Opponent",
     size = 320,
 }: HexagonRadarProps) => {
+    const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
     const center = size / 2;
-    const radius = (size / 2) - 55; // More padding for labels
+    const radius = (size / 2) - 45; // Reduced padding for closer labels
     const levels = 5;
 
     // Calculate points on the hexagon
@@ -64,8 +75,8 @@ const HexagonRadar = ({
                 y: center + radius * oppNormalized * Math.sin(angle),
             });
 
-            // Position labels further out with better spacing
-            const labelRadius = radius + 45;
+            // Position labels closer to the graph
+            const labelRadius = radius + 32; // Increased for larger text
             labels.push({
                 x: center + labelRadius * Math.cos(angle),
                 y: center + labelRadius * Math.sin(angle),
@@ -82,9 +93,33 @@ const HexagonRadar = ({
     const teamPath = teamPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
     const opponentPath = opponentPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
 
+    const handleTeamHover = (index: number, point: { x: number; y: number }) => {
+        setHoverInfo({
+            index,
+            type: 'team',
+            x: point.x,
+            y: point.y,
+            label: data[index].label,
+            value: data[index].teamValue,
+            teamName: teamName,
+        });
+    };
+
+    const handleOpponentHover = (index: number, point: { x: number; y: number }) => {
+        setHoverInfo({
+            index,
+            type: 'opponent',
+            x: point.x,
+            y: point.y,
+            label: data[index].label,
+            value: data[index].opponentValue,
+            teamName: opponentName,
+        });
+    };
+
     return (
         <div className="relative flex flex-col items-center">
-            <svg width={size} height={size} className="mx-auto">
+            <svg width={size} height={size} className="mx-auto overflow-visible">
                 {/* Defs for gradients and filters */}
                 <defs>
                     <linearGradient id="teamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -170,29 +205,54 @@ const HexagonRadar = ({
                     transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
                 />
 
-                {/* Data point dots - Opponent */}
+                {/* Data point dots - Opponent (interactive) */}
                 {opponentPoints.map((point, i) => (
-                    <motion.circle
+                    <motion.g
                         key={`opp-${i}`}
-                        cx={point.x}
-                        cy={point.y}
-                        r={5}
-                        fill="hsl(var(--background))"
-                        stroke="hsl(var(--muted-foreground))"
-                        strokeWidth={2}
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3, delay: 0.5 + i * 0.08 }}
-                    />
-                ))}
-
-                {/* Data point dots - Team with glow */}
-                {teamPoints.map((point, i) => (
-                    <motion.g key={`team-${i}`}>
+                        onMouseEnter={() => handleOpponentHover(i, point)}
+                        onMouseLeave={() => setHoverInfo(null)}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        {/* Hover hitbox (larger invisible circle) */}
+                        <circle
+                            cx={point.x}
+                            cy={point.y}
+                            r={12}
+                            fill="transparent"
+                        />
                         <motion.circle
                             cx={point.x}
                             cy={point.y}
-                            r={8}
+                            r={hoverInfo?.type === 'opponent' && hoverInfo?.index === i ? 7 : 5}
+                            fill="hsl(var(--background))"
+                            stroke="hsl(var(--muted-foreground))"
+                            strokeWidth={2}
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ duration: 0.3, delay: 0.5 + i * 0.08 }}
+                        />
+                    </motion.g>
+                ))}
+
+                {/* Data point dots - Team with glow (interactive) */}
+                {teamPoints.map((point, i) => (
+                    <motion.g
+                        key={`team-${i}`}
+                        onMouseEnter={() => handleTeamHover(i, point)}
+                        onMouseLeave={() => setHoverInfo(null)}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        {/* Hover hitbox (larger invisible circle) */}
+                        <circle
+                            cx={point.x}
+                            cy={point.y}
+                            r={14}
+                            fill="transparent"
+                        />
+                        <motion.circle
+                            cx={point.x}
+                            cy={point.y}
+                            r={hoverInfo?.type === 'team' && hoverInfo?.index === i ? 10 : 8}
                             fill="hsl(var(--primary))"
                             opacity={0.3}
                             initial={{ scale: 0 }}
@@ -202,7 +262,7 @@ const HexagonRadar = ({
                         <motion.circle
                             cx={point.x}
                             cy={point.y}
-                            r={5}
+                            r={hoverInfo?.type === 'team' && hoverInfo?.index === i ? 7 : 5}
                             fill="hsl(var(--primary))"
                             stroke="hsl(var(--background))"
                             strokeWidth={2}
@@ -221,10 +281,10 @@ const HexagonRadar = ({
                             label.angle === 1 || label.angle === 2 ? 'start' :
                                 label.angle === 3 ? 'middle' : 'end';
 
-                    // Better dy offset
+                    // Better dy offset - reduced spacing
                     const dy =
                         label.angle === 0 ? -8 :
-                            label.angle === 3 ? 16 : 4;
+                            label.angle === 3 ? 14 : 3;
 
                     return (
                         <g key={i}>
@@ -232,15 +292,15 @@ const HexagonRadar = ({
                                 x={label.x}
                                 y={label.y + dy}
                                 textAnchor={textAnchor}
-                                className="fill-foreground text-[11px] font-semibold"
+                                className="fill-foreground text-xs font-bold"
                             >
                                 {label.label}
                             </text>
                             <text
                                 x={label.x}
-                                y={label.y + dy + 12}
+                                y={label.y + dy + 14}
                                 textAnchor={textAnchor}
-                                className="fill-primary text-[10px] font-bold"
+                                className="fill-primary text-sm font-bold"
                             >
                                 {label.value.team}%
                             </text>
@@ -248,6 +308,34 @@ const HexagonRadar = ({
                     );
                 })}
             </svg>
+
+            {/* Hover Tooltip */}
+            <AnimatePresence>
+                {hoverInfo && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.8, y: 5 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: 5 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute pointer-events-none z-10 px-3 py-2 rounded-lg shadow-lg border border-border"
+                        style={{
+                            left: hoverInfo.x,
+                            top: hoverInfo.y - 50,
+                            transform: 'translateX(-50%)',
+                            backgroundColor: hoverInfo.type === 'team'
+                                ? 'hsl(var(--primary) / 0.95)'
+                                : 'hsl(var(--secondary))',
+                        }}
+                    >
+                        <p className={`text-[10px] font-medium ${hoverInfo.type === 'team' ? 'text-primary-foreground' : 'text-foreground'}`}>
+                            {hoverInfo.teamName}
+                        </p>
+                        <p className={`text-sm font-bold ${hoverInfo.type === 'team' ? 'text-primary-foreground' : 'text-foreground'}`}>
+                            {hoverInfo.label}: {hoverInfo.value}%
+                        </p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Legend - Improved styling */}
             <div className="flex items-center justify-center gap-8 mt-2 px-4 py-2 rounded-lg bg-secondary/30">

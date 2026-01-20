@@ -134,53 +134,16 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
             </div>
 
             {/* Field with Passing Network */}
-            <div className="relative w-full max-w-3xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-border shadow-xl">
-                {/* Field Background */}
-                <div className="absolute inset-0 bg-gradient-to-b from-emerald-800 via-emerald-900 to-emerald-800 dark:from-[#1a4a1a] dark:via-[#1a3a1a] dark:to-[#1a4a1a]" />
-
-                {/* Grass Pattern */}
-                <div
-                    className="absolute inset-0 opacity-30"
-                    style={{
-                        backgroundImage: `repeating-linear-gradient(
-              90deg,
-              transparent,
-              transparent 8%,
-              rgba(255,255,255,0.03) 8%,
-              rgba(255,255,255,0.03) 16%
-            )`
-                    }}
+            <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl" style={{ aspectRatio: '105/68' }}>
+                {/* Football Field Background Image */}
+                <img
+                    src="/41290.jpg"
+                    alt="Football field"
+                    className="absolute inset-0 w-full h-full object-cover"
                 />
 
-                {/* Field markings SVG */}
-                <svg viewBox="0 0 100 62.5" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                    <defs>
-                        <filter id={`glow-${uniqueId}`}>
-                            <feGaussianBlur stdDeviation="0.5" result="coloredBlur" />
-                            <feMerge>
-                                <feMergeNode in="coloredBlur" />
-                                <feMergeNode in="SourceGraphic" />
-                            </feMerge>
-                        </filter>
-                    </defs>
-
-                    {/* Field outline */}
-                    <rect x="2" y="2" width="96" height="58.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    {/* Center line */}
-                    <line x1="50" y1="2" x2="50" y2="60.5" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    {/* Center circle */}
-                    <circle cx="50" cy="31.25" r="9.15" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    <circle cx="50" cy="31.25" r="0.8" fill="rgba(255,255,255,0.7)" />
-                    {/* Penalty areas */}
-                    <rect x="2" y="13" width="16.5" height="36.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    <rect x="81.5" y="13" width="16.5" height="36.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    {/* Goal areas */}
-                    <rect x="2" y="21" width="5.5" height="20.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    <rect x="92.5" y="21" width="5.5" height="20.5" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.4" />
-                    {/* Goals */}
-                    <rect x="0" y="25" width="2" height="12.5" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-                    <rect x="98" y="25" width="2" height="12.5" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-                </svg>
+                {/* Subtle overlay for better visibility of markers */}
+                <div className="absolute inset-0 bg-black/10" />
 
                 {/* Position Heatmap Overlay */}
                 <div
@@ -215,23 +178,37 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
                                 <polygon points="0 0, 8 4, 0 8" fill="hsl(0, 72%, 50%)" />
                             </marker>
                         </defs>
-                        {filteredPasses.map((pass, index) => (
-                            <motion.line
-                                key={`pass-${index}`}
-                                x1={`${pass.x}%`}
-                                y1={`${pass.y}%`}
-                                x2={`${pass.targetX}%`}
-                                y2={`${pass.targetY}%`}
-                                stroke={pass.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
-                                strokeWidth={pass.success ? "2" : "1.5"}
-                                strokeOpacity={pass.success ? 0.7 : 0.5}
-                                strokeDasharray={pass.success ? "none" : "4,2"}
-                                markerEnd={`url(#${pass.success ? `arrow-success-${uniqueId}` : `arrow-fail-${uniqueId}`})`}
-                                initial={{ pathLength: 0, opacity: 0 }}
-                                animate={{ pathLength: 1, opacity: 1 }}
-                                transition={{ duration: 0.3, delay: index * 0.02 }}
-                            />
-                        ))}
+                        {filteredPasses.map((pass, index) => {
+                            // Calculate angle from origin to target
+                            const dx = pass.targetX - pass.x;
+                            const dy = pass.targetY - pass.y;
+                            const angle = Math.atan2(dy, dx);
+
+                            // Circle radius in percentage (roughly 1.5% of container)
+                            const circleRadiusPercent = 1.5;
+
+                            // Offset start position by circle radius in direction of target
+                            const startX = pass.x + Math.cos(angle) * circleRadiusPercent;
+                            const startY = pass.y + Math.sin(angle) * circleRadiusPercent;
+
+                            return (
+                                <motion.line
+                                    key={`pass-${index}`}
+                                    x1={`${startX}%`}
+                                    y1={`${startY}%`}
+                                    x2={`${pass.targetX}%`}
+                                    y2={`${pass.targetY}%`}
+                                    stroke={pass.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
+                                    strokeWidth={pass.success ? "2" : "1.5"}
+                                    strokeOpacity={pass.success ? 0.7 : 0.5}
+                                    strokeDasharray={pass.success ? "none" : "4,2"}
+                                    markerEnd={`url(#${pass.success ? `arrow-success-${uniqueId}` : `arrow-fail-${uniqueId}`})`}
+                                    initial={{ pathLength: 0, opacity: 0 }}
+                                    animate={{ pathLength: 1, opacity: 1 }}
+                                    transition={{ duration: 0.3, delay: index * 0.02 }}
+                                />
+                            );
+                        })}
                     </svg>
                 )}
 

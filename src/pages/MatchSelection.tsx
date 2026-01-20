@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import AuthHeader from "@/components/layout/AuthHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Calendar, Eye, ChevronRight, Search } from "lucide-react";
-import playersData from "@/data/players.json";
-import { Player } from "@/types/player";
+import { cn } from "@/lib/utils";
 
 // Animation variants
 const containerVariants = {
@@ -34,53 +35,69 @@ interface MatchData {
     awayScore: number;
 }
 
+
+interface MatchResponse {
+    id: string;
+    match_date: string;
+    competition_name: string;
+    home_score: number;
+    away_score: number;
+    home_team: { team_name: string } | null;
+    away_team: { team_name: string } | null;
+}
+
 const MatchSelection = () => {
     const [searchQuery, setSearchQuery] = useState("");
 
-    const players = playersData.players as Player[];
+    const { data: matches = [], isLoading } = useQuery<MatchResponse[]>({
+        queryKey: ['matches'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('matches')
+                .select(`
+                    id,
+                    match_date,
+                    competition_name,
+                    home_score,
+                    away_score,
+                    home_team:home_team_id(team_name),
+                    away_team:away_team_id(team_name)
+                `)
+                .order('match_date', { ascending: false });
 
-    // Extract unique matches from player data
-    const matches = useMemo(() => {
-        const matchMap = new Map<string, MatchData>();
+            if (error) throw error;
+            return data as unknown as MatchResponse[]; // Cast since Supabase types might be distinct
+        }
+    });
 
-        players.forEach((player) => {
-            player.matchStats.forEach((match) => {
-                if (!matchMap.has(match.matchId)) {
-                    // Calculate team score (sum of goals from all players in that match)
-                    const teamGoals = players.reduce((total, p) => {
-                        const playerMatch = p.matchStats.find(m => m.matchId === match.matchId);
-                        return total + (playerMatch?.stats.goals || 0);
-                    }, 0);
+    const formattedMatches = useMemo(() => {
+        return matches.map(match => {
+            // Helper to get team name safely
+            const getTeamName = (team: any) => team?.team_name || 'Unknown Team';
 
-                    matchMap.set(match.matchId, {
-                        matchId: match.matchId,
-                        opponent: match.opponent,
-                        date: match.date,
-                        teamName: player.team,
-                        tournament: "MFA Women's Premier League", // Default tournament name
-                        homeScore: teamGoals,
-                        awayScore: Math.floor(Math.random() * 3), // Simulated opponent score
-                    });
-                }
-            });
+            return {
+                matchId: match.id,
+                opponent: getTeamName(match.away_team), // Assuming format Team vs Opponent
+                date: match.match_date,
+                teamName: getTeamName(match.home_team),
+                tournament: match.competition_name,
+                homeScore: match.home_score,
+                awayScore: match.away_score,
+            };
         });
-
-        return Array.from(matchMap.values()).sort((a, b) =>
-            new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-    }, [players]);
+    }, [matches]);
 
     // Filter matches based on search
     const filteredMatches = useMemo(() => {
-        if (!searchQuery.trim()) return matches;
+        if (!searchQuery.trim()) return formattedMatches;
         const query = searchQuery.toLowerCase();
-        return matches.filter(
+        return formattedMatches.filter(
             (match) =>
                 match.opponent.toLowerCase().includes(query) ||
                 match.teamName.toLowerCase().includes(query) ||
                 match.tournament.toLowerCase().includes(query)
         );
-    }, [matches, searchQuery]);
+    }, [formattedMatches, searchQuery]);
 
     return (
         <div className="min-h-screen bg-background">
@@ -156,58 +173,70 @@ const MatchSelection = () => {
                                         <p>No matches found</p>
                                     </div>
                                 ) : (
-                                    filteredMatches.map((match) => (
-                                        <motion.div
-                                            key={match.matchId}
-                                            variants={itemVariants}
-                                            className="group"
-                                        >
-                                            <Link
-                                                to={`/match/${match.matchId}`}
-                                                className="grid grid-cols-12 gap-4 items-center px-4 py-4 rounded-lg hover:bg-secondary/50 transition-all duration-200 border-l-4 border-primary/70 hover:border-primary"
+                                    filteredMatches.map((match) => {
+                                        const isWin = match.homeScore > match.awayScore;
+                                        const isLoss = match.homeScore < match.awayScore;
+
+                                        return (
+                                            <motion.div
+                                                key={match.matchId}
+                                                variants={itemVariants}
+                                                className="group"
                                             >
-                                                {/* Match Name */}
-                                                <div className="col-span-4">
-                                                    <p className="font-medium text-foreground">
-                                                        {match.teamName} vs {match.opponent}
-                                                    </p>
-                                                </div>
+                                                <Link
+                                                    to={`/match/${match.matchId}`}
+                                                    className="relative overflow-hidden grid grid-cols-12 gap-4 items-center px-4 py-4 rounded-lg hover:bg-secondary/50 transition-all duration-200 border border-border"
+                                                >
+                                                    {/* Win/Loss Indicator Bar */}
+                                                    <div className={cn(
+                                                        "absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg",
+                                                        isWin && "bg-emerald-500",
+                                                        isLoss && "bg-red-500",
+                                                        !isWin && !isLoss && "bg-orange-500"
+                                                    )} />
+                                                    {/* Match Name */}
+                                                    <div className="col-span-4">
+                                                        <p className="font-medium text-foreground">
+                                                            {match.teamName} vs {match.opponent}
+                                                        </p>
+                                                    </div>
 
-                                                {/* Score */}
-                                                <div className="col-span-2 flex justify-center">
-                                                    <span className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground font-bold text-sm">
-                                                        {match.homeScore} - {match.awayScore}
-                                                    </span>
-                                                </div>
+                                                    {/* Score */}
+                                                    <div className="col-span-2 flex justify-center">
+                                                        <span className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground font-bold text-sm">
+                                                            {match.homeScore} - {match.awayScore}
+                                                        </span>
+                                                    </div>
 
-                                                {/* Date */}
-                                                <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
-                                                    <Calendar className="w-4 h-4" />
-                                                    <span className="text-sm">
-                                                        {new Date(match.date).toLocaleDateString('en-US', {
-                                                            month: 'short',
-                                                            day: 'numeric',
-                                                            year: 'numeric'
-                                                        })}
-                                                    </span>
-                                                </div>
+                                                    {/* Date */}
+                                                    <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
+                                                        <Calendar className="w-4 h-4" />
+                                                        <span className="text-sm">
+                                                            {new Date(match.date).toLocaleDateString('en-US', {
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </span>
+                                                    </div>
 
-                                                {/* Tournament */}
-                                                <div className="col-span-3">
-                                                    <span className="text-sm text-primary">
-                                                        {match.tournament}
-                                                    </span>
-                                                </div>
+                                                    {/* Tournament */}
+                                                    <div className="col-span-3">
+                                                        <span className="text-sm text-primary">
+                                                            {match.tournament}
+                                                        </span>
+                                                    </div>
 
-                                                {/* Action */}
-                                                <div className="col-span-1 flex items-center justify-end gap-1 text-muted-foreground group-hover:text-primary transition-colors">
-                                                    <Eye className="w-4 h-4" />
-                                                    <span className="text-sm font-medium">View Details</span>
-                                                    <ChevronRight className="w-4 h-4 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-                                                </div>
-                                            </Link>
-                                        </motion.div>
-                                    ))
+                                                    {/* Action */}
+                                                    <div className="col-span-1 flex items-center justify-end gap-1 text-muted-foreground group-hover:text-primary transition-colors">
+                                                        <Eye className="w-4 h-4" />
+                                                        <span className="text-sm font-medium">View Details</span>
+                                                        <ChevronRight className="w-4 h-4 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                                                    </div>
+                                                </Link>
+                                            </motion.div>
+                                        );
+                                    })
                                 )}
                             </motion.div>
                         </CardContent>

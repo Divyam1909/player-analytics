@@ -14,6 +14,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
+    isLoading: boolean;
     login: (email: string, password: string, role: UserRole) => boolean;
     logout: () => void;
 }
@@ -41,6 +42,7 @@ const CREDENTIALS = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Load user from localStorage on mount
     useEffect(() => {
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem('auth_user');
             }
         }
+        setIsLoading(false);
     }, []);
 
     const login = (email: string, password: string, role: UserRole): boolean => {
@@ -79,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

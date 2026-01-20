@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Sun, Monitor, LogOut } from 'lucide-react';
+import { Moon, Sun, Monitor, LogOut, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,9 +14,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthHeaderProps {
     title?: string;
+    showBack?: boolean;
+    onBack?: () => void;
 }
 
-const AuthHeader = ({ title = 'Dashboard' }: AuthHeaderProps) => {
+const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack }: AuthHeaderProps) => {
     const { theme, setTheme, resolvedTheme } = useTheme();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -26,22 +28,33 @@ const AuthHeader = ({ title = 'Dashboard' }: AuthHeaderProps) => {
         navigate('/login');
     };
 
+    const handleBack = () => {
+        if (onBack) {
+            onBack();
+        } else {
+            navigate(-1);
+        }
+    };
+
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+        <header className="fixed top-0 left-64 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
             <div className="container mx-auto px-6">
                 <div className="flex h-16 items-center justify-between">
-                    {/* Left Side - Brand */}
-                    <Link to="/dashboard" className="flex items-center gap-3">
-                        <img
-                            src="/image.png"
-                            alt="Thinking Engines"
-                            className="w-8 h-8 rounded-lg object-cover"
-                        />
-                        <div>
-                            <span className="text-lg font-semibold text-foreground">Thinking Engines</span>
-                            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">{title}</span>
-                        </div>
-                    </Link>
+                    {/* Left Side - Back Button & Page Title */}
+                    <div className="flex items-center gap-4">
+                        {showBack && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleBack}
+                                className="gap-2 text-muted-foreground hover:text-foreground"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="hidden sm:inline">Back</span>
+                            </Button>
+                        )}
+                        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+                    </div>
 
                     {/* Right Side */}
                     <div className="flex items-center gap-4">

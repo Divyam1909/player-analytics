@@ -13,9 +13,9 @@ import ShotMap from "@/components/analytics/ShotMap";
 import { Player, PlayerMatch } from "@/types/player";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, User, Target, Footprints, Flame, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search } from "lucide-react";
+import { User, Target, Footprints, Flame, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import playersData from "@/data/players.json";
+import { usePlayers } from "@/hooks/usePlayers";
 
 // Valid tab values
 const VALID_TABS = ["overall", "match", "passing", "shots"];
@@ -40,11 +40,21 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [matchSearch, setMatchSearch] = useState<string>("");
 
-  const players = playersData.players as Player[];
+  // Use the hook to fetch players from Supabase
+  const { data: players = [], isLoading } = usePlayers();
   const player = players.find((p) => p.id === id);
 
   // Default to first player if no id or player not found
   const currentPlayer = player || players[0];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-primary">Loading player data...</div>
+      </div>
+    );
+  }
 
   // Set default selected match - using useEffect for side effects
   useEffect(() => {
@@ -94,6 +104,20 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     return "text-destructive";
   };
 
+  // Helper to sum nullable stats - returns null if any value is null (data not available)
+  const sumNullableStat = (statKey: keyof import("@/types/player").MatchStats): number | null => {
+    if (!currentPlayer) return null;
+    const values = currentPlayer.matchStats.map(m => m.stats[statKey]);
+    if (values.some(v => v === null)) return null;
+    return values.reduce((a, v) => (a as number) + (v as number), 0) as number;
+  };
+
+  // Helper to display stat value - shows "--" for null
+  const displayStat = (value: number | null | string): string => {
+    if (value === null) return "--";
+    return String(value);
+  };
+
   if (!currentPlayer) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -112,21 +136,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
 
   return (
     <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
-      {!embedded && <AuthHeader title="Player Stats" />}
+      {!embedded && <AuthHeader title="Player Stats" showBack />}
       {!embedded && <Sidebar />}
 
       <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 ml-64"}>
         <div className="container mx-auto">
-          {/* Back Button */}
-          {!embedded && (
-            <button
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </button>
-          )}
 
           {/* Player Header */}
           <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 mb-8">
@@ -200,6 +214,8 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             onValueChange={(value) => {
               setActiveTab(value);
               navigate(`#${value}`, { replace: true });
+              // Reset scroll position to top when switching tabs
+              window.scrollTo(0, 0);
             }}
             className="space-y-6"
           >
@@ -247,12 +263,12 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                       {[
                         { label: "Matches", value: currentPlayer.matchStats.length, icon: CalendarDays, color: "text-primary" },
                         { label: "Minutes", value: currentPlayer.matchStats.reduce((a, m) => a + (m.minutesPlayed || 90), 0), icon: Activity, color: "text-muted-foreground" },
-                        { label: "Goals", value: aggregatedStats?.goals || 0, icon: Target, color: "text-destructive" },
-                        { label: "Assists", value: aggregatedStats?.assists || 0, icon: Footprints, color: "text-warning" },
+                        { label: "Goals", value: aggregatedStats?.goals ?? null, icon: Target, color: "text-destructive" },
+                        { label: "Assists", value: aggregatedStats?.assists ?? null, icon: Footprints, color: "text-warning" },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-4 rounded-lg bg-secondary/50 border border-border">
                           <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
-                          <p className={cn("text-2xl font-bold", stat.color)}>{stat.value}</p>
+                          <p className={cn("text-2xl font-bold", stat.color)}>{stat.value !== null ? stat.value : "--"}</p>
                           <p className="text-xs uppercase text-muted-foreground mt-1">{stat.label}</p>
                         </div>
                       ))}
@@ -261,36 +277,51 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                     {/* Category Comparison Bars */}
                     <div className="space-y-4">
                       <h4 className="text-sm font-medium text-muted-foreground">Category Strengths</h4>
-                      {[
-                        {
-                          label: "Passing",
-                          value: currentPlayer.attributes.passing,
-                          color: "bg-primary"
-                        },
-                        {
-                          label: "Attacking",
-                          value: Math.round((currentPlayer.attributes.shooting + currentPlayer.attributes.dribbling) / 2),
-                          color: "bg-destructive"
-                        },
-                        {
-                          label: "Defending",
-                          value: Math.round((currentPlayer.attributes.defending + currentPlayer.attributes.physical) / 2),
-                          color: "bg-success"
-                        },
-                      ].map((category) => (
-                        <div key={category.label} className="flex items-center gap-3">
-                          <span className="text-xs font-medium w-20 text-muted-foreground">{category.label}</span>
-                          <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                            <motion.div
-                              className={cn("h-full rounded-full", category.color)}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${category.value}%` }}
-                              transition={{ duration: 0.5, delay: 0.2 }}
-                            />
+                      {(() => {
+                        const attrs = currentPlayer.attributes;
+                        const hasPassingData = attrs.passing !== null;
+                        const hasAttackingData = attrs.shooting !== null && attrs.dribbling !== null;
+                        const hasDefendingData = attrs.defending !== null && attrs.physical !== null;
+
+                        const categories = [
+                          {
+                            label: "Passing",
+                            value: hasPassingData ? attrs.passing : null,
+                            color: "bg-primary"
+                          },
+                          {
+                            label: "Attacking",
+                            value: hasAttackingData ? Math.round(((attrs.shooting ?? 0) + (attrs.dribbling ?? 0)) / 2) : null,
+                            color: "bg-destructive"
+                          },
+                          {
+                            label: "Defending",
+                            value: hasDefendingData ? Math.round(((attrs.defending ?? 0) + (attrs.physical ?? 0)) / 2) : null,
+                            color: "bg-success"
+                          },
+                        ];
+
+                        return categories.map((category) => (
+                          <div key={category.label} className="flex items-center gap-3">
+                            <span className="text-xs font-medium w-20 text-muted-foreground">{category.label}</span>
+                            <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
+                              {category.value !== null ? (
+                                <motion.div
+                                  className={cn("h-full rounded-full", category.color)}
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${category.value}%` }}
+                                  transition={{ duration: 0.5, delay: 0.2 }}
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
+                                  Data unavailable
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-bold w-8 text-right">{category.value !== null ? category.value : "--"}</span>
                           </div>
-                          <span className="text-xs font-bold w-8 text-right">{category.value}</span>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -312,14 +343,14 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                         { label: "Total Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passes, 0) },
                         { label: "Pass Accuracy", value: `${Math.round(currentPlayer.matchStats.reduce((a, m) => a + m.stats.passAccuracy, 0) / currentPlayer.matchStats.length)}%` },
                         { label: "Key Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.keyPasses, 0) },
-                        { label: "Final Third", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passesInFinalThird, 0) },
-                        { label: "In Box", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passesInBox, 0) },
+                        { label: "Final Third", value: sumNullableStat("passesInFinalThird") },
+                        { label: "In Box", value: sumNullableStat("passesInBox") },
                         { label: "Crosses", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.crosses, 0) },
                         { label: "Assists", value: aggregatedStats?.assists || 0 },
                         { label: "Prog. Pass", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressivePassing, 0) },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
-                          <p className="text-xl font-bold text-primary">{stat.value}</p>
+                          <p className="text-xl font-bold text-primary">{displayStat(stat.value)}</p>
                           <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
                         </div>
                       ))}
@@ -338,13 +369,13 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   <CardContent>
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { label: "Blocks", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.blocks, 0) },
-                        { label: "Interceptions", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.interceptions, 0) },
-                        { label: "Clearances", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.clearances, 0) },
-                        { label: "Recoveries", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.recoveries, 0) },
+                        { label: "Blocks", value: sumNullableStat("blocks") },
+                        { label: "Interceptions", value: sumNullableStat("interceptions") },
+                        { label: "Clearances", value: sumNullableStat("clearances") },
+                        { label: "Recoveries", value: sumNullableStat("recoveries") },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
-                          <p className="text-xl font-bold text-success">{stat.value}</p>
+                          <p className="text-xl font-bold text-success">{displayStat(stat.value)}</p>
                           <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
                         </div>
                       ))}
@@ -363,9 +394,9 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { label: "Prog. Runs", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressiveRuns, 0) },
+                        { label: "Prog. Runs", value: sumNullableStat("progressiveRuns") },
                         { label: "Total Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribbles, 0) },
-                        { label: "Successful Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribblesSuccessful, 0) },
+                        { label: "Success Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribblesSuccessful, 0) },
                         { label: "Aerial Duels Won", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.aerialDuelsWon, 0) },
                         { label: "Shots", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0) },
                         { label: "Shots on Target", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shotsOnTarget, 0) },
@@ -373,7 +404,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                         { label: "Ball Touches", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.ballTouches, 0) },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
-                          <p className="text-xl font-bold text-destructive">{stat.value}</p>
+                          <p className="text-xl font-bold text-destructive">{displayStat(stat.value)}</p>
                           <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
                         </div>
                       ))}
@@ -512,7 +543,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                         ].map((stat) => (
                           <div key={stat.label} className="text-center p-3 rounded-lg bg-secondary/50">
                             <p className={cn("text-xl font-bold", stat.color)}>
-                              {stat.value}
+                              {displayStat(stat.value)}
                             </p>
                             <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
                               {stat.label}
@@ -541,7 +572,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                         ].map((stat) => (
                           <div key={stat.label} className="text-center p-4 rounded-lg bg-secondary/50">
                             <p className={cn("text-2xl font-bold", stat.color)}>
-                              {stat.value}
+                              {displayStat(stat.value)}
                             </p>
                             <p className="text-xs uppercase tracking-wide text-muted-foreground mt-1">
                               {stat.label}
@@ -574,7 +605,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                         ].map((stat) => (
                           <div key={stat.label} className="text-center p-3 rounded-lg bg-secondary/50">
                             <p className={cn("text-xl font-bold", stat.color)}>
-                              {stat.value}
+                              {displayStat(stat.value)}
                             </p>
                             <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
                               {stat.label}
@@ -584,51 +615,6 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                       </div>
                     </CardContent>
                   </Card>
-
-                  {/* Match Quick Stats */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="bg-card border-border">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Match Performance</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-4 gap-3">
-                          {[
-                            { label: "Goals", value: selectedMatch.stats.goals, color: "text-destructive" },
-                            { label: "Assists", value: selectedMatch.stats.assists, color: "text-warning" },
-                            { label: "Shots", value: selectedMatch.stats.shots, color: "text-primary" },
-                            { label: "On Target", value: selectedMatch.stats.shotsOnTarget, color: "text-success" },
-                          ].map((stat) => (
-                            <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
-                              <p className={cn("text-xl font-bold", stat.color)}>{stat.value}</p>
-                              <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-card border-border">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Passing & Movement</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-4 gap-3">
-                          {[
-                            { label: "Passes", value: selectedMatch.stats.passes, color: "text-primary" },
-                            { label: "Dribbles", value: selectedMatch.stats.dribbles, color: "text-warning" },
-                            { label: "Intercept", value: selectedMatch.stats.interceptions, color: "text-success" },
-                            { label: "Sprints", value: selectedMatch.stats.sprints, color: "text-muted-foreground" },
-                          ].map((stat) => (
-                            <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
-                              <p className={cn("text-xl font-bold", stat.color)}>{stat.value}</p>
-                              <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
 
                   {/* Match Touch Map */}
                   <Card className="bg-card border-border">

@@ -73,7 +73,7 @@ const Sidebar = ({ className }: SidebarProps) => {
 
     return (
         <aside className={cn(
-            "fixed left-0 top-16 bottom-0 w-64 bg-card border-r border-border z-40 overflow-y-auto",
+            "fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-40 overflow-y-auto",
             className
         )}>
             <div className="p-4">

@@ -12,11 +12,16 @@ interface PlayerCardProps {
   player: Player;
   onCompare?: (player: Player) => void;
   statFilter?: StatFilterMode;
+  matchId?: string; // If provided, only show stats from this match
 }
 
-// Helper function to calculate overall stats for a player
-const calculateOverallStats = (player: Player) => {
-  const matches = player.matchStats;
+// Helper function to calculate stats for a player - optionally filters by matchId
+const calculateOverallStats = (player: Player, matchId?: string) => {
+  // If matchId is provided, only use stats from that specific match
+  const matches = matchId
+    ? player.matchStats.filter(ms => ms.matchId === matchId)
+    : player.matchStats;
+
   if (matches.length === 0) return null;
 
   return {
@@ -26,13 +31,13 @@ const calculateOverallStats = (player: Player) => {
     assists: matches.reduce((a, m) => a + m.stats.assists, 0),
 
     // Defensive stats
-    blocks: matches.reduce((a, m) => a + m.stats.blocks, 0),
-    interceptions: matches.reduce((a, m) => a + m.stats.interceptions, 0),
-    clearances: matches.reduce((a, m) => a + m.stats.clearances, 0),
-    recoveries: matches.reduce((a, m) => a + m.stats.recoveries, 0),
+    blocks: matches.reduce((a, m) => a + (m.stats.blocks || 0), 0),
+    interceptions: matches.reduce((a, m) => a + (m.stats.interceptions || 0), 0),
+    clearances: matches.reduce((a, m) => a + (m.stats.clearances || 0), 0),
+    recoveries: matches.reduce((a, m) => a + (m.stats.recoveries || 0), 0),
 
     // Attacking stats
-    progressiveRuns: matches.reduce((a, m) => a + m.stats.progressiveRuns, 0),
+    progressiveRuns: matches.reduce((a, m) => a + (m.stats.progressiveRuns || 0), 0),
     totalDribbles: matches.reduce((a, m) => a + m.stats.dribbles, 0),
     successfulDribbles: matches.reduce((a, m) => a + m.stats.dribblesSuccessful, 0),
     aerialDuelsWon: matches.reduce((a, m) => a + m.stats.aerialDuelsWon, 0),
@@ -44,7 +49,7 @@ const calculateOverallStats = (player: Player) => {
   };
 };
 
-const PlayerCard = ({ player, onCompare, statFilter = "none" }: PlayerCardProps) => {
+const PlayerCard = ({ player, onCompare, statFilter = "none", matchId }: PlayerCardProps) => {
   const getRatingColor = (rating: number) => {
     if (rating >= 90) return "text-success";
     if (rating >= 80) return "text-primary";
@@ -58,7 +63,7 @@ const PlayerCard = ({ player, onCompare, statFilter = "none" }: PlayerCardProps)
     onCompare?.(player);
   };
 
-  const stats = calculateOverallStats(player);
+  const stats = calculateOverallStats(player, matchId);
 
   // Get stats display based on filter
   const getFilteredStats = () => {
@@ -96,7 +101,7 @@ const PlayerCard = ({ player, onCompare, statFilter = "none" }: PlayerCardProps)
   const filteredStats = getFilteredStats();
 
   return (
-    <Link to={`/player/${player.id}`}>
+    <Link to={`/player/${player.id}`} onClick={() => window.scrollTo(0, 0)}>
       <motion.div
         whileHover={{ y: -4, transition: { duration: 0.2 } }}
         whileTap={{ scale: 0.98 }}

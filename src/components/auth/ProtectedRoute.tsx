@@ -7,8 +7,17 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, isLoading } = useAuth();
     const location = useLocation();
+
+    // Show loading state while checking localStorage
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="animate-pulse text-muted-foreground">Loading...</div>
+            </div>
+        );
+    }
 
     if (!isAuthenticated) {
         // Redirect to login selection page, preserving the attempted location
