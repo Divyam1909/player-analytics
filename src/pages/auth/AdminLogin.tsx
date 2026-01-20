@@ -144,9 +144,15 @@ const AdminLogin = () => {
                         </div>
 
                         <div className="mt-6 pt-4 border-t border-border">
-                            <p className="text-xs text-muted-foreground text-center">
-                                Demo: admin@postmatch.org / admin123
-                            </p>
+                            <div className="bg-secondary/30 rounded-lg p-3 border border-border">
+                                <p className="text-xs font-semibold text-foreground text-center mb-1">🔑 Test Credentials</p>
+                                <p className="text-xs text-muted-foreground text-center">
+                                    <span className="font-mono">admin@postmatch.org</span>
+                                </p>
+                                <p className="text-xs text-muted-foreground text-center">
+                                    Password: <span className="font-mono">password123</span>
+                                </p>
+                            </div>
                         </div>
                     </motion.div>
                 </div>

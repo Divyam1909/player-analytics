@@ -145,9 +145,29 @@ const PlayerLogin = () => {
                         </div>
 
                         <div className="mt-6 pt-4 border-t border-border">
-                            <p className="text-xs text-muted-foreground text-center">
-                                Demo: player1@postmatch.org / player123
-                            </p>
+                            <div className="bg-secondary/30 rounded-lg p-3 border border-border">
+                                <p className="text-xs font-semibold text-foreground text-center mb-2">🔑 Test Credentials (Thunder FC)</p>
+                                <div className="space-y-1.5">
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        <span className="font-mono">player1@thunderfc.org</span> <span className="text-[10px]">(Oliver Smith, GK #1)</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        <span className="font-mono">player2@thunderfc.org</span> <span className="text-[10px]">(Harry Johnson, RB #2)</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        <span className="font-mono">player3@thunderfc.org</span> <span className="text-[10px]">(Lucas Lopez, CAM #10)</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        <span className="font-mono">player4@thunderfc.org</span> <span className="text-[10px]">(Samuel Diaz, ST #9)</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        <span className="font-mono">player5@thunderfc.org</span> <span className="text-[10px]">(Henry Gomez, RW #7)</span>
+                                    </p>
+                                </div>
+                                <p className="text-xs text-muted-foreground text-center mt-2">
+                                    Password (all): <span className="font-mono">password123</span>
+                                </p>
+                            </div>
                         </div>
                     </motion.div>
                 </div>
