@@ -13,7 +13,8 @@ import type {
     DbPlayer,
     DbTeam,
     DbMatch,
-    DbMatchStatistics,
+    DbMatchStatisticsSummary,
+    DbPlayerMatchStatistics,
     DbPassEvent,
     DbShotOnTarget,
     DbDuel,
@@ -94,11 +95,11 @@ export async function fetchMatchesFromDB(): Promise<DbMatch[] | null> {
 /**
  * Fetch match statistics from Supabase
  */
-export async function fetchMatchStatisticsFromDB(): Promise<DbMatchStatistics[] | null> {
+export async function fetchMatchStatisticsFromDB(): Promise<DbMatchStatisticsSummary[] | null> {
     if (!isSupabaseConfigured() || !supabase) return null;
 
     const { data, error } = await supabase
-        .from('match_statistics')
+        .from('match_statistics_summary')
         .select('*');
 
     if (error) {
@@ -274,6 +275,28 @@ export interface HybridPlayerData {
  * Get all players with their stats from Supabase
  * Returns empty array if database is not available
  */
+/**
+ * Fetch player match statistics from Supabase
+ */
+export async function fetchPlayerMatchStatisticsFromDB(): Promise<DbPlayerMatchStatistics[] | null> {
+    if (!isSupabaseConfigured() || !supabase) return null;
+
+    const { data, error } = await supabase
+        .from('player_match_statistics')
+        .select('*');
+
+    if (error) {
+        console.error('Error fetching player match statistics:', error);
+        return null;
+    }
+
+    return data;
+}
+
+/**
+ * Get all players with their stats from Supabase
+ * Returns empty array if database is not available
+ */
 export async function getPlayersWithStats(): Promise<Player[]> {
     // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
@@ -282,12 +305,10 @@ export async function getPlayersWithStats(): Promise<Player[]> {
     }
 
     try {
-        // Fetch all data from Supabase
-        const [dbPlayers, passEvents, shots, duels, matches, teams] = await Promise.all([
+        // Fetch all data from Supabase - Optimized to use views
+        const [dbPlayers, playerMatchStats, matches, teams] = await Promise.all([
             fetchPlayersFromDB(),
-            fetchPassEventsFromDB(),
-            fetchShotsFromDB(),
-            fetchDuelsFromDB(),
+            fetchPlayerMatchStatisticsFromDB(),
             fetchMatchesFromDB(),
             fetchTeamsFromDB(),
         ]);
@@ -298,11 +319,6 @@ export async function getPlayersWithStats(): Promise<Player[]> {
             return [];
         }
 
-        // Group events by player and match
-        const passesByPlayerMatch = groupByPlayerAndMatch(passEvents || []);
-        const shotsByPlayerMatch = groupByPlayerAndMatch(shots || []);
-        const duelsByPlayerMatch = groupByPlayerAndMatch(duels || []);
-
         // Create a map of matches for quick lookup
         const matchMap = new Map<string, DbMatch>();
         matches?.forEach(m => matchMap.set(m.id, m));
@@ -311,45 +327,55 @@ export async function getPlayersWithStats(): Promise<Player[]> {
         const teamMap = new Map<string, DbTeam>();
         teams?.forEach(t => teamMap.set(t.id, t));
 
+        // Group stats by player
+        const statsByPlayer = new Map<string, DbPlayerMatchStatistics[]>();
+        playerMatchStats?.forEach(stat => {
+            const current = statsByPlayer.get(stat.player_id) || [];
+            current.push(stat);
+            statsByPlayer.set(stat.player_id, current);
+        });
+
         // Build player data
         const players: Player[] = dbPlayers.map(dbPlayer => {
-            // Get unique match IDs for this player
-            const playerMatchIds = new Set<string>();
-            passesByPlayerMatch.forEach((_, key) => {
-                if (key.startsWith(dbPlayer.id + '__')) {
-                    playerMatchIds.add(key.split('__')[1]);
-                }
-            });
-            shotsByPlayerMatch.forEach((_, key) => {
-                if (key.startsWith(dbPlayer.id + '__')) {
-                    playerMatchIds.add(key.split('__')[1]);
-                }
-            });
-            duelsByPlayerMatch.forEach((_, key) => {
-                if (key.startsWith(dbPlayer.id + '__')) {
-                    playerMatchIds.add(key.split('__')[1]);
-                }
-            });
+            const playerStats = statsByPlayer.get(dbPlayer.id) || [];
 
             // Build match stats for each match
-            const matchStats: PlayerMatch[] = [];
+            const matchStats: PlayerMatch[] = playerStats.map(stat => {
+                const match = matchMap.get(stat.match_id);
 
-            playerMatchIds.forEach(matchId => {
-                const key = `${dbPlayer.id}__${matchId}`;
-                const match = matchMap.get(matchId);
-
-                const playerPassEvents = passesByPlayerMatch.get(key) || [];
-                const playerShots = shotsByPlayerMatch.get(key) || [];
-                const playerDuels = duelsByPlayerMatch.get(key) || [];
-
-                matchStats.push({
-                    matchId,
+                return {
+                    matchId: stat.match_id,
                     opponent: match?.opponent_name_deprecated || 'Unknown',
                     date: match?.match_date || new Date().toISOString().split('T')[0],
                     minutesPlayed: 90, // TODO: Fetch from physical_stats table when available
-                    stats: buildMatchStats(playerPassEvents, playerShots, playerDuels),
-                    events: buildMatchEvents(playerPassEvents, playerShots, playerDuels),
-                });
+                    stats: {
+                        goals: stat.goals || 0,
+                        assists: stat.assists || 0,
+                        passes: stat.total_passes || 0,
+                        passAccuracy: calculatePassCompletionRate(stat.successful_passes || 0, stat.total_passes || 0),
+                        keyPasses: stat.key_passes || 0,
+                        passesInFinalThird: stat.final_third_touches || 0, // Using touches as proxy for now
+                        passesInBox: 0, // Not directly in view yet, would need update
+                        crosses: stat.crosses || 0,
+                        progressivePassing: stat.progressive_passes || 0,
+                        shots: (stat.shots_on_target || 0) + (stat.goals || 0), // Rough est
+                        shotsOnTarget: stat.shots_on_target || 0,
+                        dribbles: stat.total_dribbles || 0,
+                        dribblesSuccessful: stat.successful_dribbles || 0,
+                        aerialDuelsWon: stat.aerial_duels_won || 0,
+                        ballTouches: (stat.total_passes || 0) + (stat.total_dribbles || 0), // Approx
+
+                        blocks: stat.blocks,
+                        interceptions: stat.interceptions,
+                        clearances: stat.clearances,
+                        recoveries: stat.ball_recoveries,
+                        tackles: null, // Not in view
+                        progressiveRuns: stat.progressive_carries,
+                        distanceCovered: null,
+                        sprints: null,
+                    },
+                    events: [], // detailed events loaded on demand if needed
+                };
             });
 
             return {
@@ -358,8 +384,7 @@ export async function getPlayersWithStats(): Promise<Player[]> {
                 jerseyNumber: dbPlayer.jersey_number || 0,
                 position: dbPositionToFrontend(dbPlayer.position),
                 team: teamMap.get(dbPlayer.team_id)?.team_name || 'Unknown Team',
-                // TODO: Fetch from player_attributes table when available
-                overallRating: null,
+                overallRating: null, // TODO: Fetch from attributes
                 attributes: {
                     passing: null,
                     shooting: null,
@@ -377,6 +402,11 @@ export async function getPlayersWithStats(): Promise<Player[]> {
         console.error('Error fetching player data:', error);
         return [];
     }
+}
+
+function calculatePassCompletionRate(successful: number, total: number): number {
+    if (total === 0) return 0;
+    return Math.round((successful / total) * 100);
 }
 
 /**

@@ -22,9 +22,9 @@ const AdminLogin = () => {
         setError('');
         setIsLoading(true);
 
-        await new Promise((r) => setTimeout(r, 500));
 
-        const success = login(email, password, 'admin');
+        // Removed artificial delay as actual DB call takes time
+        const success = await login(email, password, 'admin');
 
         if (success) {
             navigate('/admin');

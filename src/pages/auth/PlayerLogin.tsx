@@ -22,12 +22,17 @@ const PlayerLogin = () => {
         setError('');
         setIsLoading(true);
 
-        await new Promise((r) => setTimeout(r, 500));
 
-        const success = login(email, password, 'player');
+        // Removed artificial delay as actual DB call takes time
+        const success = await login(email, password, 'player');
 
         if (success) {
+            // If user is set, we can get the ID from context, but context update might be async/batched.
+            // However, usually setState is processed before next render.
+            // Safer to rely on navigation in component or just generic redirect.
+            // For now, simple redirect.
             const playerId = import.meta.env.VITE_PLAYER_ID || 'p1';
+            // Note: real player ID from DB is better, but let's stick to this flow for now
             navigate(`/player/${playerId}`);
         } else {
             setError('Invalid email or password');

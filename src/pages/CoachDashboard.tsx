@@ -110,7 +110,7 @@ const CoachDashboard = () => {
     }, [matches]);
 
     const coachName = user?.name || 'Coach';
-    const teamName = user?.team || 'Bombay Gymkhana Men';
+    const teamName = user?.team || 'Team';
 
     return (
         <div className="min-h-screen bg-background">

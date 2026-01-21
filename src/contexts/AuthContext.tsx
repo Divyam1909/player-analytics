@@ -1,13 +1,16 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export type UserRole = 'admin' | 'coach' | 'player';
 
 interface User {
+    id: string;
     email: string;
     role: UserRole;
     name?: string;
     team?: string;
+    teamName?: string; // Support both just in case
     playerId?: string;
 }
 
@@ -15,30 +18,11 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string, role: UserRole) => boolean;
+    login: (email: string, password: string, role: UserRole) => Promise<boolean>;
     logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Credentials from environment variables
-const CREDENTIALS = {
-    admin: {
-        email: import.meta.env.VITE_ADMIN_EMAIL || 'admin@postmatch.org',
-        password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin123',
-    },
-    coach: {
-        email: import.meta.env.VITE_COACH_EMAIL || 'bombaygymkhanamen@post-match.org',
-        password: import.meta.env.VITE_COACH_PASSWORD || 'coach123',
-        name: import.meta.env.VITE_COACH_NAME || 'Rudrashish',
-        team: import.meta.env.VITE_COACH_TEAM || 'Bombay Gymkhana Men',
-    },
-    player: {
-        email: import.meta.env.VITE_PLAYER_EMAIL || 'player1@postmatch.org',
-        password: import.meta.env.VITE_PLAYER_PASSWORD || 'player123',
-        playerId: import.meta.env.VITE_PLAYER_ID || 'p1',
-    },
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -57,23 +41,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
     }, []);
 
-    const login = (email: string, password: string, role: UserRole): boolean => {
-        const creds = CREDENTIALS[role];
-
-        if (email === creds.email && password === creds.password) {
-            const newUser: User = {
-                email,
-                role,
-                ...(role === 'coach' && { name: CREDENTIALS.coach.name, team: CREDENTIALS.coach.team }),
-                ...(role === 'player' && { playerId: CREDENTIALS.player.playerId }),
-            };
-
-            setUser(newUser);
-            localStorage.setItem('auth_user', JSON.stringify(newUser));
-            return true;
+    const login = async (email: string, password: string, role: UserRole): Promise<boolean> => {
+        // 1. Check configuration
+        if (!isSupabaseConfigured() || !supabase) {
+            console.error('Supabase not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+            return false;
         }
 
-        return false;
+        try {
+            console.log('Attempting login via RPC for:', email);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await (supabase as any).rpc('verify_user_password', {
+                p_email: email,
+                p_password: password
+            });
+
+            if (error) {
+                console.error('Supabase RPC Error:', error);
+                return false;
+            }
+
+            console.log('RPC Response Data:', data);
+
+            // Check if user was returned
+            if (data && data.length > 0) {
+                const dbUser = data[0];
+
+                // Verify role matches
+                if (dbUser.role !== role) {
+                    console.warn(`User found but role mismatch. Expected ${role}, got ${dbUser.role}`);
+                    return false;
+                }
+
+                const newUser: User = {
+                    id: dbUser.id,
+                    email: dbUser.email,
+                    role: dbUser.role as UserRole,
+                    name: `${dbUser.first_name} ${dbUser.last_name}`,
+                    team: dbUser.team_name, // Using team_name from RPC join
+                    playerId: dbUser.player_id
+                };
+
+                setUser(newUser);
+                localStorage.setItem('auth_user', JSON.stringify(newUser));
+                return true;
+            } else {
+                console.warn('Login failed: No user found with matching credentials.');
+                return false;
+            }
+
+        } catch (err) {
+            console.error('Supabase login exception:', err);
+            return false;
+        }
     };
 
     const logout = () => {
@@ -81,8 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('auth_user');
     };
 
+    // Memoize the value to prevent unnecessary re-renders in consumers
+    const value = useMemo(() => ({
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout
+    }), [user, isLoading]);
+
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
@@ -115,7 +144,7 @@ export function useAuthNavigation() {
                 navigate('/dashboard');
                 break;
             case 'player':
-                navigate(`/player/${user.playerId}`);
+                navigate(`/player/${user.playerId || 'overview'}`);
                 break;
         }
     };

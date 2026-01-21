@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from "framer-motion";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -56,33 +57,41 @@ const pageVariants = {
 } as const;
 
 // Component to handle root redirect based on auth state
+// Component to handle root redirect based on auth state
 function RootRedirect() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
 
-  // Show loading state while checking localStorage
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        navigate('/login', { replace: true });
+        return;
+      }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+      // Redirect based on role
+      switch (user?.role) {
+        case 'admin':
+          navigate('/admin', { replace: true });
+          break;
+        case 'coach':
+          navigate('/dashboard', { replace: true });
+          break;
+        case 'player':
+          navigate(`/player/${user.playerId || 'overview'}`, { replace: true });
+          break;
+        default:
+          navigate('/login', { replace: true });
+      }
+    }
+  }, [isLoading, isAuthenticated, user, navigate]);
 
-  // Redirect based on role
-  switch (user?.role) {
-    case 'admin':
-      return <Navigate to="/admin" replace />;
-    case 'coach':
-      return <Navigate to="/dashboard" replace />;
-    case 'player':
-      return <Navigate to={`/player/${user.playerId}`} replace />;
-    default:
-      return <Navigate to="/login" replace />;
-  }
+  // Show loading state while checking
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-pulse text-muted-foreground">Redirecting...</div>
+    </div>
+  );
 }
 
 function AnimatedRoutes() {

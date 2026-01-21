@@ -22,9 +22,9 @@ const CoachLogin = () => {
         setError('');
         setIsLoading(true);
 
-        await new Promise((r) => setTimeout(r, 500));
 
-        const success = login(email, password, 'coach');
+        // Removed artificial delay as actual DB call takes time
+        const success = await login(email, password, 'coach');
 
         if (success) {
             navigate('/dashboard');

@@ -274,13 +274,51 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     const { data: matchStatsList = [] } = useQuery({
         queryKey: ['match-statistics', selectedMatch],
         queryFn: async () => {
-            let query = supabase.from('match_statistics').select('*');
+            let query = supabase.from('match_statistics_summary').select('*');
             if (selectedMatch !== "all") {
                 query = query.eq('match_id', selectedMatch);
             }
             const { data, error } = await query;
             if (error) throw error;
-            return (data || []) as unknown as MatchStatistics[];
+
+            // Map view columns to UI expected columns
+            return (data || []).map((m: any) => {
+                const isHome = m.team_id === m.home_team_id;
+
+                return {
+                    match_id: m.match_id,
+
+                    // Generic Team Stats
+                    team_clearances: isHome ? m.home_clearances : m.away_clearances,
+                    team_interceptions: isHome ? m.home_interceptions : m.away_interceptions,
+                    team_successful_dribbles: isHome ? m.home_successful_dribbles : m.away_successful_dribbles,
+                    home_ball_recoveries: m.home_ball_recoveries, // Keep original for some logic
+                    away_ball_recoveries: m.away_ball_recoveries,
+                    team_chances_created: isHome ? m.home_chances_in_box : m.away_chances_in_box, // Mapping to chances in box
+                    team_chances_final_third: isHome ? m.home_final_third_entries : m.away_final_third_entries,
+                    team_aerial_duels_won: isHome ? m.home_aerial_duels_won : m.away_aerial_duels_won,
+                    team_shots_on_target: isHome ? m.home_shots_on_target : m.away_shots_on_target,
+                    team_fouls: isHome ? m.home_fouls_committed : m.away_fouls_committed,
+                    team_saves: isHome ? m.home_saves : m.away_saves,
+                    team_freekicks: isHome ? m.home_freekicks : m.away_freekicks,
+
+                    // Generic Opponent Stats
+                    opponent_clearances: isHome ? m.away_clearances : m.home_clearances,
+                    opponent_interceptions: isHome ? m.away_interceptions : m.home_interceptions,
+                    opponent_successful_dribbles: isHome ? m.away_successful_dribbles : m.home_successful_dribbles,
+                    opponent_chances_created: isHome ? m.away_chances_in_box : m.home_chances_in_box,
+                    opponent_chances_final_third: isHome ? m.away_final_third_entries : m.home_final_third_entries,
+                    opponent_aerial_duels_won: isHome ? m.away_aerial_duels_won : m.home_aerial_duels_won,
+                    opponent_fouls: isHome ? m.away_fouls_committed : m.home_fouls_committed,
+                    opponent_saves: isHome ? m.away_saves : m.home_saves,
+                    opponent_freekicks: isHome ? m.away_freekicks : m.home_freekicks,
+                    opponent_conversion_rate: null, // Calc if needed
+
+                    // Indices (Assuming they are already in the view or null)
+                    home_possession_control_index: m.home_possession_control_index,
+                    // ... other indices map directly
+                } as unknown as MatchStatistics;
+            });
         }
     });
 
