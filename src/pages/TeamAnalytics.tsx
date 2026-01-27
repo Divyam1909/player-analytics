@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AuthHeader from "@/components/layout/AuthHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { Player, MatchEvent } from "@/types/player";
@@ -30,6 +30,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { usePlayers } from "@/hooks/usePlayers";
 import { useCountUp } from "@/hooks/useCountUp";
+import { FORMATIONS, FormationName, getFormationByName, getSlotColor, FormationSlot } from "@/lib/formationPositions";
+import TacticalField from "@/components/field/TacticalField";
 
 // Animation variants
 const containerVariants = {
@@ -121,58 +123,13 @@ const AnimatedBar = ({
     );
 };
 
-// Position colors for pie chart and players
+// Position colors for pie chart
 const POSITION_COLORS: Record<string, string> = {
     Forward: "hsl(var(--destructive))",
     Midfielder: "hsl(var(--primary))",
     Defender: "hsl(var(--success))",
     Goalkeeper: "hsl(var(--warning))",
     Winger: "hsl(var(--chart-4))",
-};
-
-// Generate dynamic positions for any number of players
-const generatePositions = (players: Player[]) => {
-    // Group players by position type
-    const groups: Record<string, Player[]> = {};
-    players.forEach((p) => {
-        const pos = p.position;
-        if (!groups[pos]) groups[pos] = [];
-        groups[pos].push(p);
-    });
-
-    // Position zones (y coordinate ranges for half-field, viewBox height is 60)
-    // Goal is at top (y=0), so goalkeeper is closest to goal, forwards are furthest
-    // Leave padding at bottom for player labels
-    const zones: Record<string, { y: number; order: number }> = {
-        Goalkeeper: { y: 8, order: 1 },
-        Defender: { y: 18, order: 2 },
-        Midfielder: { y: 28, order: 3 },
-        Winger: { y: 38, order: 4 },
-        Forward: { y: 48, order: 5 },
-    };
-
-    const result: { player: Player; position: { x: number; y: number }; color: string }[] = [];
-
-    // For each position type, distribute players horizontally
-    Object.entries(groups).forEach(([position, posPlayers]) => {
-        const zone = zones[position] || { y: 50, order: 3 };
-        const count = posPlayers.length;
-
-        posPlayers.forEach((player, i) => {
-            // Distribute evenly across the width (10% to 90%)
-            const x = count === 1 ? 50 : 15 + (70 * i) / (count - 1);
-            // Add slight y variation for visual interest
-            const yOffset = count > 2 ? (i % 2 === 0 ? -3 : 3) : 0;
-
-            result.push({
-                player,
-                position: { x, y: zone.y + yOffset },
-                color: POSITION_COLORS[position] || "hsl(var(--primary))",
-            });
-        });
-    });
-
-    return result;
 };
 
 // Get all goal events from all matches
@@ -220,7 +177,8 @@ interface MatchStatistics {
     opponent_fouls: number;
     opponent_saves: number;
     opponent_freekicks: number;
-    opponent_conversion_rate: number;
+    opponent_shots_on_target: number;
+    opponent_conversion_rate: number | null;
 
     // Indices
     home_possession_control_index?: number;
@@ -241,11 +199,19 @@ interface MatchStatistics {
 // ... imports moved to top
 
 const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps) => {
+    const navigate = useNavigate();
     // const players = playersData.players as Player[]; // Remove
     const { data: players = [], isLoading: isPlayersLoading } = usePlayers(); // Use hook
     const [selectedMatch, setSelectedMatch] = useState<string>(defaultMatchId || "all");
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
+
+    // Formation state
+    const [selectedFormation, setSelectedFormation] = useState<FormationName>('4-3-3');
+    const [fieldPlayerIds, setFieldPlayerIds] = useState<string[]>([]);
+    const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
+    const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
+    const [swapConfirmation, setSwapConfirmation] = useState<{ from: string; to: string; slotIndex: number } | null>(null);
 
     // Fetch matches from Supabase
     const { data: dbMatches = [] } = useQuery({
@@ -312,11 +278,23 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     opponent_fouls: isHome ? m.away_fouls_committed : m.home_fouls_committed,
                     opponent_saves: isHome ? m.away_saves : m.home_saves,
                     opponent_freekicks: isHome ? m.away_freekicks : m.home_freekicks,
+                    opponent_shots_on_target: isHome ? m.away_shots_on_target : m.home_shots_on_target,
                     opponent_conversion_rate: null, // Calc if needed
 
-                    // Indices (Assuming they are already in the view or null)
-                    home_possession_control_index: m.home_possession_control_index,
-                    // ... other indices map directly
+                    // Indices - swap based on which team is ours
+                    home_possession_control_index: isHome ? m.home_possession_control_index : m.away_possession_control_index,
+                    home_chance_creation_index: isHome ? m.home_chance_creation_index : m.away_chance_creation_index,
+                    home_shooting_efficiency: isHome ? m.home_shooting_efficiency : m.away_shooting_efficiency,
+                    home_defensive_solidity: isHome ? m.home_defensive_solidity : m.away_defensive_solidity,
+                    home_transition_progression: isHome ? m.home_transition_progression : m.away_transition_progression,
+                    home_recovery_pressing_efficiency: isHome ? m.home_recovery_pressing_efficiency : m.away_recovery_pressing_efficiency,
+
+                    away_possession_control_index: isHome ? m.away_possession_control_index : m.home_possession_control_index,
+                    away_chance_creation_index: isHome ? m.away_chance_creation_index : m.home_chance_creation_index,
+                    away_shooting_efficiency: isHome ? m.away_shooting_efficiency : m.home_shooting_efficiency,
+                    away_defensive_solidity: isHome ? m.away_defensive_solidity : m.home_defensive_solidity,
+                    away_transition_progression: isHome ? m.away_transition_progression : m.home_transition_progression,
+                    away_recovery_pressing_efficiency: isHome ? m.away_recovery_pressing_efficiency : m.home_recovery_pressing_efficiency,
                 } as unknown as MatchStatistics;
             });
         }
@@ -436,12 +414,129 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     }, [players]);
 
     // Generate dynamic formation positions
-    const formationPlayers = useMemo(() => {
-        const activePlayers = selectedMatch === "all"
+    const currentFormation = useMemo(() => getFormationByName(selectedFormation), [selectedFormation]);
+
+    // Get active players for selected match
+    const activePlayers = useMemo(() => {
+        return selectedMatch === "all"
             ? players
             : players.filter(p => p.matchStats.some(m => m.matchId === selectedMatch));
-        return generatePositions(activePlayers);
     }, [players, selectedMatch]);
+
+    // Auto-assign players to formation slots when match or formation changes
+    useEffect(() => {
+        if (activePlayers.length === 0) return;
+
+        const formation = getFormationByName(selectedFormation);
+        const assigned: string[] = [];
+        const usedPlayerIds = new Set<string>();
+
+        // For each slot, find the best matching player
+        formation.slots.forEach((slot) => {
+            // Find players that match this slot's preferred positions
+            const candidates = activePlayers.filter(p =>
+                !usedPlayerIds.has(p.id) &&
+                slot.preferredPositions.some(pref =>
+                    p.position.toLowerCase().includes(pref.toLowerCase()) ||
+                    pref.toLowerCase().includes(p.position.toLowerCase())
+                )
+            );
+
+            // Pick the best candidate (highest rating)
+            const bestCandidate = candidates.sort((a, b) => b.overallRating - a.overallRating)[0];
+
+            if (bestCandidate) {
+                assigned.push(bestCandidate.id);
+                usedPlayerIds.add(bestCandidate.id);
+            } else {
+                // If no matching player, pick any unused player
+                const fallback = activePlayers.find(p => !usedPlayerIds.has(p.id));
+                if (fallback) {
+                    assigned.push(fallback.id);
+                    usedPlayerIds.add(fallback.id);
+                } else {
+                    assigned.push(''); // Empty slot
+                }
+            }
+        });
+
+        setFieldPlayerIds(assigned);
+    }, [activePlayers, selectedFormation, selectedMatch]);
+
+    // Field players with their slot positions
+    const fieldPlayers = useMemo(() => {
+        const formation = getFormationByName(selectedFormation);
+        return formation.slots.map((slot, index) => {
+            const playerId = fieldPlayerIds[index];
+            const player = activePlayers.find(p => p.id === playerId);
+            return { slot, player: player || null };
+        });
+    }, [fieldPlayerIds, activePlayers, selectedFormation]);
+
+    // Bench players (not on field)
+    const benchPlayers = useMemo(() => {
+        const fieldIds = new Set(fieldPlayerIds);
+        return activePlayers.filter(p => !fieldIds.has(p.id));
+    }, [activePlayers, fieldPlayerIds]);
+
+    // Drag-drop handlers
+    const handleDragStart = (playerId: string) => {
+        setDraggedPlayerId(playerId);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDropOnField = (targetSlotIndex: number) => {
+        if (!draggedPlayerId) return;
+
+        const draggedPlayer = players.find(p => p.id === draggedPlayerId);
+        const targetPlayerId = fieldPlayerIds[targetSlotIndex];
+        const targetPlayer = players.find(p => p.id === targetPlayerId);
+
+        if (!draggedPlayer) return;
+
+        // Show confirmation dialog
+        setSwapConfirmation({
+            from: draggedPlayer.name,
+            to: targetPlayer?.name || 'Empty slot',
+            slotIndex: targetSlotIndex
+        });
+    };
+
+    const confirmSwap = () => {
+        if (!swapConfirmation || !draggedPlayerId) return;
+
+        const newFieldPlayerIds = [...fieldPlayerIds];
+        const draggedIsOnField = fieldPlayerIds.includes(draggedPlayerId);
+        const targetPlayerId = fieldPlayerIds[swapConfirmation.slotIndex];
+
+        if (draggedIsOnField) {
+            // Swapping two field players
+            const draggedIndex = fieldPlayerIds.indexOf(draggedPlayerId);
+            newFieldPlayerIds[draggedIndex] = targetPlayerId;
+            newFieldPlayerIds[swapConfirmation.slotIndex] = draggedPlayerId;
+        } else {
+            // Swapping bench player with field player
+            newFieldPlayerIds[swapConfirmation.slotIndex] = draggedPlayerId;
+        }
+
+        setFieldPlayerIds(newFieldPlayerIds);
+        setDraggedPlayerId(null);
+        setSwapConfirmation(null);
+    };
+
+    const cancelSwap = () => {
+        setDraggedPlayerId(null);
+        setSwapConfirmation(null);
+    };
+
+    const handleDropOnBench = () => {
+        // If dragging a field player to bench, we need to swap with a bench player
+        // For simplicity, this will just reset the drag state
+        setDraggedPlayerId(null);
+    };
 
     // Get all goal moments (shots that were successful)
     const goalMoments = useMemo(() => {
@@ -693,7 +788,11 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                                     const teamConversion = teamShots !== null && teamShots > 0 && teamShotsOnTarget !== null
                                         ? Math.round((teamShotsOnTarget / teamShots) * 100) : null;
-                                    const oppConversion = avgWithNull(relevantStats, m => m.opponent_conversion_rate ? Number(m.opponent_conversion_rate) : null);
+
+                                    const oppShotsOnTarget = sumWithNull(relevantStats, m => m.opponent_shots_on_target);
+                                    const oppShots = oppShotsOnTarget !== null ? oppShotsOnTarget * 2 : null; // Estimate
+                                    const oppConversion = oppShots !== null && oppShots > 0 && oppShotsOnTarget !== null
+                                        ? Math.round((oppShotsOnTarget / oppShots) * 100) : null;
 
                                     // Match info for header
                                     const currentMatchInfo = dbMatches.find(m => m.id === selectedMatch);
@@ -970,89 +1069,321 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                     {/* Main Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                        {/* Formation Visualization - Now shows ALL players */}
+                        {/* Formation Visualization - 11 field players + bench */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
                             className="lg:col-span-2"
                         >
-                            <Card className="bg-card border-border h-full">
-                                <CardHeader className="flex flex-row items-center justify-between">
+                            <Card className="bg-card border-border">
+                                <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                                     <CardTitle className="text-lg flex items-center gap-2">
                                         <Shield className="w-5 h-5 text-primary" />
-                                        Team Formation ({players.length} Players)
+                                        Team Formation
                                     </CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        {Object.entries(POSITION_COLORS).map(([pos, color]) => {
-                                            const count = positionData.find((p) => p.name === pos)?.value || 0;
-                                            if (count === 0) return null;
-                                            return (
-                                                <div key={pos} className="flex items-center gap-1 text-xs">
-                                                    <div
-                                                        className="w-2.5 h-2.5 rounded-full"
-                                                        style={{ backgroundColor: color }}
-                                                    />
-                                                    <span className="text-muted-foreground">{pos}</span>
-                                                </div>
-                                            );
-                                        })}
+                                    <div className="flex items-center gap-3">
+                                        {/* Formation Dropdown */}
+                                        <Select
+                                            value={selectedFormation}
+                                            onValueChange={(value) => setSelectedFormation(value as FormationName)}
+                                        >
+                                            <SelectTrigger className="w-[120px] h-8 text-sm">
+                                                <SelectValue placeholder="Formation" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {FORMATIONS.map((f) => (
+                                                    <SelectItem key={f.name} value={f.name}>
+                                                        {f.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {/* Position Legend */}
+                                        <div className="hidden md:flex items-center gap-2">
+                                            <div className="flex items-center gap-1 text-xs">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--warning))' }} />
+                                                <span className="text-muted-foreground">GK</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-xs">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--success))' }} />
+                                                <span className="text-muted-foreground">DEF</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-xs">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))' }} />
+                                                <span className="text-muted-foreground">MID</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-xs">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--destructive))' }} />
+                                                <span className="text-muted-foreground">FWD</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="relative w-full max-w-4xl mx-auto rounded-xl border border-white/20 overflow-hidden bg-muted/20" style={{ aspectRatio: '1.4' }}>
-                                        {/* Properly rotated background */}
-                                        <div
-                                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                                            style={{
-                                                width: '71.43%',
-                                                height: '100%',
-                                                backgroundImage: 'url(/half-field.jpg)',
-                                                backgroundSize: '100% 100%',
-                                                backgroundPosition: 'center',
-                                                backgroundRepeat: 'no-repeat',
-                                                transform: 'translate(-50%, -50%) rotate(90deg)',
-                                            }}
-                                        />
+                                <CardContent className="space-y-4">
+                                    {/* Half-field with formation - VERTICAL layout (goal on top) */}
+                                    <TacticalField
+                                        viewMode="top_half"
+                                        className="w-full aspect-[72/80] max-w-3xl mx-auto"
+                                    >
+                                        {/* Field Players - 11 slots */}
+                                        {fieldPlayers.map(({ slot, player }, index) => {
+                                            // For VERTICAL display (goal on top, center on bottom):
+                                            // We're showing the LEFT HALF of the field (x: 0-52.5) and rotating it -90deg
+                                            // 
+                                            // Original slot coordinates (0-100 percentage):
+                                            // slot.x: 0 = left edge, 100 = right edge (becomes vertical after rotation)
+                                            // slot.y: 0 = near goal, 100 = midfield (becomes horizontal after rotation)
+                                            //
+                                            // For vertical display with rotation:
+                                            // - slot.y maps to SVG X (0 at goal/left, 52.5 at midfield/right)
+                                            // - slot.x maps to SVG Y (0 at top, 68 at bottom) -> We need to invert this because
+                                            //   rotation makes 0 (top) become Right and 68 (bottom) become Left.
 
-                                        {/* Subtle overlay for better visibility */}
-                                        <div className="absolute inset-0 bg-black/15" />
+                                            const svgX = (slot.y / 100) * 52.5;  // 0-52.5 (goal to midfield)
+                                            // Invert X axis for proper Left/Right placement
+                                            const svgY = 68 - ((slot.x / 100) * 68);    // 0-68 (width of field)
 
-                                        {/* Players - ALL visible now */}
-                                        {formationPlayers.map(({ player, position, color }, index) => (
-                                            <Link
-                                                key={player.id}
-                                                to={`/player/${player.id}`}
-                                                className="absolute transform -translate-x-1/2 -translate-y-1/2 group/player z-10"
-                                                style={{ left: `${position.x}%`, top: `${(position.y / 60) * 100}%` }}
-                                            >
-                                                <motion.div
-                                                    className="flex flex-col items-center"
-                                                    whileHover={{ scale: 1.2, zIndex: 20 }}
-                                                    initial={{ scale: 0, opacity: 0 }}
-                                                    animate={{ scale: 1, opacity: 1 }}
-                                                    transition={{ delay: 0.1 + index * 0.05, type: "spring" }}
-                                                >
-                                                    <div
-                                                        className={cn(
-                                                            "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 shadow-lg transition-all",
-                                                            "text-white",
-                                                            "group-hover/player:ring-2 group-hover/player:ring-white/50 group-hover/player:shadow-xl"
-                                                        )}
-                                                        style={{ backgroundColor: color, borderColor: color }}
+                                            const circleRadius = 1.8;
+
+                                            const handlePlayerClick = (e: React.MouseEvent) => {
+                                                if (player && !draggedPlayerId) {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    navigate(`/player/${player.id}`);
+                                                }
+                                            };
+
+                                            return (
+                                                <g key={slot.id}>
+                                                    {/* Drop zone for drag and drop */}
+                                                    <foreignObject
+                                                        x={svgX - 4}
+                                                        y={svgY - 4}
+                                                        width={8}
+                                                        height={8}
+                                                        style={{ pointerEvents: 'all' }}
                                                     >
-                                                        {player.jerseyNumber}
+                                                        <div
+                                                            onDragOver={handleDragOver}
+                                                            onDrop={() => handleDropOnField(index)}
+                                                            style={{ width: '100%', height: '100%' }}
+                                                        />
+                                                    </foreignObject>
+
+                                                    {player ? (
+                                                        <g
+                                                            transform={`translate(${svgX}, ${svgY})`}
+                                                            className="cursor-pointer"
+                                                            onClick={handlePlayerClick}
+                                                            style={{ pointerEvents: 'all' }}
+                                                        >
+                                                            {/* Shadow/halo */}
+                                                            <circle
+                                                                cx={0}
+                                                                cy={0}
+                                                                r={circleRadius + 0.3}
+                                                                fill="rgba(0,0,0,0.3)"
+                                                            />
+
+                                                            {/* Main circle */}
+                                                            <motion.circle
+                                                                cx={0}
+                                                                cy={0}
+                                                                r={circleRadius}
+                                                                fill={getSlotColor(slot.role)}
+                                                                stroke="white"
+                                                                strokeWidth={0.2}
+                                                                initial={{ scale: 0, opacity: 0 }}
+                                                                animate={{ scale: 1, opacity: 1 }}
+                                                                transition={{ delay: 0.1 + index * 0.03, type: "spring" }}
+                                                                whileHover={{ scale: 1.3 }}
+                                                                className={cn(
+                                                                    draggedPlayerId === player.id && "stroke-yellow-400 stroke-[0.4]"
+                                                                )}
+                                                            />
+
+                                                            {/* Jersey number - rotated -90 to counter field rotation */}
+                                                            <text
+                                                                x={0}
+                                                                y={0.5}
+                                                                textAnchor="middle"
+                                                                fill="white"
+                                                                fontSize="1.4"
+                                                                fontWeight="bold"
+                                                                fontFamily="Arial"
+                                                                transform="rotate(-90)"
+                                                                style={{ pointerEvents: 'none' }}
+                                                            >
+                                                                {player.jerseyNumber}
+                                                            </text>
+
+                                                            {/* Player name (below circle) - rotated -90 */}
+                                                            {/* We need to adjust x/y because of rotation. 
+                                                                Before rotation: y was offset. 
+                                                                After rotation (-90): y becomes x, x becomes -y.
+                                                                Wait, rotate(-90) rotates the AXES.
+                                                                So drawing at (0, y) stays at (0, y) in the new system? No.
+                                                                rotate(-90) is a transform. 
+                                                                If I use transform="rotate(-90)", the element is rotated around (0,0).
+                                                                The text anchor is at x=0, so it pivots around x=0.
+                                                                If I just rotate, the 'y' offset will now point to the RIGHT (since Y axis rotates -90 to become X axis).
+                                                                
+                                                                Actually:
+                                                                Origin (0,0) is center of circle.
+                                                                Old pos: (0, r+2).
+                                                                Rotate(-90) moves (0, r+2) to (r+2, 0) relative to screen?
+                                                                No, strict rotation of the vector (0, y) by -90deg is (y, 0).
+                                                                So the text would appear to the RIGHT of the player.
+                                                                We want the text BELOW the player visually.
+                                                                Visually BELOW means positive Screen Y.
+                                                                Since field is rotated 90 (clockwise), Screen Y matches Field X (reversed? or Field -X?).
+                                                                
+                                                                Let's look at `TacticalField`: `isVertical && "rotate-90"`.
+                                                                The SVG itself is rotated 90deg Clockwise.
+                                                                So:
+                                                                Screen X = Field -Y
+                                                                Screen Y = Field X (simplified)
+                                                                
+                                                                We want text to be at Screen (0, offset).
+                                                                This corresponds to Field (offset, 0).
+                                                                So we should place text at x=offset, y=0 in the SVG coordinate space.
+                                                                AND rotate the text -90 deg so it stands up.
+                                                                
+                                                                So:
+                                                                Jersey Number: (0,0) -> rotated -90 -> stays (0,0). Correct.
+                                                                Name: Was (0, r+2). rotated -90 -> ends up at (r+2, 0) relative to rotated axes?
+                                                                If I simply rotate the text element, it rotates around its origin anchor (specified by x,y).
+                                                                NO, SVG transform rotates around (0,0) of the current user coordinate system (the <g> center).
+                                                                
+                                                                So:
+                                                                1. Rotate coordinate system -90. New X points UP (Screen -Y), New Y points RIGHT (Screen X).
+                                                                   Wait, Visual Field: Vertical.
+                                                                   SVG: Horizontal. Rotated 90deg.
+                                                                   Screen Up is SVG Left (-X?). Screen Right is SVG Top (-Y?).
+                                                                   
+                                                                   Let's just use intuition: 
+                                                                   To place text "Below" player (Screen Down):
+                                                                   Screen Down corresponds to...
+                                                                   If SVG is rotated 90deg Clockwise:
+                                                                   SVG X axis -> Screen Down.
+                                                                   SVG Y axis -> Screen Left.
+                                                                   
+                                                                   So placing text at SVG X > 0 means Screen Down.
+                                                                   So I should set `x={circleRadius + 2}` and `y={0}`.
+                                                                   AND rotate text -90deg so letters are upright.
+                                                             */}
+                                                            <text
+                                                                x={circleRadius + 2.5}
+                                                                y={0}
+                                                                textAnchor="middle"
+                                                                fill="white"
+                                                                fontSize="1.2"
+                                                                fontWeight="bold"
+                                                                fontFamily="Arial"
+                                                                transform="rotate(-90)"
+                                                                style={{ pointerEvents: 'none' }}
+                                                                dominantBaseline="middle"
+                                                            >
+                                                                {player.name.split(" ").pop()}
+                                                            </text>
+
+                                                            {/* Position label - rotated -90 */}
+                                                            <text
+                                                                x={circleRadius + 4}
+                                                                y={0}
+                                                                textAnchor="middle"
+                                                                fill="rgba(255,255,255,0.7)"
+                                                                fontSize="1"
+                                                                fontFamily="Arial"
+                                                                transform="rotate(-90)"
+                                                                style={{ pointerEvents: 'none' }}
+                                                                dominantBaseline="middle"
+                                                            >
+                                                                {slot.role}
+                                                            </text>
+                                                        </g>
+                                                    ) : (
+                                                        <g transform={`translate(${svgX}, ${svgY})`}>
+                                                            <circle
+                                                                cx={0}
+                                                                cy={0}
+                                                                r={circleRadius}
+                                                                fill="rgba(0,0,0,0.2)"
+                                                                stroke="rgba(255,255,255,0.4)"
+                                                                strokeWidth={0.2}
+                                                                strokeDasharray="0.6 0.6"
+                                                            />
+                                                            <text
+                                                                x={0}
+                                                                y={0.5}
+                                                                textAnchor="middle"
+                                                                fill="rgba(255,255,255,0.4)"
+                                                                fontSize="1.2"
+                                                                transform="rotate(90)"
+                                                            >
+                                                                {slot.role}
+                                                            </text>
+                                                        </g>
+                                                    )}
+                                                </g>
+                                            );
+                                        })}
+                                    </TacticalField>
+
+                                    {/* Bench Section */}
+                                    {benchPlayers.length > 0 && (
+                                        <div
+                                            className="mt-4 p-3 rounded-lg bg-secondary/30 border border-border"
+                                            onDragOver={handleDragOver}
+                                            onDrop={handleDropOnBench}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-medium text-muted-foreground">
+                                                    Bench ({benchPlayers.length} players)
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Drag players to swap positions
+                                                </span>
+                                            </div>
+                                            <div className="flex gap-3 overflow-x-auto pb-2">
+                                                {benchPlayers.map((player) => (
+                                                    <div
+                                                        key={player.id}
+                                                        className={cn(
+                                                            "flex-shrink-0 cursor-grab active:cursor-grabbing",
+                                                            draggedPlayerId === player.id && "opacity-50"
+                                                        )}
+                                                        draggable
+                                                        onDragStart={() => handleDragStart(player.id)}
+                                                    >
+                                                        <Link to={`/player/${player.id}`} onClick={(e) => draggedPlayerId && e.preventDefault()}>
+                                                            <motion.div
+                                                                className="flex flex-col items-center p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                                                                whileHover={{ scale: 1.05 }}
+                                                            >
+                                                                <div
+                                                                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 text-white shadow"
+                                                                    style={{
+                                                                        backgroundColor: 'hsl(var(--muted-foreground))',
+                                                                        borderColor: 'hsl(var(--muted-foreground))'
+                                                                    }}
+                                                                >
+                                                                    {player.jerseyNumber}
+                                                                </div>
+                                                                <span className="text-[9px] mt-1 text-foreground font-medium whitespace-nowrap max-w-[60px] truncate">
+                                                                    {player.name.split(" ").pop()}
+                                                                </span>
+                                                                <span className="text-[8px] text-muted-foreground">
+                                                                    {player.position}
+                                                                </span>
+                                                            </motion.div>
+                                                        </Link>
                                                     </div>
-                                                    <span className="text-[11px] mt-1 text-white font-semibold bg-black/60 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                                        {player.name.split(" ")[1] || player.name.split(" ")[0]}
-                                                    </span>
-                                                    <span className="text-[9px] text-white/70 bg-black/40 px-1.5 rounded">
-                                                        {player.position}
-                                                    </span>
-                                                </motion.div>
-                                            </Link>
-                                        ))}
-                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </motion.div>
@@ -1213,89 +1544,105 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Goal Pitch Visualization */}
-                                    <div className="relative w-full max-w-4xl mx-auto rounded-xl border border-white/20 overflow-hidden bg-muted/20" style={{ aspectRatio: '1.4' }}>
-                                        {/* Properly rotated background */}
-                                        <div
-                                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                                            style={{
-                                                width: '71.43%',
-                                                height: '100%',
-                                                backgroundImage: 'url(/half-field.jpg)',
-                                                backgroundSize: '100% 100%',
-                                                backgroundPosition: 'center',
-                                                backgroundRepeat: 'no-repeat',
-                                                transform: 'translate(-50%, -50%) rotate(90deg)',
-                                            }}
-                                        />
+                                    {/* Goal Pitch Visualization - HORIZONTAL (goal on right) */}
+                                    <div className="relative w-full max-w-lg mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 aspect-[4/3]">
+                                        <TacticalField
+                                            viewMode="right_half"
+                                            className="w-full h-full"
+                                            interactive
+                                        >
+                                            {/* Current Goal Animation */}
+                                            <AnimatePresence mode="wait">
+                                                {currentGoal && (
+                                                    <g key={`${currentGoal.matchId}-${currentGoal.minute}`}>
+                                                        {(() => {
+                                                            // For right_half view: viewBox '47 -5 63 78' shows x from 47-110, y from -5 to 73
+                                                            // Goal is on RIGHT at x=105, center y=34
 
-                                        {/* Subtle overlay for better visibility */}
-                                        <div className="absolute inset-0 bg-black/15" />
+                                                            // Normalize event coords (0-100) 
+                                                            // If shot is from left side (x < 50), flip to show on right half
+                                                            const isFlipped = currentGoal.event.x < 50;
+                                                            const normX = isFlipped ? 100 - currentGoal.event.x : currentGoal.event.x;
+                                                            const normY = isFlipped ? 100 - currentGoal.event.y : currentGoal.event.y;
 
-                                        {/* Current Goal Animation */}
-                                        <AnimatePresence mode="wait">
-                                            {currentGoal && (
-                                                <motion.div
-                                                    key={`${currentGoal.matchId}-${currentGoal.minute}`}
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    exit={{ opacity: 0 }}
-                                                    className="absolute inset-0"
-                                                >
-                                                    {/* Shot path */}
-                                                    <svg
-                                                        viewBox="0 0 100 60"
-                                                        className="absolute inset-0 w-full h-full"
-                                                        preserveAspectRatio="xMidYMid meet"
-                                                    >
-                                                        <motion.line
-                                                            x1={currentGoal.event.x}
-                                                            y1={60 - (currentGoal.event.y * 0.6)}
-                                                            x2={50}
-                                                            y2={1.5}
-                                                            stroke="hsl(var(--destructive))"
-                                                            strokeWidth="0.8"
-                                                            strokeDasharray="2 1"
-                                                            initial={{ pathLength: 0, opacity: 0 }}
-                                                            animate={{ pathLength: 1, opacity: 1 }}
-                                                            transition={{ duration: 0.8, ease: "easeOut" }}
-                                                        />
-                                                    </svg>
+                                                            // Map to SVG coordinates for right half of field
+                                                            // normX (50-100) maps to SVG x (52.5-105)
+                                                            // normY (0-100) maps to SVG y (0-68)
+                                                            const svgX = 52.5 + ((normX - 50) / 50) * 52.5;
+                                                            const svgY = (normY / 100) * 68;
 
-                                                    {/* Shooter position */}
-                                                    <motion.div
-                                                        className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                                                        style={{
-                                                            left: `${currentGoal.event.x}%`,
-                                                            top: `${100 - currentGoal.event.y}%`,
-                                                        }}
-                                                        initial={{ scale: 0 }}
-                                                        animate={{ scale: 1 }}
-                                                        transition={{ delay: 0.2, type: "spring" }}
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-destructive flex items-center justify-center text-white font-bold border-2 border-white shadow-lg">
-                                                            {currentGoal.scorer.jerseyNumber}
-                                                        </div>
-                                                    </motion.div>
+                                                            // Goal position (right side)
+                                                            const goalX = 105;
+                                                            const goalY = 34;
 
-                                                    {/* Goal indicator */}
-                                                    <motion.div
-                                                        className="absolute left-1/2 top-2 transform -translate-x-1/2"
-                                                        initial={{ scale: 0, y: 20 }}
-                                                        animate={{ scale: 1, y: 0 }}
-                                                        transition={{ delay: 0.6, type: "spring" }}
-                                                    >
-                                                        <div className="w-5 h-5 rounded-full bg-white border-2 border-primary shadow-sm" />
-                                                    </motion.div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
+                                                            return (
+                                                                <>
+                                                                    {/* Shot trajectory line */}
+                                                                    <motion.line
+                                                                        x1={svgX}
+                                                                        y1={svgY}
+                                                                        x2={goalX}
+                                                                        y2={goalY}
+                                                                        stroke="hsl(var(--destructive))"
+                                                                        strokeWidth="0.5"
+                                                                        strokeDasharray="1.5 0.8"
+                                                                        initial={{ pathLength: 0, opacity: 0 }}
+                                                                        animate={{ pathLength: 1, opacity: 1 }}
+                                                                        transition={{ duration: 0.8, ease: "easeOut" }}
+                                                                    />
 
-                                        {filteredGoals.length === 0 && (
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <p className="text-muted-foreground">No goals in selected match</p>
-                                            </div>
-                                        )}
+                                                                    {/* Shooter position */}
+                                                                    <motion.g
+                                                                        initial={{ scale: 0 }}
+                                                                        animate={{ scale: 1 }}
+                                                                        transition={{ delay: 0.2, type: "spring" }}
+                                                                    >
+                                                                        <circle
+                                                                            cx={svgX}
+                                                                            cy={svgY}
+                                                                            r={2}
+                                                                            fill="rgba(0,0,0,0.3)"
+                                                                        />
+                                                                        <circle
+                                                                            cx={svgX}
+                                                                            cy={svgY}
+                                                                            r={1.8}
+                                                                            fill="hsl(var(--destructive))"
+                                                                            stroke="white"
+                                                                            strokeWidth="0.2"
+                                                                        />
+                                                                        <text
+                                                                            x={svgX}
+                                                                            y={svgY + 0.5}
+                                                                            textAnchor="middle"
+                                                                            fill="white"
+                                                                            fontSize="1.4"
+                                                                            fontWeight="bold"
+                                                                            fontFamily="Arial"
+                                                                        >
+                                                                            {currentGoal.scorer.jerseyNumber}
+                                                                        </text>
+                                                                    </motion.g>
+
+                                                                    {/* Goal indicator (Ball in net) */}
+                                                                    <motion.circle
+                                                                        cx={goalX}
+                                                                        cy={goalY}
+                                                                        r={1}
+                                                                        fill="white"
+                                                                        stroke="black"
+                                                                        strokeWidth="0.15"
+                                                                        initial={{ scale: 0, opacity: 0 }}
+                                                                        animate={{ scale: 1, opacity: 1 }}
+                                                                        transition={{ delay: 0.8, type: "spring" }}
+                                                                    />
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </g>
+                                                )}
+                                            </AnimatePresence>
+                                        </TacticalField>
                                     </div>
 
                                     {/* Goal Details */}
@@ -1346,6 +1693,19 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
+
+                                        {/* Empty state when no goals */}
+                                        {filteredGoals.length === 0 && (
+                                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                                <Target className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                                                <p className="text-muted-foreground font-medium">No goals recorded</p>
+                                                <p className="text-sm text-muted-foreground/60">
+                                                    {selectedMatch === "all"
+                                                        ? "No goals have been scored yet"
+                                                        : "No goals scored in this match"}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Goal List */}
                                         <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -1476,6 +1836,31 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     </div>
                 </div>
             </main>
+
+            {/* Swap Confirmation Dialog */}
+            {swapConfirmation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-card border-2 border-primary rounded-xl p-6 max-w-md mx-4 shadow-2xl"
+                    >
+                        <h3 className="text-xl font-bold text-foreground mb-4">Confirm Player Swap</h3>
+                        <p className="text-muted-foreground mb-6">
+                            Swap <span className="font-semibold text-primary">{swapConfirmation.from}</span> with{' '}
+                            <span className="font-semibold text-primary">{swapConfirmation.to}</span>?
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <Button variant="outline" onClick={cancelSwap}>
+                                Cancel
+                            </Button>
+                            <Button onClick={confirmSwap}>
+                                Confirm Swap
+                            </Button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 };

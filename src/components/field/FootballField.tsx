@@ -11,6 +11,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import TacticalField from "@/components/field/TacticalField";
 
 interface FootballFieldProps {
   events: MatchEvent[];
@@ -204,13 +205,9 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
       </div>
 
       {/* Main Field Container */}
-      <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl" style={{ aspectRatio: '105/68' }}>
-        {/* Football Field Background Image */}
-        <img
-          src="/41290.jpg"
-          alt="Football field"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+      <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]">
+        {/* Tactical Field Background */}
+        <TacticalField viewMode="full" className="absolute inset-0 w-full h-full" interactive={false} />
 
         {/* Subtle overlay for better visibility of markers */}
         <div className="absolute inset-0 bg-black/10" />

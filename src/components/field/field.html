@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Tactical Football Pitch</title>
+    <style>
+        :root {
+            /* Slightly richer greens for the texture base */
+            --pitch-green: #357a38;
+            --pitch-light: #4caf50;
+            --line-white: #ffffffcc;
+            --ui-bg: #1f2937;
+            --ui-text: #f3f4f6;
+            --accent: #3b82f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #111827;
+            color: var(--ui-text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        p.subtitle {
+            color: #9ca3af;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        /* The Pitch Container */
+        .pitch-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1050px;
+            background: var(--pitch-green);
+            /* Base green */
+            border-radius: 4px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            border: 5px solid #1a3c20;
+            transition: max-width 0.3s ease;
+        }
+
+        .pitch-wrapper.half-view {
+            max-width: 600px;
+        }
+
+        /* The SVG itself */
+        svg#pitch {
+            display: block;
+            width: 100%;
+            height: auto;
+            cursor: crosshair;
+            transition: viewBox 0.3s ease;
+        }
+
+        /* Elements on the pitch */
+        .element-group {
+            pointer-events: none;
+        }
+
+        .player-node {
+            cursor: pointer;
+            pointer-events: auto;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .player-node:hover {
+            transform: scale(1.3);
+        }
+
+        .tooltip {
+            fill: #1f2937;
+            font-size: 3px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .player-node:hover+.tooltip {
+            opacity: 1;
+        }
+
+        /* Controls Sidebar */
+        .controls {
+            width: 300px;
+            background: var(--ui-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            font-size: 1rem;
+            color: var(--accent);
+        }
+
+        button {
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #4b5563;
+        }
+
+        button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        button.primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-group button {
+            width: 50%;
+        }
+
+        .log-box {
+            background: #111827;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            height: 150px;
+            overflow-y: auto;
+            color: #10b981;
+            border-radius: 4px;
+        }
+
+        .coord-display {
+            background: #374151;
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Tactical Pitch Engine</h1>
+    <p class="subtitle">105m x 68m Metric Coordinate System • SVG Textures • Interactive Mapping</p>
+
+    <div class="container">
+
+        <div class="pitch-wrapper" id="pitchWrapper">
+            <!-- 
+                ViewBox is set to 0 0 105 68. 
+                This means 1 SVG unit = 1 Meter.
+            -->
+            <svg id="pitch" viewBox="-5 -5 115 78" preserveAspectRatio="xMidYMid meet"
+                xmlns="http://www.w3.org/2000/svg">
+
+                <defs>
+                    <!-- Marker for Pass Arrows -->
+                    <marker id="arrowhead" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+                        <path d="M0,0 L4,2 L0,4 Z" fill="#fbbf24" />
+                    </marker>
+
+                    <!-- PATTERN: Goal Netting (Crosshatch) -->
+                    <pattern id="goalNet" x="0" y="0" width="0.5" height="0.5" patternUnits="userSpaceOnUse">
+                        <!-- Diagonal Mesh Look -->
+                        <path d="M 0,0 L 0.5,0.5 M 0.5,0 L 0,0.5" stroke="#cbd5e1" stroke-width="0.08" opacity="0.6" />
+                        <rect width="0.5" height="0.5" fill="rgba(255,255,255,0.05)" />
+                    </pattern>
+
+                    <!-- PATTERN: Grass Stripes -->
+                    <!-- We use a pattern for stripes to keep it vector based -->
+                    <pattern id="grassStripes" x="0" y="0" width="12" height="68" patternUnits="userSpaceOnUse">
+                        <rect x="0" y="0" width="6" height="68" fill-opacity="0" /> <!-- Transparent (shows base) -->
+                        <rect x="6" y="0" width="6" height="68" fill="white" fill-opacity="0.05" />
+                        <!-- Lighter Stripe -->
+                    </pattern>
+
+                    <!-- FILTER: Organic Grass Noise -->
+                    <filter id="grassNoise" x="0%" y="0%" width="100%" height="100%">
+                        <!-- Generate noise -->
+                        <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" result="noise" />
+                        <!-- Adjust noise contrast/opacity -->
+                        <feColorMatrix type="matrix" in="noise"
+                            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.15 0" />
+                        <!-- Blend mode could be used, but simple overlay works -->
+                    </filter>
+                </defs>
+
+                <!-- LAYER 0: Grass Base & Texture -->
+                <!-- Base Green Background for the SVG area -->
+                <rect x="-10" y="-10" width="130" height="90" fill="var(--pitch-green)" />
+
+                <!-- Stripes -->
+                <rect x="-5" y="-5" width="115" height="78" fill="url(#grassStripes)" />
+
+                <!-- Noise Texture Overlay (Grain) -->
+                <rect x="-10" y="-10" width="130" height="90" filter="url(#grassNoise)" opacity="0.6"
+                    style="pointer-events:none;" />
+
+
+                <!-- LAYER 1: Field Lines -->
+                <g id="lines" fill="none" stroke="white" stroke-width="0.15">
+
+                    <!-- Touchlines and Goal lines -->
+                    <rect x="0" y="0" width="105" height="68" />
+
+                    <!-- Halfway Line -->
+                    <line x1="52.5" y1="0" x2="52.5" y2="68" />
+
+                    <!-- Center Circle -->
+                    <circle cx="52.5" cy="34" r="9.15" />
+                    <circle cx="52.5" cy="34" r="0.4" fill="white" />
+
+                    <!-- LEFT SIDE -->
+                    <rect x="0" y="13.84" width="16.5" height="40.32" />
+                    <rect x="0" y="24.84" width="5.5" height="18.32" />
+                    <circle cx="11" cy="34" r="0.3" fill="white" />
+                    <path d="M 16.5,26.5 A 9.15,9.15 0 0,1 16.5,41.5" />
+                    <path d="M 0,1 A 1,1 0 0,0 1,0" />
+                    <path d="M 0,67 A 1,1 0 0,1 1,68" />
+
+                    <!-- RIGHT SIDE -->
+                    <rect x="88.5" y="13.84" width="16.5" height="40.32" />
+                    <rect x="99.5" y="24.84" width="5.5" height="18.32" />
+                    <circle cx="94" cy="34" r="0.3" fill="white" />
+                    <path d="M 88.5,26.5 A 9.15,9.15 0 0,0 88.5,41.5" />
+                    <path d="M 105,1 A 1,1 0 0,1 104,0" />
+                    <path d="M 105,67 A 1,1 0 0,0 104,68" />
+                </g>
+
+                <!-- LAYER 2: Goals (Textured) -->
+                <g id="goals">
+                    <!-- Left Goal: Box with Net Pattern -->
+                    <rect x="-2.44" y="30.34" width="2.44" height="7.32" fill="url(#goalNet)" stroke="#e5e7eb"
+                        stroke-width="0.2" />
+                    <!-- Right Goal: Box with Net Pattern -->
+                    <rect x="105" y="30.34" width="2.44" height="7.32" fill="url(#goalNet)" stroke="#e5e7eb"
+                        stroke-width="0.2" />
+                </g>
+
+                <!-- LAYER 3: Data -->
+                <g id="layer-passes"></g>
+                <g id="layer-shots"></g>
+                <g id="layer-players"></g>
+
+            </svg>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <h3>View Options</h3>
+                <button onclick="setPitchView('full')">Full Pitch</button>
+                <div class="btn-group">
+                    <button onclick="setPitchView('left')">Left Half</button>
+                    <button onclick="setPitchView('right')">Right Half</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Data Mapping Tools</h3>
+                <button class="primary" onclick="generateSampleMatch()">Visualize Sample Match</button>
+                <button onclick="clearPitch()">Clear Board</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Manual Input</h3>
+                <button onclick="setMode('player')">Mode: Add Player (Click)</button>
+                <button onclick="setMode('pass')">Mode: Add Pass (Drag)</button>
+                <button onclick="setMode('shot')">Mode: Add Shot (Click)</button>
+                <div class="coord-display" id="coordDisplay">X: 0.00, Y: 0.00</div>
+            </div>
+
+            <div class="control-group">
+                <h3>Event Log</h3>
+                <div class="log-box" id="log">Waiting for input...</div>
+            </div>
+
+            <div class="control-group">
+                <small style="color:#6b7280">
+                    Coordinate System:<br>
+                    X: 0 (Left) to 105 (Right)<br>
+                    Y: 0 (Top) to 68 (Bottom)
+                </small>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const svg = document.getElementById('pitch');
+        const pitchWrapper = document.getElementById('pitchWrapper');
+        const layers = {
+            players: document.getElementById('layer-players'),
+            passes: document.getElementById('layer-passes'),
+            shots: document.getElementById('layer-shots')
+        };
+        const logBox = document.getElementById('log');
+        const coordDisplay = document.getElementById('coordDisplay');
+
+        // State
+        let currentMode = 'player'; // player, pass, shot
+        let isDragging = false;
+        let startPoint = null;
+
+        // Constants
+        const PITCH_WIDTH = 105;
+        const PITCH_HEIGHT = 68;
+
+        // --- VIEW FUNCTIONS ---
+        function setPitchView(view) {
+            // Full Field: x:-5 to 110, y:-5 to 73
+            if (view === 'full') {
+                svg.setAttribute('viewBox', '-5 -5 115 78');
+                pitchWrapper.classList.remove('half-view');
+                log("View switched to Full Pitch");
+            }
+            // Left Half (0-52.5): Zoom in
+            else if (view === 'left') {
+                // x range: -5 to 58 (roughly half + padding)
+                svg.setAttribute('viewBox', '-5 -5 63 78');
+                pitchWrapper.classList.add('half-view');
+                log("View switched to Left Half");
+            }
+            // Right Half (52.5-105): Zoom in
+            else if (view === 'right') {
+                // x range: 47 to 110 (roughly start at 52.5 - padding)
+                svg.setAttribute('viewBox', '47 -5 63 78');
+                pitchWrapper.classList.add('half-view');
+                log("View switched to Right Half");
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+
+        // Helper: Convert screen pixel coordinates to SVG Metric coordinates
+        function getPoint(evt) {
+            const pt = svg.createSVGPoint();
+            pt.x = evt.clientX;
+            pt.y = evt.clientY;
+            // The matrix transform handles scaling/panning automatically (even in zoomed view)
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            return {
+                x: Math.max(0, Math.min(PITCH_WIDTH, svgP.x)), // Clamp to bounds
+                y: Math.max(0, Math.min(PITCH_HEIGHT, svgP.y))
+            };
+        }
+
+        // Add Player Node
+        function addPlayer(x, y, color = '#ef4444', number = '', name = 'Player') {
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("class", "player-node");
+            g.setAttribute("transform", `translate(${x}, ${y})`);
+
+            // Halo/Shadow
+            const shadow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            shadow.setAttribute("r", "1.8");
+            shadow.setAttribute("fill", "rgba(0,0,0,0.3)");
+
+            // Jersey
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("r", "1.5");
+            circle.setAttribute("fill", color);
+            circle.setAttribute("stroke", "white");
+            circle.setAttribute("stroke-width", "0.2");
+
+            // Number
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.textContent = number;
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("dy", "0.5"); // vertical align
+            text.setAttribute("fill", "white");
+            text.setAttribute("font-size", "1.4");
+            text.setAttribute("font-weight", "bold");
+            text.setAttribute("font-family", "Arial");
+
+            // Tooltip Label (Shows on hover)
+            const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+            title.textContent = `${name} (x:${x.toFixed(1)}, y:${y.toFixed(1)})`;
+
+            g.appendChild(shadow);
+            g.appendChild(circle);
+            g.appendChild(text);
+            g.appendChild(title);
+
+            layers.players.appendChild(g);
+            log(`Player added at [${x.toFixed(1)}, ${y.toFixed(1)}]`);
+        }
+
+        // Add Pass Vector
+        function addPass(x1, y1, x2, y2, success = true) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("stroke", success ? "#fbbf24" : "#9ca3af"); // Amber for success, gray for fail
+            line.setAttribute("stroke-width", "0.4");
+            line.setAttribute("stroke-dasharray", success ? "0" : "1, 1");
+            line.setAttribute("marker-end", "url(#arrowhead)");
+            line.setAttribute("opacity", "0.8");
+
+            layers.passes.appendChild(line);
+            log(`Pass: [${x1.toFixed(1)},${y1.toFixed(1)}] -> [${x2.toFixed(1)},${y2.toFixed(1)}]`);
+        }
+
+        // Add Shot Marker
+        function addShot(x, y, isGoal = false) {
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("transform", `translate(${x}, ${y})`);
+
+            if (isGoal) {
+                // Star shape for goal
+                const star = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                star.setAttribute("points", "0,-2 1.2,-0.6 2.6,-0.6 1.4,0.4 1.9,1.8 0,0.8 -1.9,1.8 -1.4,0.4 -2.6,-0.6 -1.2,-0.6");
+                star.setAttribute("fill", "#fbbf24"); // Gold
+                star.setAttribute("stroke", "white");
+                star.setAttribute("stroke-width", "0.1");
+                g.appendChild(star);
+            } else {
+                // X for miss/save
+                const cross = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                cross.textContent = "✖";
+                cross.setAttribute("text-anchor", "middle");
+                cross.setAttribute("dy", "1");
+                cross.setAttribute("fill", "#ef4444");
+                cross.setAttribute("font-size", "3");
+                cross.setAttribute("font-weight", "bold");
+                g.appendChild(cross);
+            }
+
+            layers.shots.appendChild(g);
+            log(`Shot at [${x.toFixed(1)}, ${y.toFixed(1)}] - ${isGoal ? 'GOAL' : 'MISS'}`);
+        }
+
+        // --- INTERACTIVITY ---
+
+        svg.addEventListener('mousemove', (e) => {
+            const p = getPoint(e);
+            coordDisplay.innerText = `X: ${p.x.toFixed(2)}, Y: ${p.y.toFixed(2)}`;
+
+            if (isDragging && currentMode === 'pass') {
+                // Optional: Draw ghost line here
+            }
+        });
+
+        svg.addEventListener('mousedown', (e) => {
+            const p = getPoint(e);
+
+            if (currentMode === 'pass') {
+                isDragging = true;
+                startPoint = p;
+            } else if (currentMode === 'player') {
+                // Random team color for demo
+                const isHome = Math.random() > 0.5;
+                addPlayer(p.x, p.y, isHome ? '#ef4444' : '#3b82f6', Math.floor(Math.random() * 99), isHome ? 'Home' : 'Away');
+            } else if (currentMode === 'shot') {
+                const isGoal = Math.random() > 0.7; // 30% chance of goal for fun
+                addShot(p.x, p.y, isGoal);
+            }
+        });
+
+        svg.addEventListener('mouseup', (e) => {
+            if (currentMode === 'pass' && isDragging) {
+                const endPoint = getPoint(e);
+                // Don't draw tiny lines (clicks)
+                if (Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y) > 2) {
+                    addPass(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+                }
+                isDragging = false;
+                startPoint = null;
+            }
+        });
+
+        // --- UI UTILS ---
+
+        function setMode(mode) {
+            currentMode = mode;
+            log(`Mode switched to: ${mode.toUpperCase()}`);
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.innerText = `> ${msg}`;
+            logBox.insertBefore(div, logBox.firstChild);
+        }
+
+        function clearPitch() {
+            layers.players.innerHTML = '';
+            layers.passes.innerHTML = '';
+            layers.shots.innerHTML = '';
+            log("Pitch cleared.");
+        }
+
+        // --- SAMPLE DATA GENERATOR ---
+        function generateSampleMatch() {
+            clearPitch();
+            log("Loading sample tactical data...");
+
+            // Formation: 4-3-3 (Home - Red) attacking Right
+            const homePositions = [
+                { x: 5, y: 34, n: 1 }, // GK
+                { x: 20, y: 10, n: 2 }, { x: 20, y: 26, n: 4 }, { x: 20, y: 42, n: 5 }, { x: 20, y: 58, n: 3 }, // Def
+                { x: 40, y: 34, n: 6 }, { x: 50, y: 20, n: 8 }, { x: 50, y: 48, n: 10 }, // Mid
+                { x: 80, y: 10, n: 7 }, { x: 85, y: 34, n: 9 }, { x: 80, y: 58, n: 11 }  // Att
+            ];
+
+            homePositions.forEach(p => addPlayer(p.x, p.y, '#ef4444', p.n, 'Red Team'));
+
+            // Formation: 4-4-2 (Away - Blue) defending Left
+            const awayPositions = [
+                { x: 100, y: 34, n: 1 }, // GK
+                { x: 85, y: 15, n: 2 }, { x: 85, y: 30, n: 4 }, { x: 85, y: 38, n: 5 }, { x: 85, y: 53, n: 3 }, // Def
+                { x: 70, y: 10, n: 7 }, { x: 70, y: 28, n: 6 }, { x: 70, y: 40, n: 8 }, { x: 70, y: 58, n: 11 }, // Mid
+                { x: 55, y: 30, n: 9 }, { x: 55, y: 38, n: 10 } // Att
+            ];
+
+            awayPositions.forEach(p => addPlayer(p.x, p.y, '#3b82f6', p.n, 'Blue Team'));
+
+            // Simulate a goal sequence
+            // 1. Midfielder passes to Winger
+            addPass(50, 48, 80, 58, true);
+            // 2. Winger crosses to Striker
+            addPass(80, 58, 92, 34, true);
+            // 3. Striker shoots
+            addShot(92, 34, true);
+
+            // Random failed pass
+            addPass(40, 34, 70, 40, false);
+        }
+
+    </script>
+</body>
+
+</html>

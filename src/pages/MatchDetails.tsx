@@ -96,6 +96,34 @@ const MatchDetails = () => {
         enabled: !!matchId
     });
 
+    // Fetch all matches for the dropdown
+    const { data: allMatches = [] } = useQuery({
+        queryKey: ['all-matches-for-dropdown'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('matches')
+                .select(`
+                    id,
+                    match_date,
+                    home_team:home_team_id(team_name),
+                    away_team:away_team_id(team_name)
+                `)
+                .order('match_date', { ascending: false });
+
+            if (error) throw error;
+            return ((data as any[]) || []).map(m => ({
+                id: m.id,
+                label: `${(m.home_team as any)?.team_name || 'Team'} vs ${(m.away_team as any)?.team_name || 'Opponent'}`,
+                date: m.match_date
+            }));
+        }
+    });
+
+    // Handle match change from dropdown
+    const handleMatchChange = (newMatchId: string) => {
+        navigate(`/match/${newMatchId}#${activeTab}`, { replace: false });
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -119,7 +147,13 @@ const MatchDetails = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            <AuthHeader title="Match Details" showBack />
+            <AuthHeader
+                title="Match Details"
+                showBack
+                matchOptions={allMatches}
+                selectedMatchId={matchId}
+                onMatchChange={handleMatchChange}
+            />
             <Sidebar />
 
             <main className="pt-24 pb-12 px-6 ml-64">

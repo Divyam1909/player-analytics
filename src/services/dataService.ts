@@ -15,6 +15,7 @@ import type {
     DbMatch,
     DbMatchStatisticsSummary,
     DbPlayerMatchStatistics,
+    DbPlayerAttributes,
     DbPassEvent,
     DbShotOnTarget,
     DbDuel,
@@ -173,6 +174,24 @@ export async function fetchDuelsFromDB(matchId?: string, playerId?: string): Pro
     return data;
 }
 
+/**
+ * Fetch player attributes from Supabase
+ */
+export async function fetchPlayerAttributesFromDB(): Promise<DbPlayerAttributes[] | null> {
+    if (!isSupabaseConfigured() || !supabase) return null;
+
+    const { data, error } = await supabase
+        .from('player_attributes')
+        .select('*');
+
+    if (error) {
+        console.error('Error fetching player attributes:', error);
+        return null;
+    }
+
+    return data;
+}
+
 // ============================================
 // DATA TRANSFORMATION
 // ============================================
@@ -306,11 +325,12 @@ export async function getPlayersWithStats(): Promise<Player[]> {
 
     try {
         // Fetch all data from Supabase - Optimized to use views
-        const [dbPlayers, playerMatchStats, matches, teams] = await Promise.all([
+        const [dbPlayers, playerMatchStats, matches, teams, playerAttributes] = await Promise.all([
             fetchPlayersFromDB(),
             fetchPlayerMatchStatisticsFromDB(),
             fetchMatchesFromDB(),
             fetchTeamsFromDB(),
+            fetchPlayerAttributesFromDB(),
         ]);
 
         // If DB fetch failed, return empty array
@@ -327,6 +347,10 @@ export async function getPlayersWithStats(): Promise<Player[]> {
         const teamMap = new Map<string, DbTeam>();
         teams?.forEach(t => teamMap.set(t.id, t));
 
+        // Create a map of player attributes for quick lookup
+        const attributesMap = new Map<string, DbPlayerAttributes>();
+        playerAttributes?.forEach(attr => attributesMap.set(attr.player_id, attr));
+
         // Group stats by player
         const statsByPlayer = new Map<string, DbPlayerMatchStatistics[]>();
         playerMatchStats?.forEach(stat => {
@@ -338,14 +362,25 @@ export async function getPlayersWithStats(): Promise<Player[]> {
         // Build player data
         const players: Player[] = dbPlayers.map(dbPlayer => {
             const playerStats = statsByPlayer.get(dbPlayer.id) || [];
+            const attributes = attributesMap.get(dbPlayer.id);
 
             // Build match stats for each match
             const matchStats: PlayerMatch[] = playerStats.map(stat => {
                 const match = matchMap.get(stat.match_id);
 
+                // Compute opponent name from team relationships
+                let opponentName = 'Unknown';
+                if (match) {
+                    // Opponent is the team that is NOT our_team_id
+                    const opponentTeamId = match.our_team_id === match.home_team_id
+                        ? match.away_team_id
+                        : match.home_team_id;
+                    opponentName = teamMap.get(opponentTeamId)?.team_name || 'Unknown';
+                }
+
                 return {
                     matchId: stat.match_id,
-                    opponent: match?.opponent_name_deprecated || 'Unknown',
+                    opponent: opponentName,
                     date: match?.match_date || new Date().toISOString().split('T')[0],
                     minutesPlayed: 90, // TODO: Fetch from physical_stats table when available
                     stats: {
@@ -384,13 +419,14 @@ export async function getPlayersWithStats(): Promise<Player[]> {
                 jerseyNumber: dbPlayer.jersey_number || 0,
                 position: dbPositionToFrontend(dbPlayer.position),
                 team: teamMap.get(dbPlayer.team_id)?.team_name || 'Unknown Team',
-                overallRating: null, // TODO: Fetch from attributes
+                teamId: dbPlayer.team_id,
+                overallRating: attributes?.overall_rating || null,
                 attributes: {
-                    passing: null,
-                    shooting: null,
-                    dribbling: null,
-                    defending: null,
-                    physical: null,
+                    passing: attributes?.passing || null,
+                    shooting: attributes?.shooting || null,
+                    dribbling: attributes?.dribbling || null,
+                    defending: attributes?.defending || null,
+                    physical: attributes?.physical || null,
                 },
                 matchStats,
             };

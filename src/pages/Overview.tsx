@@ -85,15 +85,13 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
 
     let filtered = players;
 
-    // First filter by match - filter players whose matchStats include this matchId
+    // First filter by match - filter players whose team is in this match
     if (matchId && selectedMatch) {
-      // Get all unique team names from players who have stats in this match
+      // Get the team IDs from the match
       const teamIds = getMatchTeamIds(selectedMatch);
 
-      // Build a set of team names that are playing in this match by checking player matchStats
+      // First try to find teams from players with match events
       const teamsInMatch = new Set<string>();
-
-      // Find players who have events in this match - their team is in the match
       players.forEach(player => {
         if (player.matchStats.some(ms => ms.matchId === matchId)) {
           teamsInMatch.add(player.team);
@@ -103,6 +101,12 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
       // If we found teams from players with match events, filter by those
       if (teamsInMatch.size > 0) {
         filtered = players.filter(player => teamsInMatch.has(player.team));
+      } else if (teamIds.homeTeamId || teamIds.awayTeamId) {
+        // Fallback: Filter by the match's team IDs directly
+        filtered = players.filter(player =>
+          player.teamId === teamIds.homeTeamId ||
+          player.teamId === teamIds.awayTeamId
+        );
       }
     }
 

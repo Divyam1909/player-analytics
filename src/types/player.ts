@@ -70,6 +70,7 @@ export interface Player {
   jerseyNumber: number;
   position: string;
   team: string;
+  teamId: string; // Added for team-based filtering
   overallRating: number | null;
   attributes: PlayerAttributes;
   matchStats: PlayerMatch[];

@@ -47,16 +47,8 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
   // Default to first player if no id or player not found
   const currentPlayer = player || players[0];
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-primary">Loading player data...</div>
-      </div>
-    );
-  }
-
   // Set default selected match - using useEffect for side effects
+  // NOTE: This hook MUST be before any early returns to comply with Rules of Hooks
   useEffect(() => {
     if (defaultMatchId) {
       setSelectedMatchId(defaultMatchId);
@@ -65,11 +57,23 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     }
   }, [currentPlayer, selectedMatchId, defaultMatchId]);
 
-  const selectedMatch = currentPlayer?.matchStats.find(
-    (m) => m.matchId === selectedMatchId
-  );
+  // Scroll to top when navigating to a new player
+  useEffect(() => {
+    if (!embedded) {
+      window.scrollTo(0, 0);
+    }
+  }, [id, embedded]);
 
-  // Calculate aggregated stats
+  // Loading state - MUST be before any conditional logic
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-primary">Loading player data...</div>
+      </div>
+    );
+  }
+
+  // Calculate aggregated stats - after loading check
   const aggregatedStats = useMemo(() => {
     if (!currentPlayer) return null;
 
@@ -96,6 +100,10 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     if (!currentPlayer) return [];
     return currentPlayer.matchStats.flatMap((m) => m.events);
   }, [currentPlayer]);
+
+  const selectedMatch = currentPlayer?.matchStats.find(
+    (m) => m.matchId === selectedMatchId
+  );
 
   const getRatingColor = (rating: number) => {
     if (rating >= 90) return "text-success";

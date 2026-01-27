@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Target, Circle, X, Star, AlertTriangle } from "lucide-react";
+import TacticalField from "@/components/field/TacticalField";
 
 interface ShotMapProps {
     events: MatchEvent[];
@@ -168,69 +169,64 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
             </div>
 
             {/* Half-Field Shot Map (attacking half only - Goal Top) */}
-            <div
-                className="relative w-full max-w-6xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl bg-muted/20"
-                style={{
-                    aspectRatio: '1.26796',
-                }}
-            >
-                {/* Properly rotated background - Swapping dimensions to prevent cropping and stretching */}
-                <div
-                    className="absolute top-1/2 left-1/2"
-                    style={{
-                        width: '78.867%',   // (3549/4500) * 100% / ratio
-                        height: '126.796%', // ratio * 100%
-                        backgroundImage: 'url(/half-field.jpg)',
-                        backgroundSize: '100% 100%',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        transform: 'translate(-50%, -50%) rotate(90deg)',
-                    }}
-                />
-                {/* Subtle overlay for better visibility of markers */}
-                <div className="absolute inset-0 bg-black/10" />
+            <div className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl bg-muted/20 aspect-[1.26796]">
+                <TacticalField
+                    viewMode="vertical_half"
+                    className="w-full h-full"
+                    interactive
+                >
+                    {/* Shot Markers */}
+                    {filteredShots.map((shot, index) => {
+                        // Transform for Goal Top view (Vertical Half -90deg):
+                        // Shot X (Length): 0 (Own Goal) -> 100 (Opp Goal).
+                        // SVG X (Vertical): 0 (Bottom) -> 105 (Top).
+                        // shot.x=100 -> svgX=105. shot.x=50 -> svgX=52.5.
+                        const svgX = shot.x * 1.05;
 
-                {/* Shot Markers */}
-                {filteredShots.map((shot, index) => {
-                    // Transform for Goal Top view:
-                    // Data X (50 Mid -> 100 Goal) maps to Screen Y (100% Bottom -> 0% Top)
-                    // Data Y (0 -> 100) maps to Screen X (0% Left -> 100% Right)
+                        // Shot Y (Width): 0 (Left) -> 100 (Right).
+                        // SVG Y (Horizontal): 0 (Left) -> 68 (Right).
+                        const svgY = shot.y * 0.68;
 
-                    const displayY = (100 - shot.x) * 2; // 100->0, 50->100
-                    const displayX = shot.y; // 0->0, 100->100
-                    const shotXG = shot.xG || calculateXG(shot.x, shot.y);
+                        const shotXG = shot.xG || calculateXG(shot.x, shot.y);
 
-                    return (
-                        <motion.div
-                            key={`shot-${index}`}
-                            className={cn(
-                                "absolute cursor-pointer flex items-center justify-center",
-                                selectedShot === shot.originalIndex && "ring-2 ring-white ring-offset-2 ring-offset-transparent z-20"
-                            )}
-                            style={{
-                                left: `${displayX}%`,
-                                top: `${displayY}%`,
-                                transform: "translate(-50%, -50%)",
-                            }}
-                            onClick={() => setSelectedShot(selectedShot === shot.originalIndex ? null : shot.originalIndex)}
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: index * 0.05 }}
-                            whileHover={{ scale: 1.3 }}
-                        >
-                            {getShotIcon(shot)}
+                        return (
+                            <foreignObject
+                                key={`shot-${index}`}
+                                x={svgX - 2.5}
+                                y={svgY - 2.5}
+                                width={5}
+                                height={5}
+                                className="overflow-visible"
+                            >
+                                <motion.div
+                                    className={cn(
+                                        "w-full h-full flex items-center justify-center cursor-pointer transform rotate-90", // Counter-rotate to stay upright
+                                        selectedShot === shot.originalIndex && "ring-2 ring-white ring-offset-2 ring-offset-transparent rounded-full"
+                                    )}
+                                    onClick={() => setSelectedShot(selectedShot === shot.originalIndex ? null : shot.originalIndex)}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    whileHover={{ scale: 1.3 }}
+                                >
+                                    {getShotIcon(shot)}
 
-                            {/* xG Badge */}
-                            {showXG && (
-                                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-mono px-1 py-0.5 rounded bg-black/70 text-white">
-                                    {shotXG.toFixed(2)}
-                                </div>
-                            )}
-                        </motion.div>
-                    );
-                })}
+                                    {/* xG Badge */}
+                                    {showXG && (
+                                        <div
+                                            className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-mono px-1 py-0.5 rounded bg-black/70 text-white whitespace-nowrap"
+                                            style={{ fontSize: '1.5px', lineHeight: '1.2', bottom: '-2px' }}
+                                        >
+                                            {shotXG.toFixed(2)}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            </foreignObject>
+                        );
+                    })}
+                </TacticalField>
 
-                {/* Selected Shot Details */}
+                {/* Selected Shot Details Overlay */}
                 <AnimatePresence>
                     {selectedShot !== null && (
                         <motion.div

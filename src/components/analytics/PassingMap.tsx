@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layers, ArrowRight } from "lucide-react";
+import TacticalField from "@/components/field/TacticalField";
 
 interface PassingMapProps {
     events: MatchEvent[];
@@ -134,97 +135,67 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
             </div>
 
             {/* Field with Passing Network */}
-            <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl" style={{ aspectRatio: '105/68' }}>
-                {/* Football Field Background Image */}
-                <img
-                    src="/41290.jpg"
-                    alt="Football field"
-                    className="absolute inset-0 w-full h-full object-cover"
-                />
+            <TacticalField viewMode="full" className="w-full max-w-3xl mx-auto rounded-xl shadow-xl overflow-visible" showGrid={false}>
+                <defs>
+                    <marker id={`arrow-success-${uniqueId}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L6,3 L0,6 Z" fill="hsl(142, 76%, 36%)" />
+                    </marker>
+                    <marker id={`arrow-fail-${uniqueId}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L6,3 L0,6 Z" fill="hsl(0, 72%, 50%)" />
+                    </marker>
+                </defs>
 
-                {/* Subtle overlay for better visibility of markers */}
-                <div className="absolute inset-0 bg-black/10" />
-
-                {/* Position Heatmap Overlay */}
-                <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${positionHeatmap.gridCols}, 1fr)`,
-                        gridTemplateRows: `repeat(${positionHeatmap.gridRows}, 1fr)`,
-                    }}
-                >
+                {/* Heatmap Overlay (SVG Rects) */}
+                <g style={{ opacity: 0.5 }}>
                     {positionHeatmap.zones.map((row, rowIndex) =>
                         row.map((intensity, colIndex) => (
-                            <div
-                                key={`${rowIndex}-${colIndex}`}
-                                style={{
-                                    backgroundColor: getHeatmapColor(intensity, positionHeatmap.maxIntensity),
-                                    filter: intensity > 0 ? "blur(8px)" : "none",
-                                }}
+                            <rect
+                                key={`hm-${rowIndex}-${colIndex}`}
+                                x={colIndex * 10.5}
+                                y={rowIndex * 11.33}
+                                width={10.5}
+                                height={11.33}
+                                fill={getHeatmapColor(intensity, positionHeatmap.maxIntensity)}
+                                style={{ filter: intensity > 0 ? "blur(4px)" : "none" }}
                             />
                         ))
                     )}
-                </div>
+                </g>
 
                 {/* Pass Connection Lines */}
-                {showConnections && (
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
-                        <defs>
-                            <marker id={`arrow-success-${uniqueId}`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                                <polygon points="0 0, 8 4, 0 8" fill="hsl(142, 76%, 36%)" />
-                            </marker>
-                            <marker id={`arrow-fail-${uniqueId}`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                                <polygon points="0 0, 8 4, 0 8" fill="hsl(0, 72%, 50%)" />
-                            </marker>
-                        </defs>
-                        {filteredPasses.map((pass, index) => {
-                            // Calculate angle from origin to target
-                            const dx = pass.targetX - pass.x;
-                            const dy = pass.targetY - pass.y;
-                            const angle = Math.atan2(dy, dx);
+                {showConnections && filteredPasses.map((pass, index) => {
+                    const x1 = pass.x / 100 * 105;
+                    const y1 = pass.y / 100 * 68;
+                    const x2 = pass.targetX / 100 * 105;
+                    const y2 = pass.targetY / 100 * 68;
+                    const dist = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 
-                            // Circle radius in percentage (roughly 1.5% of container)
-                            const circleRadiusPercent = 1.5;
+                    if (dist < 1) return null;
 
-                            // Offset start position by circle radius in direction of target
-                            const startX = pass.x + Math.cos(angle) * circleRadiusPercent;
-                            const startY = pass.y + Math.sin(angle) * circleRadiusPercent;
-
-                            return (
-                                <motion.line
-                                    key={`pass-${index}`}
-                                    x1={`${startX}%`}
-                                    y1={`${startY}%`}
-                                    x2={`${pass.targetX}%`}
-                                    y2={`${pass.targetY}%`}
-                                    stroke={pass.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
-                                    strokeWidth={pass.success ? "2" : "1.5"}
-                                    strokeOpacity={pass.success ? 0.7 : 0.5}
-                                    strokeDasharray={pass.success ? "none" : "4,2"}
-                                    markerEnd={`url(#${pass.success ? `arrow-success-${uniqueId}` : `arrow-fail-${uniqueId}`})`}
-                                    initial={{ pathLength: 0, opacity: 0 }}
-                                    animate={{ pathLength: 1, opacity: 1 }}
-                                    transition={{ duration: 0.3, delay: index * 0.02 }}
-                                />
-                            );
-                        })}
-                    </svg>
-                )}
+                    return (
+                        <motion.line
+                            key={`pass-${index}`}
+                            x1={x1} y1={y1} x2={x2} y2={y2}
+                            stroke={pass.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
+                            strokeWidth={pass.success ? 0.3 : 0.25}
+                            strokeOpacity={pass.success ? 0.85 : 0.7}
+                            strokeDasharray={pass.success ? "none" : "1,0.5"}
+                            markerEnd={`url(#${pass.success ? `arrow-success-${uniqueId}` : `arrow-fail-${uniqueId}`})`}
+                            initial={{ pathLength: 0, opacity: 0 }}
+                            animate={{ pathLength: 1, opacity: 1 }}
+                            transition={{ duration: 0.3, delay: index * 0.02 }}
+                        />
+                    );
+                })}
 
                 {/* Pass Origin Points */}
                 {filteredPasses.map((pass, index) => (
-                    <motion.div
+                    <motion.circle
                         key={`point-${index}`}
-                        className={cn(
-                            "absolute w-3 h-3 rounded-full z-10",
-                            pass.success ? "bg-success" : "bg-destructive"
-                        )}
-                        style={{
-                            left: `${pass.x}%`,
-                            top: `${pass.y}%`,
-                            transform: "translate(-50%, -50%)",
-                        }}
+                        cx={pass.x / 100 * 105}
+                        cy={pass.y / 100 * 68}
+                        r={0.6}
+                        fill={pass.success ? "hsl(var(--success))" : "hsl(var(--destructive))"}
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: index * 0.02 }}
@@ -233,25 +204,26 @@ const PassingMap = ({ events, playerName }: PassingMapProps) => {
 
                 {/* Pass Destination Points (Receivers) */}
                 {showConnections && filteredPasses.filter(p => p.success).map((pass, index) => (
-                    <motion.div
+                    <foreignObject
                         key={`target-${index}`}
-                        className="absolute flex flex-col items-center z-10"
-                        style={{
-                            left: `${pass.targetX}%`,
-                            top: `${pass.targetY}%`,
-                            transform: "translate(-50%, -50%)",
-                        }}
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: index * 0.02 + 0.1 }}
+                        x={(pass.targetX / 100 * 105) - 3}
+                        y={(pass.targetY / 100 * 68) - 3}
+                        width={6}
+                        height={6}
+                        className="overflow-visible"
                     >
-                        <div className="w-2.5 h-2.5 rounded-full bg-primary border border-white/50" />
-                        <span className="text-[8px] text-white bg-black/60 px-1 rounded mt-0.5 whitespace-nowrap">
-                            {pass.passTarget || `${pass.minute}'`}
-                        </span>
-                    </motion.div>
+                        <div className="flex flex-col items-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary border border-white/50" />
+                            <span
+                                className="text-white bg-black/60 px-0.5 rounded mt-0.5 whitespace-nowrap"
+                                style={{ fontSize: '1.5px', lineHeight: '1.2' }}
+                            >
+                                {pass.passTarget || `${pass.minute}'`}
+                            </span>
+                        </div>
+                    </foreignObject>
                 ))}
-            </div>
+            </TacticalField>
 
             {/* Legend */}
             <div className="flex items-center justify-center gap-6 text-sm flex-wrap">

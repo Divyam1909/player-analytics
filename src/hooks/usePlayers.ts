@@ -21,7 +21,10 @@ interface DbTeam {
 interface DbMatch {
     id: string;
     match_date: string;
+    home_team_id: string;
     away_team_id: string;
+    our_team_id: string;
+    home_team: { team_name: string }[] | { team_name: string } | null;
     away_team: { team_name: string }[] | { team_name: string } | null;
 }
 
@@ -79,7 +82,7 @@ export const usePlayers = () => {
             // 2. Fetch Matches (to get dates and opponents)
             const { data: dbMatches, error: matchesError } = await supabase
                 .from('matches')
-                .select('id, match_date, away_team_id, away_team:away_team_id(team_name)')
+                .select('id, match_date, home_team_id, away_team_id, our_team_id, home_team:home_team_id(team_name), away_team:away_team_id(team_name)')
                 .order('match_date', { ascending: false });
             if (matchesError) throw matchesError;
 
@@ -105,20 +108,26 @@ export const usePlayers = () => {
                 .select('*');
             // Not throwing on keeper (optional or might be empty)
 
+            // Fetch player attributes
+            const { data: playerAttributes, error: attributesError } = await supabase
+                .from('player_attributes')
+                .select('*');
+            // Not throwing - attributes might not be calculated yet
+
             // 4. Transform and Combine
             const players: Player[] = (dbPlayers as DbPlayer[]).map(dbPlayer => {
                 const fullName = `${dbPlayer.first_name} ${dbPlayer.last_name}`;
 
-                // Player attributes not available in database - set to null
-                // TODO: Fetch from player_attributes table when available
+                // Get player attributes from database
+                const playerAttr = (playerAttributes as any[])?.find(attr => attr.player_id === dbPlayer.id);
                 const attributes = {
-                    passing: null,
-                    shooting: null,
-                    dribbling: null,
-                    defending: null,
-                    physical: null
+                    passing: playerAttr?.passing || null,
+                    shooting: playerAttr?.shooting || null,
+                    dribbling: playerAttr?.dribbling || null,
+                    defending: playerAttr?.defending || null,
+                    physical: playerAttr?.physical || null
                 };
-                const overallRating = null;
+                const overallRating = playerAttr?.overall_rating || null;
 
                 // Build Match Stats
                 // Get all match IDs this player participated in (based on events)
@@ -177,13 +186,24 @@ export const usePlayers = () => {
                     });
 
                     // Note: JSON "MatchStats" structure has `stats` object
-                    const awayTeamName = Array.isArray(match.away_team)
-                        ? match.away_team[0]?.team_name
-                        : (match.away_team as any)?.team_name;
+                    // Compute opponent based on which team is "ours"
+                    const getTeamName = (team: { team_name: string }[] | { team_name: string } | null) => {
+                        if (!team) return null;
+                        return Array.isArray(team) ? team[0]?.team_name : team.team_name;
+                    };
+
+                    let opponentName = 'Opponent';
+                    if (match.our_team_id === match.home_team_id) {
+                        // We are home, opponent is away
+                        opponentName = getTeamName(match.away_team) || 'Opponent';
+                    } else {
+                        // We are away, opponent is home
+                        opponentName = getTeamName(match.home_team) || 'Opponent';
+                    }
 
                     return {
                         matchId: match.id,
-                        opponent: awayTeamName || 'Opponent',
+                        opponent: opponentName,
                         date: match.match_date,
                         minutesPlayed: 90, // Default to 90 if events exist
                         stats: {
@@ -223,6 +243,7 @@ export const usePlayers = () => {
                     jerseyNumber: dbPlayer.jersey_number,
                     position: dbPlayer.position,
                     team: teamMap.get(dbPlayer.team_id)?.team_name || 'Unknown Team',
+                    teamId: dbPlayer.team_id,
                     overallRating,
                     attributes,
                     matchStats: playerMatches

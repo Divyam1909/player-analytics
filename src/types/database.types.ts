@@ -42,25 +42,20 @@ export interface Database {
             matches: {
                 Row: {
                     id: string;
-                    team_id_deprecated: string;
-                    is_home_team_deprecated: boolean;
-                    opponent_name_deprecated: string;
-                    team_score: number;
-                    opponent_score: number;
-                    competition_name: string;
-                    match_date: string;
-                    video_url: string | null;
-                    created_at: string | null;
-                    updated_at: string | null;
-                    created_by: string;
                     home_team_id: string;
                     away_team_id: string;
                     our_team_id: string;
                     league_id: string | null;
+                    competition_name: string;
+                    match_date: string;
                     home_score: number;
                     away_score: number;
                     home_jersey_color: string | null;
                     away_jersey_color: string | null;
+                    video_url: string | null;
+                    created_by: string | null;
+                    created_at: string | null;
+                    updated_at: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['matches']['Row'], 'id' | 'created_at' | 'updated_at'>;
                 Update: Partial<Database['public']['Tables']['matches']['Insert']>;
@@ -332,6 +327,24 @@ export interface Database {
                 Insert: Omit<Database['public']['Tables']['match_highlights']['Row'], 'id' | 'created_at'>;
                 Update: Partial<Database['public']['Tables']['match_highlights']['Insert']>;
             };
+            player_attributes: {
+                Row: {
+                    id: string;
+                    player_id: string;
+                    passing: number | null;
+                    shooting: number | null;
+                    dribbling: number | null;
+                    defending: number | null;
+                    physical: number | null;
+                    overall_rating: number | null;
+                    is_manual: boolean;
+                    last_calculated_at: string | null;
+                    created_at: string | null;
+                    updated_at: string | null;
+                };
+                Insert: Omit<Database['public']['Tables']['player_attributes']['Row'], 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Database['public']['Tables']['player_attributes']['Insert']>;
+            };
         };
     };
 }
@@ -358,3 +371,4 @@ export type DbKeeperAction = Database['public']['Tables']['keeper_actions']['Row
 export type DbFinalThirdChance = Database['public']['Tables']['final_third_chances']['Row'];
 export type DbLeague = Database['public']['Tables']['leagues']['Row'];
 export type DbPlayerMatchStatistics = Database['public']['Tables']['player_match_statistics']['Row'];
+export type DbPlayerAttributes = Database['public']['Tables']['player_attributes']['Row'];

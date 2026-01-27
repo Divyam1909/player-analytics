@@ -12,13 +12,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface MatchOption {
+    id: string;
+    label: string;
+    date?: string;
+}
+
 interface AuthHeaderProps {
     title?: string;
     showBack?: boolean;
     onBack?: () => void;
+    matchOptions?: MatchOption[];
+    selectedMatchId?: string;
+    onMatchChange?: (matchId: string) => void;
 }
 
-const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack }: AuthHeaderProps) => {
+const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOptions, selectedMatchId, onMatchChange }: AuthHeaderProps) => {
     const { theme, setTheme, resolvedTheme } = useTheme();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -54,6 +63,45 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack }: AuthHeade
                             </Button>
                         )}
                         <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+
+                        {/* Match Selector Dropdown */}
+                        {matchOptions && matchOptions.length > 0 && onMatchChange && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2 ml-2">
+                                        <span className="text-sm">
+                                            {matchOptions.find(m => m.id === selectedMatchId)?.label || 'Select Match'}
+                                        </span>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="bg-popover border-border max-h-[300px] overflow-y-auto w-[280px]">
+                                    {matchOptions.map((match) => (
+                                        <DropdownMenuItem
+                                            key={match.id}
+                                            onClick={() => onMatchChange(match.id)}
+                                            className={cn(
+                                                "flex flex-col items-start gap-0.5 py-2",
+                                                selectedMatchId === match.id && 'bg-accent'
+                                            )}
+                                        >
+                                            <span className="font-medium">{match.label}</span>
+                                            {match.date && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {new Date(match.date).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric'
+                                                    })}
+                                                </span>
+                                            )}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
 
                     {/* Right Side */}
