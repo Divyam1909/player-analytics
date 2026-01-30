@@ -20,6 +20,33 @@ interface FootballFieldProps {
 
 type ViewMode = "dots" | "heatmap" | "zones";
 
+// ViewBox constants for coordinate mapping
+// Full field viewBox: '-8 -6 126 80' means x: -8 to 118, y: -6 to 74
+// Actual pitch: x: 0 to 105, y: 0 to 68
+const VIEWBOX_X_START = -8;
+const VIEWBOX_WIDTH = 126;
+const VIEWBOX_Y_START = -6;
+const VIEWBOX_HEIGHT = 80;
+const PITCH_WIDTH = 105;
+const PITCH_HEIGHT = 68;
+
+// Convert event coordinates (0-100) to CSS percentage position within the container
+// accounting for the SVG viewBox padding
+const toContainerPercent = (eventX: number, eventY: number) => {
+  // Event coords are 0-100, map to pitch coords (0-105 for x, 0-68 for y)
+  const pitchX = (eventX / 100) * PITCH_WIDTH;
+  const pitchY = (eventY / 100) * PITCH_HEIGHT;
+  
+  // Convert pitch coords to viewBox coords, then to percentage
+  const viewBoxX = pitchX - VIEWBOX_X_START;
+  const viewBoxY = pitchY - VIEWBOX_Y_START;
+  
+  const percentX = (viewBoxX / VIEWBOX_WIDTH) * 100;
+  const percentY = (viewBoxY / VIEWBOX_HEIGHT) * 100;
+  
+  return { x: percentX, y: percentY };
+};
+
 const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
   const uniqueId = useId();
   const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null);
@@ -214,80 +241,106 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
 
         {/* Zone View - Third Divisions */}
         <AnimatePresence>
-          {viewMode === "zones" && (
-            <motion.div
-              className="absolute inset-0 flex"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {[
-                { label: "Defensive", value: zoneStats.defensive, color: "from-blue-500/20" },
-                { label: "Middle", value: zoneStats.middle, color: "from-yellow-500/20" },
-                { label: "Attacking", value: zoneStats.attacking, color: "from-red-500/20" },
-              ].map((zone, i) => (
-                <motion.div
-                  key={zone.label}
-                  className={cn(
-                    "flex-1 flex items-center justify-center",
-                    i < 2 && "border-r border-dashed border-white/30",
-                    `bg-gradient-to-b ${zone.color} to-transparent`
-                  )}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <div className="text-center bg-black/30 backdrop-blur-sm rounded-lg px-4 py-3">
-                    <motion.div
-                      className="text-3xl font-bold text-white"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2 + i * 0.1, type: "spring" }}
-                    >
-                      {zone.value}%
-                    </motion.div>
-                    <div className="text-xs text-white/70 uppercase tracking-wide mt-1">{zone.label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
+          {viewMode === "zones" && (() => {
+            // Calculate the pitch area within the container (accounting for viewBox padding)
+            const pitchLeft = ((-VIEWBOX_X_START) / VIEWBOX_WIDTH) * 100;
+            const pitchTop = ((-VIEWBOX_Y_START) / VIEWBOX_HEIGHT) * 100;
+            const pitchWidthPercent = (PITCH_WIDTH / VIEWBOX_WIDTH) * 100;
+            const pitchHeightPercent = (PITCH_HEIGHT / VIEWBOX_HEIGHT) * 100;
+            
+            return (
+              <motion.div
+                className="absolute flex"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  left: `${pitchLeft}%`,
+                  top: `${pitchTop}%`,
+                  width: `${pitchWidthPercent}%`,
+                  height: `${pitchHeightPercent}%`,
+                }}
+              >
+                {[
+                  { label: "Defensive", value: zoneStats.defensive, color: "from-blue-500/20" },
+                  { label: "Middle", value: zoneStats.middle, color: "from-yellow-500/20" },
+                  { label: "Attacking", value: zoneStats.attacking, color: "from-red-500/20" },
+                ].map((zone, i) => (
+                  <motion.div
+                    key={zone.label}
+                    className={cn(
+                      "flex-1 flex items-center justify-center",
+                      i < 2 && "border-r border-dashed border-white/30",
+                      `bg-gradient-to-b ${zone.color} to-transparent`
+                    )}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <div className="text-center bg-black/30 backdrop-blur-sm rounded-lg px-4 py-3">
+                      <motion.div
+                        className="text-3xl font-bold text-white"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.2 + i * 0.1, type: "spring" }}
+                      >
+                        {zone.value}%
+                      </motion.div>
+                      <div className="text-xs text-white/70 uppercase tracking-wide mt-1">{zone.label}</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
 
         {/* Heatmap Grid */}
         <AnimatePresence>
-          {viewMode === "heatmap" && heatmapData && (
-            <motion.div
-              className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${heatmapData.gridCols}, 1fr)`,
-                gridTemplateRows: `repeat(${heatmapData.gridRows}, 1fr)`,
-              }}
-            >
-              {heatmapData.zones.map((row, rowIndex) =>
-                row.map((intensity, colIndex) => (
-                  <motion.div
-                    key={`${rowIndex}-${colIndex}`}
-                    initial={{ opacity: 0 }}
-                    animate={{
-                      opacity: 1,
-                      backgroundColor: getHeatmapColor(intensity, heatmapData.maxIntensity),
-                    }}
-                    transition={{ duration: 0.5, delay: (rowIndex + colIndex) * 0.02 }}
-                    style={{
-                      filter: intensity > 0 ? "blur(4px)" : "none",
-                    }}
-                  />
-                ))
-              )}
-            </motion.div>
-          )}
+          {viewMode === "heatmap" && heatmapData && (() => {
+            // Calculate the pitch area within the container (accounting for viewBox padding)
+            const pitchLeft = ((-VIEWBOX_X_START) / VIEWBOX_WIDTH) * 100;
+            const pitchTop = ((-VIEWBOX_Y_START) / VIEWBOX_HEIGHT) * 100;
+            const pitchWidthPercent = (PITCH_WIDTH / VIEWBOX_WIDTH) * 100;
+            const pitchHeightPercent = (PITCH_HEIGHT / VIEWBOX_HEIGHT) * 100;
+            
+            return (
+              <motion.div
+                className="absolute"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                style={{
+                  left: `${pitchLeft}%`,
+                  top: `${pitchTop}%`,
+                  width: `${pitchWidthPercent}%`,
+                  height: `${pitchHeightPercent}%`,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${heatmapData.gridCols}, 1fr)`,
+                  gridTemplateRows: `repeat(${heatmapData.gridRows}, 1fr)`,
+                }}
+              >
+                {heatmapData.zones.map((row, rowIndex) =>
+                  row.map((intensity, colIndex) => (
+                    <motion.div
+                      key={`${rowIndex}-${colIndex}`}
+                      initial={{ opacity: 0 }}
+                      animate={{
+                        opacity: 1,
+                        backgroundColor: getHeatmapColor(intensity, heatmapData.maxIntensity),
+                      }}
+                      transition={{ duration: 0.5, delay: (rowIndex + colIndex) * 0.02 }}
+                      style={{
+                        filter: intensity > 0 ? "blur(4px)" : "none",
+                      }}
+                    />
+                  ))
+                )}
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
 
         {/* Event points */}
@@ -295,6 +348,35 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
           {(viewMode === "dots" || viewMode === "zones") && filteredEvents.map((event, index) => {
             const isAnimated = animationIndex >= 0 && index <= animationIndex;
             const isCurrentAnimation = index === animationIndex;
+
+            // Special styling for shots: Goal = filled red, On Target = concentric circles, Missed = empty circle
+            const isShot = event.type === "shot";
+            const isGoal = isShot && (event.isGoal || event.shotOutcome === 'goal');
+            const isOnTarget = isShot && !isGoal && (event.success || event.shotOutcome === 'saved');
+            const isMissedShot = isShot && !isGoal && !isOnTarget;
+
+            // Shot styling: all red, different fill patterns
+            const getShotStyle = () => {
+              if (isGoal) {
+                return { background: "hsl(var(--destructive))", border: "none" };
+              }
+              if (isOnTarget) {
+                return { 
+                  background: "transparent", 
+                  border: "2px solid hsl(var(--destructive))",
+                  boxShadow: "inset 0 0 0 3px transparent, inset 0 0 0 5px hsl(var(--destructive))"
+                };
+              }
+              if (isMissedShot) {
+                return { background: "transparent", border: "2px solid hsl(var(--destructive))" };
+              }
+              return {};
+            };
+
+            const shotStyle = isShot ? getShotStyle() : {};
+            
+            // Convert event coordinates to container percentages
+            const pos = toContainerPercent(event.x, event.y);
 
             return (
               <motion.div
@@ -308,24 +390,38 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
                 transition={{ duration: 0.2, delay: viewMode === "dots" ? index * 0.02 : 0 }}
                 className={cn(
                   "absolute cursor-pointer z-10",
-                  eventColors[event.type].bg,
+                  !isShot && eventColors[event.type].bg,
                   "rounded-full",
                   selectedEvent === event && "ring-2 ring-white",
                   isCurrentAnimation && "ring-2 ring-white animate-pulse",
                 )}
                 style={{
-                  left: `${event.x}%`,
-                  top: `${(event.y / 100) * 100}%`,
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
                   transform: "translate(-50%, -50%)",
                   width: "12px",
                   height: "12px",
                   boxShadow: selectedEvent === event
                     ? `0 0 20px 4px hsla(${eventColors[event.type].hsl}, 0.6)`
                     : `0 2px 4px rgba(0,0,0,0.3)`,
+                  ...shotStyle,
                 }}
                 onClick={() => setSelectedEvent(event === selectedEvent ? null : event)}
                 whileHover={{ scale: 1.3 }}
               >
+                {/* Inner circle for on-target shots (concentric effect) */}
+                {isOnTarget && (
+                  <div 
+                    className="absolute rounded-full border-2 border-destructive"
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  />
+                )}
                 {/* Time badge on hover/select */}
                 <AnimatePresence>
                   {selectedEvent === event && (
@@ -347,57 +443,65 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
         {/* Connection lines during animation */}
         {isAnimating && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-5">
-            {filteredEvents.slice(0, animationIndex + 1).map((event, index) => (
-              <motion.line
-                key={`line-${index}`}
-                x1={`${event.x}%`}
-                y1={`${event.y}%`}
-                x2={`${event.targetX}%`}
-                y2={`${event.targetY}%`}
-                stroke={event.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
-                strokeWidth="2"
-                strokeOpacity="0.6"
-                strokeDasharray="6,3"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.3 }}
-              />
-            ))}
+            {filteredEvents.slice(0, animationIndex + 1).map((event, index) => {
+              const startPos = toContainerPercent(event.x, event.y);
+              const endPos = toContainerPercent(event.targetX, event.targetY);
+              return (
+                <motion.line
+                  key={`line-${index}`}
+                  x1={`${startPos.x}%`}
+                  y1={`${startPos.y}%`}
+                  x2={`${endPos.x}%`}
+                  y2={`${endPos.y}%`}
+                  stroke={event.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
+                  strokeWidth="2"
+                  strokeOpacity="0.6"
+                  strokeDasharray="6,3"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.3 }}
+                />
+              );
+            })}
           </svg>
         )}
 
         {/* Direction line for selected event */}
-        {selectedEvent && !isAnimating && (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
-            <defs>
-              <marker
-                id={`arrowhead-${uniqueId}`}
-                markerWidth="10"
-                markerHeight="10"
-                refX="8"
-                refY="5"
-                orient="auto"
-              >
-                <polygon
-                  points="0 0, 10 5, 0 10"
-                  fill={selectedEvent.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
-                />
-              </marker>
-            </defs>
-            <motion.line
-              x1={`${selectedEvent.x}%`}
-              y1={`${selectedEvent.y}%`}
-              x2={`${selectedEvent.targetX}%`}
-              y2={`${selectedEvent.targetY}%`}
-              stroke={selectedEvent.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
-              strokeWidth="3"
-              markerEnd={`url(#arrowhead-${uniqueId})`}
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 0.4 }}
-            />
-          </svg>
-        )}
+        {selectedEvent && !isAnimating && (() => {
+          const startPos = toContainerPercent(selectedEvent.x, selectedEvent.y);
+          const endPos = toContainerPercent(selectedEvent.targetX, selectedEvent.targetY);
+          return (
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
+              <defs>
+                <marker
+                  id={`arrowhead-${uniqueId}`}
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="5"
+                  orient="auto"
+                >
+                  <polygon
+                    points="0 0, 10 5, 0 10"
+                    fill={selectedEvent.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
+                  />
+                </marker>
+              </defs>
+              <motion.line
+                x1={`${startPos.x}%`}
+                y1={`${startPos.y}%`}
+                x2={`${endPos.x}%`}
+                y2={`${endPos.y}%`}
+                stroke={selectedEvent.success ? "hsl(142, 76%, 36%)" : "hsl(0, 72%, 50%)"}
+                strokeWidth="3"
+                markerEnd={`url(#arrowhead-${uniqueId})`}
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.4 }}
+              />
+            </svg>
+          );
+        })()}
 
         {/* Event details tooltip */}
         <AnimatePresence>

@@ -12,6 +12,8 @@ import {
     FileText,
     Shield,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -84,13 +86,17 @@ const adminFeatures = [
 
 const AdminDashboard = () => {
     const { user } = useAuth();
+    const { isCollapsed } = useSidebarContext();
 
     return (
         <div className="min-h-screen bg-background">
             <AuthHeader title="Admin Dashboard" />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto">
                     {/* Welcome Section */}
                     <motion.div

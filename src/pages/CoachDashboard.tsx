@@ -1,21 +1,19 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthHeader from '@/components/layout/AuthHeader';
 import Sidebar from '@/components/layout/Sidebar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     Trophy,
     Target,
     TrendingUp,
     Video,
-    Calendar,
-    Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 
 // Animation variants
 const containerVariants = {
@@ -47,6 +45,7 @@ interface MatchData {
 
 const CoachDashboard = () => {
     const { user } = useAuth();
+    const { isCollapsed } = useSidebarContext();
 
     // Extract matches and calculate stats
     const { data: matches = [], isLoading } = useQuery({
@@ -117,7 +116,10 @@ const CoachDashboard = () => {
             <AuthHeader title="Dashboard" />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto">
                     {/* Welcome Section */}
                     <motion.div
@@ -242,95 +244,6 @@ const CoachDashboard = () => {
                         </motion.div>
                     </motion.div>
 
-                    {/* Recent Matches */}
-                    <Card className="bg-card border-border">
-                        <CardHeader>
-                            <CardTitle className="text-xl">Recent Matches</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <motion.div
-                                className="space-y-2"
-                                variants={containerVariants}
-                                initial="hidden"
-                                animate="show"
-                            >
-                                {matches.map((match) => {
-                                    const isWin = match.homeScore > match.awayScore;
-                                    const isLoss = match.homeScore < match.awayScore;
-
-                                    return (
-                                        <Link
-                                            key={match.matchId}
-                                            to={`/match/${match.matchId}`}
-                                            className="block"
-                                        >
-                                            <motion.div
-                                                variants={itemVariants}
-                                                className="relative overflow-hidden flex items-center justify-between p-4 rounded-lg hover:bg-secondary/50 transition-colors border border-border cursor-pointer group"
-                                            >
-                                                {/* Win/Loss Indicator Bar */}
-                                                <div className={cn(
-                                                    "absolute left-0 top-0 bottom-0 w-1.5",
-                                                    isWin && "bg-emerald-500",
-                                                    isLoss && "bg-red-500",
-                                                    !isWin && !isLoss && "bg-gray-500"
-                                                )} />
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-                                                        {teamName} vs {match.opponent}
-                                                    </p>
-                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                        {/* Score Badge */}
-                                                        <span
-                                                            className={cn(
-                                                                "px-2 py-0.5 rounded text-xs font-bold text-white",
-                                                                isWin && "bg-emerald-500",
-                                                                isLoss && "bg-red-500",
-                                                                !isWin && !isLoss && "bg-gray-500"
-                                                            )}
-                                                        >
-                                                            {match.homeScore} - {match.awayScore}
-                                                        </span>
-
-                                                        {/* Date */}
-                                                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                            <Calendar className="w-3 h-3" />
-                                                            {new Date(match.date).toLocaleDateString('en-US', {
-                                                                month: 'short',
-                                                                day: 'numeric',
-                                                            })}
-                                                        </span>
-
-                                                        {/* Tournament */}
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {match.tournament}
-                                                        </span>
-
-                                                        {/* Tier if exists */}
-                                                        {match.tier && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {match.tier}
-                                                            </span>
-                                                        )}
-
-                                                        {/* Status Badge */}
-                                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                                                            Registered
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Arrow Icon */}
-                                                <div className="flex items-center gap-1 text-sm text-muted-foreground group-hover:text-primary transition-colors">
-                                                    <Eye className="w-4 h-4" />
-                                                </div>
-                                            </motion.div>
-                                        </Link>
-                                    );
-                                })}
-                            </motion.div>
-                        </CardContent>
-                    </Card>
                 </div>
             </main>
         </div>

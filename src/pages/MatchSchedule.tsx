@@ -17,6 +17,7 @@ import {
     Plane
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 
 // Sample schedule data - IDs match Supabase match IDs for navigation
 const scheduleData = [
@@ -51,6 +52,7 @@ const MatchSchedule = () => {
     const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 1)); // January 2026
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+    const { isCollapsed } = useSidebarContext();
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -99,7 +101,10 @@ const MatchSchedule = () => {
             <AuthHeader title="Match Schedule" />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto">
                     {/* Header */}
                     <motion.div

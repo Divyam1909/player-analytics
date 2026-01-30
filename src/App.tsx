@@ -7,6 +7,8 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from "framer-motion";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SidebarProvider } from "@/contexts/SidebarContext";
+import { CustomStatsProvider } from "@/contexts/CustomStatsContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Pages
@@ -240,7 +242,11 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <AnimatedRoutes />
+            <SidebarProvider>
+              <CustomStatsProvider>
+                <AnimatedRoutes />
+              </CustomStatsProvider>
+            </SidebarProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

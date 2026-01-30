@@ -74,7 +74,7 @@ const TacticalField: React.FC<TacticalFieldProps> = ({
                     isVertical && "rotate-90"
                 )}
                 onClick={handleDataClick}
-                style={{ cursor: interactive ? 'crosshair' : 'default' }}
+                style={{ cursor: onFieldClick ? 'crosshair' : 'default' }}
             >
                 {/* Definitions */}
                 <defs>

@@ -6,15 +6,14 @@ import {
     User,
     Calendar,
     ChevronDown,
+    ChevronLeft,
     ChevronRight,
     Clock,
     History,
     CalendarDays,
-    BarChart3,
-    Users,
-    Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 
 interface SidebarProps {
     className?: string;
@@ -30,17 +29,17 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
     {
         label: 'Home',
-        icon: <Home className="w-5 h-5" />,
+        icon: <Home className="w-[18px] h-[18px]" />,
         href: '/dashboard',
     },
     {
         label: 'Profile',
-        icon: <User className="w-5 h-5" />,
+        icon: <User className="w-[18px] h-[18px]" />,
         href: '/profile',
     },
     {
         label: 'Matches',
-        icon: <Calendar className="w-5 h-5" />,
+        icon: <Calendar className="w-[18px] h-[18px]" />,
         children: [
             { label: 'Upcoming Matches', href: '/matches/upcoming', icon: <Clock className="w-4 h-4" /> },
             { label: 'Past Matches', href: '/matches', icon: <History className="w-4 h-4" /> },
@@ -52,8 +51,10 @@ const menuItems: MenuItem[] = [
 const Sidebar = ({ className }: SidebarProps) => {
     const location = useLocation();
     const [expandedItems, setExpandedItems] = useState<string[]>(['Matches']);
+    const { isCollapsed, toggleSidebar } = useSidebarContext();
 
     const toggleExpand = (label: string) => {
+        if (isCollapsed) return; // Don't expand when collapsed
         setExpandedItems(prev =>
             prev.includes(label)
                 ? prev.filter(item => item !== label)
@@ -72,26 +73,38 @@ const Sidebar = ({ className }: SidebarProps) => {
     };
 
     return (
-        <aside className={cn(
-            "fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-40 overflow-y-auto",
-            className
-        )}>
-            <div className="p-4">
-                {/* Logo */}
-                <div className="flex items-center gap-3 mb-6 px-2">
-                    <img
-                        src="/image.png"
-                        alt="Thinking Engines"
-                        className="w-10 h-10 rounded-lg object-cover"
-                    />
-                    <div>
-                        <span className="font-semibold text-foreground text-sm">Thinking Engines</span>
-                        <span className="block text-[10px] text-muted-foreground">Analytics Platform</span>
-                    </div>
+        <motion.aside
+            className={cn(
+                "fixed left-0 top-0 bottom-0 bg-card border-r border-border z-40 overflow-y-auto overflow-x-hidden",
+                className
+            )}
+            animate={{ width: isCollapsed ? 64 : 256 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
+            <div className="p-3 h-full flex flex-col">
+                {/* Collapse Toggle at top */}
+                <div className={cn(
+                    "flex mb-4",
+                    isCollapsed ? "justify-center" : "justify-end"
+                )}>
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-1.5 rounded-md transition-colors text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center gap-1.5"
+                        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                        {isCollapsed ? (
+                            <ChevronRight className="w-4 h-4" />
+                        ) : (
+                            <>
+                                <span className="text-xs font-medium">Collapse</span>
+                                <ChevronLeft className="w-4 h-4" />
+                            </>
+                        )}
+                    </button>
                 </div>
 
                 {/* Navigation */}
-                <nav className="space-y-1">
+                <nav className="space-y-1 flex-1">
                     {menuItems.map((item) => (
                         <div key={item.label}>
                             {item.children ? (
@@ -100,25 +113,44 @@ const Sidebar = ({ className }: SidebarProps) => {
                                     <button
                                         onClick={() => toggleExpand(item.label)}
                                         className={cn(
-                                            "w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-colors text-left",
+                                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left",
+                                            isCollapsed ? "justify-center" : "justify-between",
                                             isChildActive(item.children)
                                                 ? "bg-primary/10 text-primary"
                                                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                                         )}
+                                        title={isCollapsed ? item.label : undefined}
                                     >
-                                        <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "flex items-center gap-3",
+                                            isCollapsed && "justify-center"
+                                        )}>
                                             {item.icon}
-                                            <span className="text-sm font-medium">{item.label}</span>
+                                            <AnimatePresence>
+                                                {!isCollapsed && (
+                                                    <motion.span
+                                                        initial={{ opacity: 0, width: 0 }}
+                                                        animate={{ opacity: 1, width: "auto" }}
+                                                        exit={{ opacity: 0, width: 0 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                                                    >
+                                                        {item.label}
+                                                    </motion.span>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
-                                        <motion.div
-                                            animate={{ rotate: expandedItems.includes(item.label) ? 180 : 0 }}
-                                            transition={{ duration: 0.2 }}
-                                        >
-                                            <ChevronDown className="w-4 h-4" />
-                                        </motion.div>
+                                        {!isCollapsed && (
+                                            <motion.div
+                                                animate={{ rotate: expandedItems.includes(item.label) ? 180 : 0 }}
+                                                transition={{ duration: 0.2 }}
+                                            >
+                                                <ChevronDown className="w-4 h-4" />
+                                            </motion.div>
+                                        )}
                                     </button>
                                     <AnimatePresence>
-                                        {expandedItems.includes(item.label) && (
+                                        {expandedItems.includes(item.label) && !isCollapsed && (
                                             <motion.div
                                                 initial={{ height: 0, opacity: 0 }}
                                                 animate={{ height: 'auto', opacity: 1 }}
@@ -153,20 +185,34 @@ const Sidebar = ({ className }: SidebarProps) => {
                                     to={item.href!}
                                     className={cn(
                                         "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                                        isCollapsed && "justify-center",
                                         isActive(item.href)
                                             ? "bg-primary/10 text-primary"
                                             : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                                     )}
+                                    title={isCollapsed ? item.label : undefined}
                                 >
                                     {item.icon}
-                                    <span className="text-sm font-medium">{item.label}</span>
+                                    <AnimatePresence>
+                                        {!isCollapsed && (
+                                            <motion.span
+                                                initial={{ opacity: 0, width: 0 }}
+                                                animate={{ opacity: 1, width: "auto" }}
+                                                exit={{ opacity: 0, width: 0 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                                            >
+                                                {item.label}
+                                            </motion.span>
+                                        )}
+                                    </AnimatePresence>
                                 </Link>
                             )}
                         </div>
                     ))}
                 </nav>
             </div>
-        </aside>
+        </motion.aside>
     );
 };
 

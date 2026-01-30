@@ -27,11 +27,13 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 
 const Profile = () => {
     const { user, logout } = useAuth();
     const { theme, setTheme, resolvedTheme } = useTheme();
     const navigate = useNavigate();
+    const { isCollapsed } = useSidebarContext();
 
     // Form state
     const [name, setName] = useState(user?.name || '');
@@ -75,7 +77,10 @@ const Profile = () => {
             <AuthHeader title="Profile" />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto max-w-4xl">
                     {/* Page Header */}
                     <motion.div

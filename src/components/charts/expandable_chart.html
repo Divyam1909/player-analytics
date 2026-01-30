@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Living Elastic Donut</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #050505;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* UI Overlay */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .info-panel {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .info-panel.visible {
+            opacity: 1;
+        }
+
+        /* The Chart Container */
+        #chart-container {
+            position: relative;
+            width: 800px;
+            height: 800px;
+            /* gooey filter trick */
+            filter: url('#goo'); 
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        path {
+            cursor: pointer;
+            stroke: rgba(255,255,255,0.05); /* Slight separation for cells */
+            stroke-width: 2px;
+            stroke-linejoin: round;
+            transition: fill 0.3s;
+        }
+
+        /* Text Labels (rendered on top, not affected by goo) */
+        .labels-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+        }
+
+        .label {
+            position: absolute;
+            transform: translate(-50%, -50%); /* Centered on the coordinate */
+            font-size: 11px;
+            font-weight: 700;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .label.visible {
+            opacity: 1;
+        }
+
+        h1 {
+            font-weight: 200;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Filter Definitions for Organic Feel -->
+    <svg style="position: absolute; width: 0; height: 0;">
+        <defs>
+            <filter id="goo">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+                <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="ui-layer">
+        <div style="position: absolute; top: 40px; width: 100%; text-align: center;">
+            <h1 class="text-3xl mb-2">Organic Data Bloom</h1>
+            <p class="text-slate-500 text-sm tracking-widest">TAP SEGMENTS TO EXPAND</p>
+        </div>
+
+        <div id="info-panel" class="info-panel">
+            <div id="info-name" class="text-2xl font-bold mb-1">Total</div>
+            <div id="info-value" class="text-cyan-400 font-mono text-lg">0</div>
+        </div>
+    </div>
+
+    <div id="chart-container">
+        <svg id="main-svg" viewBox="-400 -400 800 800"></svg>
+        <div id="labels-layer" class="labels-container"></div>
+    </div>
+
+    <script>
+        /**
+         * 1. Data Structure 
+         * Root -> 2 Main -> 3 Sub -> 2 Leaf
+         */
+        const PALETTE = [
+            '#4338ca', '#3b82f6', '#06b6d4', // Blues
+            '#8b5cf6', '#ec4899', '#f43f5e'  // Pinks/Purples
+        ];
+
+        function createData() {
+            let id = 0;
+            const nextId = () => `node_${id++}`;
+
+            const root = { id: nextId(), name: "Core", value: 0, children: [], level: 0 };
+            
+            // 2 Main Options
+            const mains = ["Structure", "behavior"];
+            mains.forEach((m, i) => {
+                const nodeM = { 
+                    id: nextId(), 
+                    name: m, 
+                    value: 0, 
+                    children: [], 
+                    level: 1,
+                    baseColor: i === 0 ? '#4f46e5' : '#db2777' // Blue vs Pink base
+                };
+
+                // 3 Sub Options
+                const subs = ["Alpha", "Beta", "Gamma"];
+                subs.forEach((s, j) => {
+                    const nodeS = { 
+                        id: nextId(), 
+                        name: s, 
+                        value: 0, 
+                        children: [], 
+                        level: 2,
+                        baseColor: i === 0 ? '#38bdf8' : '#f472b6' // Lighter variants
+                    };
+
+                    // 2 Leaf Options
+                    const leaves = ["In", "Out"];
+                    leaves.forEach((l, k) => {
+                        const val = Math.floor(Math.random() * 30) + 10;
+                        nodeS.children.push({
+                            id: nextId(),
+                            name: `${s}-${l}`,
+                            value: val,
+                            children: null,
+                            level: 3,
+                            baseColor: i === 0 ? '#cffafe' : '#fce7f3' // Very light variants
+                        });
+                    });
+                    nodeM.children.push(nodeS);
+                });
+                root.children.push(nodeM);
+            });
+            return root;
+        }
+
+        // Calculate sums and angles
+        function hierarchy(node) {
+            if (!node.children || node.children.length === 0) {
+                return node.value;
+            }
+            node.value = node.children.reduce((sum, child) => sum + hierarchy(child), 0);
+            return node.value;
+        }
+
+        // Correct recursive layout
+        function correctLayout(node, start, end) {
+            node.startAngle = start;
+            node.endAngle = end;
+            node.centerAngle = start + (end - start) / 2;
+            
+            if (node.children) {
+                let curr = start;
+                const total = node.value;
+                const span = end - start;
+                node.children.forEach(child => {
+                    const childSpan = (child.value / total) * span;
+                    correctLayout(child, curr, curr + childSpan);
+                    curr += childSpan;
+                });
+            }
+        }
+
+        const data = createData();
+        hierarchy(data);
+        correctLayout(data, 0, Math.PI * 2);
+
+        /**
+         * 2. Animation Engine & State
+         */
+        
+        const svg = document.getElementById('main-svg');
+        const labelsLayer = document.getElementById('labels-layer');
+        const infoPanel = document.getElementById('info-panel');
+        const infoName = document.getElementById('info-name');
+        const infoValue = document.getElementById('info-value');
+
+        // Render Objects Registry
+        const renderObjects = {}; // id -> { element, labelElement, currentProps, targetProps }
+
+        // Configuration
+        const LEVELS = {
+            0: { inner: 0, outer: 60 },      // Root (invisible/small)
+            1: { inner: 70, outer: 140 },    // Main
+            2: { inner: 150, outer: 220 },   // Sub
+            3: { inner: 230, outer: 280 }    // Leaf
+        };
+
+        // State
+        let activePath = []; // IDs of nodes in the active branch
+
+        // Initial Setup: Create DOM elements
+        function setupNodes(node) {
+            // Create Path
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("fill", node.baseColor || "#333");
+            path.addEventListener("click", (e) => handleNodeClick(e, node));
+            
+            // Create Label
+            const label = document.createElement("div");
+            label.className = "label";
+            label.innerText = node.name;
+            
+            svg.appendChild(path);
+            labelsLayer.appendChild(label);
+
+            // Init Render Object
+            renderObjects[node.id] = {
+                id: node.id,
+                node: node,
+                el: path,
+                labelEl: label,
+                // Physics State
+                current: {
+                    innerR: 0,
+                    outerR: 0,
+                    startA: node.startAngle,
+                    endA: node.endAngle,
+                    opacity: 0
+                },
+                target: {
+                    innerR: 0,
+                    outerR: 0, // Initially closed
+                    startA: node.startAngle,
+                    endA: node.endAngle,
+                    opacity: 0
+                }
+            };
+
+            if (node.level === 1) {
+                // Main options start visible
+                renderObjects[node.id].target.innerR = LEVELS[1].inner;
+                renderObjects[node.id].target.outerR = LEVELS[1].outer;
+                renderObjects[node.id].target.opacity = 1;
+            }
+
+            if (node.children) {
+                node.children.forEach(setupNodes);
+            }
+        }
+
+        setupNodes(data);
+
+        /**
+         * 3. Interaction Logic
+         */
+        function handleNodeClick(e, node) {
+            e.stopPropagation();
+
+            // Determine if we are drilling down or closing
+            const isClosing = activePath.includes(node.id) && activePath[activePath.length-1] === node.id;
+            
+            if (isClosing) {
+                // Go up one level
+                activePath.pop();
+            } else {
+                // Set new path
+                // Logic: Find path to this node
+                const path = getPathToNode(data, node.id);
+                activePath = path.map(n => n.id);
+            }
+
+            updateTargets();
+            updateInfo(node);
+        }
+
+        // Helper: Find full lineage
+        function getPathToNode(root, targetId, currentPath = []) {
+            if (root.id === targetId) return [...currentPath, root];
+            if (root.children) {
+                for (let child of root.children) {
+                    const res = getPathToNode(child, targetId, [...currentPath, root]);
+                    if (res) return res;
+                }
+            }
+            return null;
+        }
+
+        function updateInfo(node) {
+            infoName.innerText = node.name;
+            infoValue.innerText = node.value;
+            infoPanel.classList.add('visible');
+        }
+
+        /**
+         * 4. Target Logic (The "Brain" of the animation)
+         * This decides where everything *should* be based on state.
+         */
+        function updateTargets() {
+            Object.values(renderObjects).forEach(obj => {
+                const node = obj.node;
+                const level = node.level;
+                
+                // Root Logic
+                if (level === 1) {
+                    obj.target.innerR = LEVELS[1].inner;
+                    obj.target.outerR = LEVELS[1].outer;
+                    
+                    if (activePath.length > 0) {
+                        const activeL1 = activePath.find(id => renderObjects[id].node.level === 1);
+                        if (activeL1 && activeL1 !== node.id) {
+                            // Sibling of active -> Dim
+                            obj.target.opacity = 0.3;
+                            obj.target.outerR = LEVELS[1].inner + 20; 
+                        } else {
+                            // Active
+                            obj.target.opacity = 1;
+                            obj.target.outerR = LEVELS[1].outer;
+                        }
+                    } else {
+                        // Resting
+                        obj.target.opacity = 1;
+                        obj.target.outerR = LEVELS[1].outer;
+                    }
+                }
+                
+                // Children Logic
+                else if (level > 1) {
+                    const parentId = getParentId(node);
+                    const parentIsActive = activePath.includes(parentId);
+                    
+                    if (parentIsActive) {
+                        obj.target.innerR = LEVELS[level].inner;
+                        obj.target.outerR = LEVELS[level].outer;
+                        obj.target.opacity = 1;
+
+                        const myIndexInPath = activePath.indexOf(node.id);
+                        if (myIndexInPath === -1 && activePath.length > node.level) {
+                             // Sibling of active sub-node
+                             obj.target.opacity = 0.2;
+                             obj.target.outerR = LEVELS[level].inner + 10; 
+                        }
+                    } else {
+                        // Collapse
+                        obj.target.innerR = LEVELS[level-1].outer - 20; 
+                        obj.target.outerR = LEVELS[level-1].outer - 20; 
+                        obj.target.opacity = 0;
+                    }
+                }
+            });
+        }
+
+        // Helper
+        function getParentId(node) {
+            if (node.level === 1) return data.id; 
+            for (let id in renderObjects) {
+                const p = renderObjects[id].node;
+                if (p.children && p.children.find(c => c.id === node.id)) return p.id;
+            }
+            return null;
+        }
+
+        /**
+         * 5. The Render Loop
+         */
+        
+        function polarToCartesian(centerX, centerY, radius, angleInRadians) {
+            return {
+                x: centerX + (radius * Math.cos(angleInRadians)),
+                y: centerY + (radius * Math.sin(angleInRadians))
+            };
+        }
+
+        function describeArc(x, y, innerRadius, outerRadius, startAngle, endAngle) {
+            if (innerRadius >= outerRadius) return "";
+
+            const start = polarToCartesian(x, y, outerRadius, endAngle);
+            const end = polarToCartesian(x, y, outerRadius, startAngle);
+            const start2 = polarToCartesian(x, y, innerRadius, endAngle);
+            const end2 = polarToCartesian(x, y, innerRadius, startAngle);
+
+            const largeArcFlag = endAngle - startAngle <= Math.PI ? "0" : "1";
+
+            return [
+                "M", start.x, start.y, 
+                "A", outerRadius, outerRadius, 0, largeArcFlag, 0, end.x, end.y,
+                "L", end2.x, end2.y,
+                "A", innerRadius, innerRadius, 0, largeArcFlag, 1, start2.x, start2.y,
+                "Z"
+            ].join(" ");
+        }
+
+        function animate() {
+            // Lerp factor
+            const lerp = 0.1;
+            
+            Object.values(renderObjects).forEach(obj => {
+                const current = obj.current;
+                const target = obj.target;
+
+                // Move current towards target
+                current.innerR += (target.innerR - current.innerR) * lerp;
+                current.outerR += (target.outerR - current.outerR) * lerp;
+                current.opacity += (target.opacity - current.opacity) * lerp;
+                
+                // Static Rendering (No Breathing)
+                const d = describeArc(0, 0, current.innerR, current.outerR, current.startA, current.endA);
+                obj.el.setAttribute("d", d);
+                obj.el.setAttribute("fill-opacity", current.opacity);
+                
+                // Update Label Position
+                // We ensure it's centered in the ring band
+                if (current.opacity > 0.5 && (current.outerR - current.innerR) > 20) {
+                    const midAngle = current.startA + (current.endA - current.startA) / 2;
+                    const midR = current.innerR + (current.outerR - current.innerR) / 2;
+                    
+                    // Center of HTML container is 400, 400
+                    const htmlCenter = 400;
+                    const htmlPos = polarToCartesian(htmlCenter, htmlCenter, midR, midAngle);
+                    
+                    obj.labelEl.style.left = `${htmlPos.x}px`;
+                    obj.labelEl.style.top = `${htmlPos.y}px`;
+                    obj.labelEl.classList.add('visible');
+                } else {
+                    obj.labelEl.classList.remove('visible');
+                }
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start
+        animate();
+
+    </script>
+</body>
+</html>

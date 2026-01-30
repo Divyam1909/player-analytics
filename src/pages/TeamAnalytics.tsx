@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import LineChart from "@/components/charts/LineChart";
 import HexagonRadar from "@/components/charts/HexagonRadar";
+import ExpandableStatsChart, { StatsNode } from "@/components/charts/ExpandableStatsChart";
 import {
     Users,
     Target,
@@ -29,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { usePlayers } from "@/hooks/usePlayers";
+import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useCountUp } from "@/hooks/useCountUp";
 import { FORMATIONS, FormationName, getFormationByName, getSlotColor, FormationSlot } from "@/lib/formationPositions";
 import TacticalField from "@/components/field/TacticalField";
@@ -200,6 +202,7 @@ interface MatchStatistics {
 
 const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps) => {
     const navigate = useNavigate();
+    const { isCollapsed } = useSidebarContext();
     // const players = playersData.players as Player[]; // Remove
     const { data: players = [], isLoading: isPlayersLoading } = usePlayers(); // Use hook
     const [selectedMatch, setSelectedMatch] = useState<string>(defaultMatchId || "all");
@@ -247,20 +250,18 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
             const { data, error } = await query;
             if (error) throw error;
 
-            // Map view columns to UI expected columns
+            // Map view columns to UI expected columns - normalize to team/opponent perspective
             return (data || []).map((m: any) => {
                 const isHome = m.team_id === m.home_team_id;
 
                 return {
                     match_id: m.match_id,
 
-                    // Generic Team Stats
+                    // Generic Team Stats (normalized - always "our team" perspective)
                     team_clearances: isHome ? m.home_clearances : m.away_clearances,
                     team_interceptions: isHome ? m.home_interceptions : m.away_interceptions,
                     team_successful_dribbles: isHome ? m.home_successful_dribbles : m.away_successful_dribbles,
-                    home_ball_recoveries: m.home_ball_recoveries, // Keep original for some logic
-                    away_ball_recoveries: m.away_ball_recoveries,
-                    team_chances_created: isHome ? m.home_chances_in_box : m.away_chances_in_box, // Mapping to chances in box
+                    team_chances_created: isHome ? m.home_chances_in_box : m.away_chances_in_box,
                     team_chances_final_third: isHome ? m.home_final_third_entries : m.away_final_third_entries,
                     team_aerial_duels_won: isHome ? m.home_aerial_duels_won : m.away_aerial_duels_won,
                     team_shots_on_target: isHome ? m.home_shots_on_target : m.away_shots_on_target,
@@ -279,7 +280,43 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     opponent_saves: isHome ? m.away_saves : m.home_saves,
                     opponent_freekicks: isHome ? m.away_freekicks : m.home_freekicks,
                     opponent_shots_on_target: isHome ? m.away_shots_on_target : m.home_shots_on_target,
-                    opponent_conversion_rate: null, // Calc if needed
+                    opponent_conversion_rate: null,
+
+                    // Passing stats (normalized to team perspective using home_ prefix for compatibility)
+                    home_successful_passes: isHome ? m.home_successful_passes : m.away_successful_passes,
+                    home_unsuccessful_passes: isHome ? m.home_unsuccessful_passes : m.away_unsuccessful_passes,
+                    home_total_passes: isHome ? m.home_total_passes : m.away_total_passes,
+                    home_progressive_passes: isHome ? m.home_progressive_passes : m.away_progressive_passes,
+                    home_key_passes: isHome ? m.home_key_passes : m.away_key_passes,
+                    home_assists: isHome ? m.home_assists : m.away_assists,
+                    home_crosses: isHome ? m.home_crosses : m.away_crosses,
+
+                    // Attacking stats
+                    home_goals: isHome ? m.home_goals : m.away_goals,
+                    home_penalties: isHome ? m.home_penalties : m.away_penalties,
+                    home_shots_saved: isHome ? m.home_shots_saved : m.away_shots_saved,
+
+                    // Duels stats
+                    home_aerial_duels_total: isHome ? m.home_aerial_duels_total : m.away_aerial_duels_total,
+                    home_total_dribbles: isHome ? m.home_total_dribbles : m.away_total_dribbles,
+                    home_progressive_carries: isHome ? m.home_progressive_carries : m.away_progressive_carries,
+
+                    // Defensive stats
+                    home_blocks: isHome ? m.home_blocks : m.away_blocks,
+                    home_ball_recoveries: isHome ? m.home_ball_recoveries : m.away_ball_recoveries,
+                    home_high_press_recoveries: isHome ? m.home_high_press_recoveries : m.away_high_press_recoveries,
+
+                    // Set pieces
+                    home_corners: isHome ? m.home_corners : m.away_corners,
+
+                    // Goalkeeper stats
+                    home_saves_inside_box: isHome ? m.home_saves_inside_box : m.away_saves_inside_box,
+                    home_saves_outside_box: isHome ? m.home_saves_outside_box : m.away_saves_outside_box,
+                    home_goals_conceded: isHome ? m.home_goals_conceded : m.away_goals_conceded,
+
+                    // Fouls and cards
+                    home_yellow_cards: isHome ? m.home_yellow_cards : m.away_yellow_cards,
+                    home_red_cards: isHome ? m.home_red_cards : m.away_red_cards,
 
                     // Indices - swap based on which team is ours
                     home_possession_control_index: isHome ? m.home_possession_control_index : m.away_possession_control_index,
@@ -618,7 +655,10 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
             {!embedded && <AuthHeader title="Team Analytics" />}
             {!embedded && <Sidebar />}
 
-            <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 ml-64"}>
+            <main className={cn(
+                embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
+                !embedded && (isCollapsed ? "ml-16" : "ml-64")
+            )}>
                 <div className="container mx-auto">
                     {/* Page Header */}
                     <motion.div
@@ -871,14 +911,6 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                         { label: "RPE", teamValue: rpe, opponentValue: oppRpe, maxValue: 100 },
                                     ];
 
-                                    const keyIndices = [
-                                        { label: "Possession Control Index", short: "PCI", team: pci, opponent: oppPci, icon: <Target className="w-4 h-4" /> },
-                                        { label: "Chance Creation Index", short: "CCI", team: cci, opponent: oppCci, icon: <TrendingUp className="w-4 h-4" /> },
-                                        { label: "Shooting Efficiency", short: "SE", team: se, opponent: oppSe, icon: <Flame className="w-4 h-4" /> },
-                                        { label: "Defensive Solidity", short: "DS", team: ds, opponent: oppDs, icon: <Shield className="w-4 h-4" /> },
-                                        { label: "Transition & Progression", short: "T&P", team: tp, opponent: oppTp, icon: <Footprints className="w-4 h-4" /> },
-                                        { label: "Recovery & Pressing", short: "RPE", team: rpe, opponent: oppRpe, icon: <Users className="w-4 h-4" /> },
-                                    ];
 
                                     return (
                                         <>
@@ -895,90 +927,30 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 </div>
                                             </div>
 
-                                            {/* Hexagon Chart + Key Performance Indices */}
-                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                                                {/* Hexagon Radar Chart */}
-                                                <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border">
-                                                    <h4 className="text-sm font-semibold text-foreground mb-4">Performance Overview</h4>
-                                                    <HexagonRadar
-                                                        data={hexagonData}
-                                                        teamName={teamName}
-                                                        opponentName={opponentName}
-                                                        size={320}
-                                                    />
-                                                </div>
-
-                                                {/* Key Performance Indices */}
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {keyIndices.map((stat, index) => {
-                                                        // Only compare if both values have data
-                                                        const bothHaveData = stat.team !== null && stat.opponent !== null;
-                                                        const teamLeading = bothHaveData && stat.team > stat.opponent;
-                                                        const oppLeading = bothHaveData && stat.opponent > stat.team;
-                                                        const difference = bothHaveData ? Math.abs(stat.team - stat.opponent) : 0;
-                                                        const leadPercentage = bothHaveData && stat.opponent > 0
-                                                            ? Math.round((difference / stat.opponent) * 100)
-                                                            : difference > 0 ? 100 : 0;
-                                                        const leadingTeam = bothHaveData ? (teamLeading ? teamName : (oppLeading ? opponentName : null)) : null;
-
-                                                        return (
-                                                            <motion.div
-                                                                key={stat.label}
-                                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                                animate={{ opacity: 1, scale: 1 }}
-                                                                transition={{ delay: index * 0.08 }}
-                                                                className="p-4 rounded-xl glass-subtle hover:border-primary/30 transition-all duration-300"
-                                                            >
-                                                                <div className="flex items-center gap-2 mb-3 text-primary">
-                                                                    {stat.icon}
-                                                                    <span className="text-xs font-semibold truncate">{stat.label}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between gap-2 mb-2">
-                                                                    <div className={cn(
-                                                                        "text-2xl font-bold px-3 py-1.5 rounded-lg text-center flex-1",
-                                                                        teamLeading
-                                                                            ? "bg-primary/20 text-primary"
-                                                                            : "text-foreground"
-                                                                    )}>
-                                                                        {stat.team !== null ? <AnimatedValue value={stat.team} delay={index * 100} suffix="%" /> : "--"}
-                                                                    </div>
-                                                                    <span className="text-sm font-medium text-muted-foreground">vs</span>
-                                                                    <div className={cn(
-                                                                        "text-2xl font-bold px-3 py-1.5 rounded-lg text-center flex-1",
-                                                                        oppLeading
-                                                                            ? "bg-primary/20 text-primary"
-                                                                            : "text-muted-foreground"
-                                                                    )}>
-                                                                        {stat.opponent !== null ? <AnimatedValue value={stat.opponent} delay={index * 100 + 150} suffix="%" /> : "--"}
-                                                                    </div>
-                                                                </div>
-                                                                {/* Animated comparison bar - only show if both values exist */}
-                                                                {bothHaveData && (
-                                                                    <div className="h-1.5 rounded-full bg-secondary overflow-hidden mb-2">
-                                                                        <motion.div
-                                                                            className="h-full bg-primary rounded-full"
-                                                                            initial={{ width: 0 }}
-                                                                            animate={{ width: `${(stat.team / (stat.team + stat.opponent)) * 100}%` }}
-                                                                            transition={{ duration: 1.2, delay: index * 0.1, ease: "easeOut" }}
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                                {/* Leading indicator with percentage */}
-                                                                {leadingTeam && (
-                                                                    <div className={cn(
-                                                                        "pt-2 border-t border-border/50 text-center",
-                                                                    )}>
-                                                                        <span className={cn(
-                                                                            "text-sm font-semibold",
-                                                                            teamLeading ? "text-primary" : "text-muted-foreground"
-                                                                        )}>
-                                                                            {teamLeading ? teamName.split(" ")[0] : opponentName.split(" ")[0]} leads by {leadPercentage}%
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                            </motion.div>
-                                                        );
-                                                    })}
+                                            {/* Hexagon Radar Chart - Full Width */}
+                                            <div className="flex flex-col items-center justify-center p-6 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border mb-6">
+                                                <h4 className="text-sm font-semibold text-foreground mb-4">Performance Indices Overview</h4>
+                                                <HexagonRadar
+                                                    data={hexagonData}
+                                                    teamName={teamName}
+                                                    opponentName={opponentName}
+                                                    size={380}
+                                                />
+                                                {/* Legend for indices */}
+                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 w-full">
+                                                    {[
+                                                        { label: "PCI", full: "Possession Control Index" },
+                                                        { label: "CCI", full: "Chance Creation Index" },
+                                                        { label: "SE", full: "Shooting Efficiency" },
+                                                        { label: "DS", full: "Defensive Solidity" },
+                                                        { label: "T&P", full: "Transition & Progression" },
+                                                        { label: "RPE", full: "Recovery & Pressing" },
+                                                    ].map((item) => (
+                                                        <div key={item.label} className="text-center p-2 rounded-lg bg-background/50">
+                                                            <span className="text-xs font-bold text-primary">{item.label}</span>
+                                                            <p className="text-[10px] text-muted-foreground">{item.full}</p>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
 
@@ -1061,6 +1033,230 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 </div>
                                             </div>
                                         </>
+                                    );
+                                })()}
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+
+                    {/* Statistics Breakdown - Expandable Sunburst Chart */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="mb-8"
+                    >
+                        <Card className="glass-strong rounded-xl">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <circle cx="12" cy="12" r="6" />
+                                        <circle cx="12" cy="12" r="2" />
+                                    </svg>
+                                    Statistics Breakdown
+                                </CardTitle>
+                                <p className="text-sm text-muted-foreground">Interactive breakdown of team statistics - click to expand</p>
+                            </CardHeader>
+                            <CardContent>
+                                {(() => {
+                                    // Build hierarchical stats data from match statistics
+                                    const relevantStats = matchStatsList;
+                                    
+                                    // Get aggregated values
+                                    const successfulPasses = sumWithNull(relevantStats, m => (m as any).home_successful_passes) ?? 0;
+                                    const unsuccessfulPasses = sumWithNull(relevantStats, m => (m as any).home_unsuccessful_passes) ?? 0;
+                                    const progressivePasses = sumWithNull(relevantStats, m => (m as any).home_progressive_passes) ?? 0;
+                                    const keyPasses = sumWithNull(relevantStats, m => (m as any).home_key_passes) ?? 0;
+                                    const assists = sumWithNull(relevantStats, m => (m as any).home_assists) ?? 0;
+                                    const crosses = sumWithNull(relevantStats, m => (m as any).home_crosses) ?? 0;
+                                    
+                                    const shotsOnTarget = sumWithNull(relevantStats, m => m.team_shots_on_target) ?? 0;
+                                    const goals = sumWithNull(relevantStats, m => (m as any).home_goals) ?? 0;
+                                    const penalties = sumWithNull(relevantStats, m => (m as any).home_penalties) ?? 0;
+                                    const savedShots = shotsOnTarget - goals;
+                                    
+                                    const aerialDuelsWon = sumWithNull(relevantStats, m => m.team_aerial_duels_won) ?? 0;
+                                    const aerialDuelsTotal = sumWithNull(relevantStats, m => (m as any).home_aerial_duels_total) ?? aerialDuelsWon * 2;
+                                    const aerialDuelsLost = Math.max(0, aerialDuelsTotal - aerialDuelsWon);
+                                    const successfulDribbles = sumWithNull(relevantStats, m => m.team_successful_dribbles) ?? 0;
+                                    const totalDribbles = sumWithNull(relevantStats, m => (m as any).home_total_dribbles) ?? successfulDribbles * 2;
+                                    const unsuccessfulDribbles = Math.max(0, totalDribbles - successfulDribbles);
+                                    const progressiveCarries = sumWithNull(relevantStats, m => (m as any).home_progressive_carries) ?? 0;
+                                    
+                                    const interceptions = sumWithNull(relevantStats, m => m.team_interceptions) ?? 0;
+                                    const blocks = sumWithNull(relevantStats, m => (m as any).home_blocks) ?? 0;
+                                    const clearances = sumWithNull(relevantStats, m => m.team_clearances) ?? 0;
+                                    const ballRecoveries = sumWithNull(relevantStats, m => (m as any).home_ball_recoveries) ?? 0;
+                                    const highPressRecoveries = sumWithNull(relevantStats, m => (m as any).home_high_press_recoveries) ?? 0;
+                                    
+                                    const corners = sumWithNull(relevantStats, m => (m as any).home_corners) ?? 0;
+                                    const freeKicks = sumWithNull(relevantStats, m => m.team_freekicks) ?? 0;
+                                    
+                                    const saves = sumWithNull(relevantStats, m => m.team_saves) ?? 0;
+                                    const savesInsideBox = sumWithNull(relevantStats, m => (m as any).home_saves_inside_box) ?? Math.floor(saves * 0.6);
+                                    const savesOutsideBox = saves - savesInsideBox;
+                                    const goalsConceded = sumWithNull(relevantStats, m => (m as any).home_goals_conceded) ?? 0;
+                                    
+                                    const foulsCommitted = sumWithNull(relevantStats, m => m.team_fouls) ?? 0;
+                                    const yellowCards = sumWithNull(relevantStats, m => (m as any).home_yellow_cards) ?? 0;
+                                    const redCards = sumWithNull(relevantStats, m => (m as any).home_red_cards) ?? 0;
+                                    
+                                    const statsTreeData: StatsNode = {
+                                        id: 'root',
+                                        name: 'All Stats',
+                                        value: null,
+                                        level: 0,
+                                        children: [
+                                            {
+                                                id: 'passes',
+                                                name: 'Passes',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    {
+                                                        id: 'passes-successful',
+                                                        name: 'Successful',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'passes-progressive', name: 'Progressive', value: progressivePasses, level: 3 },
+                                                            { id: 'passes-key', name: 'Key Passes', value: keyPasses, level: 3 },
+                                                            { id: 'passes-assists', name: 'Assists', value: assists, level: 3 },
+                                                            { id: 'passes-crosses', name: 'Crosses', value: crosses, level: 3 },
+                                                            { id: 'passes-other', name: 'Other', value: Math.max(0, successfulPasses - progressivePasses - keyPasses - assists - crosses), level: 3 },
+                                                        ]
+                                                    },
+                                                    {
+                                                        id: 'passes-unsuccessful',
+                                                        name: 'Unsuccessful',
+                                                        value: unsuccessfulPasses,
+                                                        level: 2,
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                id: 'shots',
+                                                name: 'Shots',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    {
+                                                        id: 'shots-goals',
+                                                        name: 'Goals',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'shots-penalties', name: 'Penalties', value: penalties, level: 3 },
+                                                            { id: 'shots-openplay', name: 'Open Play', value: Math.max(0, goals - penalties), level: 3 },
+                                                        ]
+                                                    },
+                                                    { id: 'shots-saved', name: 'Saved', value: savedShots, level: 2 },
+                                                ]
+                                            },
+                                            {
+                                                id: 'duels',
+                                                name: 'Duels',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    {
+                                                        id: 'duels-aerial',
+                                                        name: 'Aerial',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'aerial-won', name: 'Won', value: aerialDuelsWon, level: 3 },
+                                                            { id: 'aerial-lost', name: 'Lost', value: aerialDuelsLost, level: 3 },
+                                                        ]
+                                                    },
+                                                    {
+                                                        id: 'duels-dribbles',
+                                                        name: 'Dribbles',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'dribbles-successful', name: 'Successful', value: successfulDribbles, level: 3 },
+                                                            { id: 'dribbles-progressive', name: 'Progressive', value: progressiveCarries, level: 3 },
+                                                            { id: 'dribbles-failed', name: 'Failed', value: unsuccessfulDribbles, level: 3 },
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                id: 'defensive',
+                                                name: 'Defensive',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    { id: 'def-interceptions', name: 'Interceptions', value: interceptions, level: 2 },
+                                                    { id: 'def-blocks', name: 'Blocks', value: blocks, level: 2 },
+                                                    { id: 'def-clearances', name: 'Clearances', value: clearances, level: 2 },
+                                                    {
+                                                        id: 'def-recoveries',
+                                                        name: 'Recoveries',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'rec-highpress', name: 'High Press', value: highPressRecoveries, level: 3 },
+                                                            { id: 'rec-normal', name: 'Normal', value: Math.max(0, ballRecoveries - highPressRecoveries), level: 3 },
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                id: 'setpieces',
+                                                name: 'Set Pieces',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    { id: 'sp-corners', name: 'Corners', value: corners, level: 2 },
+                                                    { id: 'sp-freekicks', name: 'Free Kicks', value: freeKicks, level: 2 },
+                                                ]
+                                            },
+                                            {
+                                                id: 'goalkeeper',
+                                                name: 'Goalkeeper',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    {
+                                                        id: 'gk-saves',
+                                                        name: 'Saves',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'saves-inbox', name: 'Inside Box', value: savesInsideBox, level: 3 },
+                                                            { id: 'saves-outbox', name: 'Outside Box', value: savesOutsideBox, level: 3 },
+                                                        ]
+                                                    },
+                                                    { id: 'gk-conceded', name: 'Conceded', value: goalsConceded, level: 2 },
+                                                ]
+                                            },
+                                            {
+                                                id: 'fouls',
+                                                name: 'Fouls',
+                                                value: null,
+                                                level: 1,
+                                                children: [
+                                                    { id: 'fouls-committed', name: 'Committed', value: foulsCommitted, level: 2 },
+                                                    {
+                                                        id: 'fouls-cards',
+                                                        name: 'Cards',
+                                                        value: null,
+                                                        level: 2,
+                                                        children: [
+                                                            { id: 'cards-yellow', name: 'Yellow', value: yellowCards, level: 3 },
+                                                            { id: 'cards-red', name: 'Red', value: redCards, level: 3 },
+                                                        ]
+                                                    },
+                                                ]
+                                            },
+                                        ]
+                                    };
+                                    
+                                    return (
+                                        <ExpandableStatsChart data={statsTreeData} className="py-4" />
                                     );
                                 })()}
                             </CardContent>
@@ -1278,7 +1474,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                                 y={0}
                                                                 textAnchor="middle"
                                                                 fill="white"
-                                                                fontSize="1.2"
+                                                                fontSize="1.1"
                                                                 fontWeight="bold"
                                                                 fontFamily="Arial"
                                                                 transform="rotate(-90)"
@@ -1290,11 +1486,11 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                                                             {/* Position label - rotated -90 */}
                                                             <text
-                                                                x={circleRadius + 4}
+                                                                x={circleRadius + 4.2}
                                                                 y={0}
                                                                 textAnchor="middle"
-                                                                fill="rgba(255,255,255,0.7)"
-                                                                fontSize="1"
+                                                                fill="rgba(255,255,255,0.6)"
+                                                                fontSize="0.85"
                                                                 fontFamily="Arial"
                                                                 transform="rotate(-90)"
                                                                 style={{ pointerEvents: 'none' }}
@@ -1347,7 +1543,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 </span>
                                             </div>
                                             <div className="flex gap-3 overflow-x-auto pb-2">
-                                                {benchPlayers.map((player) => (
+                                                        {benchPlayers.map((player) => (
                                                     <div
                                                         key={player.id}
                                                         className={cn(
@@ -1355,7 +1551,13 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                             draggedPlayerId === player.id && "opacity-50"
                                                         )}
                                                         draggable
-                                                        onDragStart={() => handleDragStart(player.id)}
+                                                        onDragStart={(e) => {
+                                                            handleDragStart(player.id);
+                                                            // Create a minimal drag image to hide the default ghost
+                                                            const emptyImg = new Image();
+                                                            emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                                                            e.dataTransfer.setDragImage(emptyImg, 0, 0);
+                                                        }}
                                                     >
                                                         <Link to={`/player/${player.id}`} onClick={(e) => draggedPlayerId && e.preventDefault()}>
                                                             <motion.div
@@ -1591,7 +1793,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                                         transition={{ duration: 0.8, ease: "easeOut" }}
                                                                     />
 
-                                                                    {/* Shooter position */}
+                                                                    {/* Shooter position - Goal: Filled red circle */}
                                                                     <motion.g
                                                                         initial={{ scale: 0 }}
                                                                         animate={{ scale: 1 }}
@@ -1600,16 +1802,11 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                                         <circle
                                                                             cx={svgX}
                                                                             cy={svgY}
-                                                                            r={2}
-                                                                            fill="rgba(0,0,0,0.3)"
-                                                                        />
-                                                                        <circle
-                                                                            cx={svgX}
-                                                                            cy={svgY}
-                                                                            r={1.8}
+                                                                            r={2.2}
                                                                             fill="hsl(var(--destructive))"
-                                                                            stroke="white"
-                                                                            strokeWidth="0.2"
+                                                                            fillOpacity={0.9}
+                                                                            stroke="hsl(var(--destructive))"
+                                                                            strokeWidth="0.3"
                                                                         />
                                                                         <text
                                                                             x={svgX}
@@ -1742,98 +1939,31 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
 
 
-                    {/* Position Distribution + Team Trend */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5 }}
-                        >
-                            <Card className="bg-card border-border">
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Users className="w-5 h-5 text-primary" />
-                                        Position Distribution
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="h-64">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={positionData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={50}
-                                                    outerRadius={80}
-                                                    paddingAngle={4}
-                                                    dataKey="value"
-                                                    labelLine={false}
-                                                    label={({ name, percent }) =>
-                                                        `${name} ${(percent * 100).toFixed(0)}%`
-                                                    }
-                                                >
-                                                    {positionData.map((entry, index) => (
-                                                        <Cell
-                                                            key={`cell-${index}`}
-                                                            fill={POSITION_COLORS[entry.name] || "hsl(var(--muted))"}
-                                                        />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor: "hsl(var(--popover))",
-                                                        border: "1px solid hsl(var(--border))",
-                                                        borderRadius: "8px",
-                                                    }}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    {/* Legend */}
-                                    <div className="flex flex-wrap justify-center gap-4 mt-4">
-                                        {positionData.map((entry) => (
-                                            <div key={entry.name} className="flex items-center gap-2">
-                                                <div
-                                                    className="w-3 h-3 rounded-full"
-                                                    style={{ backgroundColor: POSITION_COLORS[entry.name] }}
-                                                />
-                                                <span className="text-sm text-muted-foreground">
-                                                    {entry.name} ({entry.value})
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-
-                        {/* Team Performance Trend */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.6 }}
-                        >
-                            <Card className="bg-card border-border">
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <TrendingUp className="w-5 h-5 text-primary" />
-                                        Team Performance Trend
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <LineChart
-                                        data={teamTrendData}
-                                        lines={[
-                                            { dataKey: "Goals", color: "hsl(var(--destructive))", name: "Goals" },
-                                            { dataKey: "Assists", color: "hsl(var(--warning))", name: "Assists" },
-                                        ]}
-                                        height={264}
-                                    />
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    </div>
+                    {/* Team Performance Trend */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                    >
+                        <Card className="bg-card border-border">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <TrendingUp className="w-5 h-5 text-primary" />
+                                    Team Performance Trend
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <LineChart
+                                    data={teamTrendData}
+                                    lines={[
+                                        { dataKey: "Goals", color: "hsl(var(--destructive))", name: "Goals" },
+                                        { dataKey: "Assists", color: "hsl(var(--warning))", name: "Assists" },
+                                    ]}
+                                    height={264}
+                                />
+                            </CardContent>
+                        </Card>
+                    </motion.div>
                 </div>
             </main>
 

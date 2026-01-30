@@ -8,6 +8,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Calendar, Eye, ChevronRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSidebarContext } from "@/contexts/SidebarContext";
 
 // Animation variants
 const containerVariants = {
@@ -48,6 +49,7 @@ interface MatchResponse {
 
 const MatchSelection = () => {
     const [searchQuery, setSearchQuery] = useState("");
+    const { isCollapsed } = useSidebarContext();
 
     const { data: matches = [], isLoading } = useQuery<MatchResponse[]>({
         queryKey: ['matches'],
@@ -104,7 +106,10 @@ const MatchSelection = () => {
             <AuthHeader title="Match Center" />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto">
                     {/* Page Header */}
                     <motion.div

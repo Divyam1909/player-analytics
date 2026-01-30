@@ -18,6 +18,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 
 // Sample upcoming matches data
 const upcomingMatchesData = [
@@ -86,6 +87,7 @@ const itemVariants = {
 
 const UpcomingMatches = () => {
     const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+    const { isCollapsed } = useSidebarContext();
 
     const getImportanceColor = (importance: string) => {
         switch (importance) {
@@ -124,7 +126,10 @@ const UpcomingMatches = () => {
             <AuthHeader title="Upcoming Matches" />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto">
                     {/* Header */}
                     <motion.div

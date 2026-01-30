@@ -1,4 +1,4 @@
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MatchEvent } from "@/types/player";
 import { cn } from "@/lib/utils";
@@ -6,13 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Target, Circle, X, Star, AlertTriangle } from "lucide-react";
 import TacticalField from "@/components/field/TacticalField";
 
 interface ShotMapProps {
     events: MatchEvent[];
-    onUpdateEvent?: (index: number, updates: Partial<MatchEvent>) => void;
-    editable?: boolean;
 }
 
 interface TimeInterval {
@@ -51,8 +48,11 @@ const calculateXG = (x: number, y: number): number => {
     return Math.min(0.95, Math.max(0.02, xG));
 };
 
-const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
-    const uniqueId = useId();
+// Field dimensions for coordinate mapping
+const PITCH_LENGTH = 105; // SVG pitch length
+const PITCH_WIDTH = 68;   // SVG pitch width
+
+const ShotMap = ({ events }: ShotMapProps) => {
     const [selectedInterval, setSelectedInterval] = useState<TimeInterval>(TIME_INTERVALS[0]);
     const [selectedShot, setSelectedShot] = useState<number | null>(null);
     const [showXG, setShowXG] = useState(true);
@@ -76,54 +76,41 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
         const total = filteredShots.length;
         const goals = filteredShots.filter(s => s.isGoal || s.shotOutcome === 'goal').length;
         const onTarget = filteredShots.filter(s => s.success || s.shotOutcome === 'saved' || s.shotOutcome === 'goal').length;
-        const bigChances = filteredShots.filter(s => s.isBigChance).length;
-        const bigChancesMissed = filteredShots.filter(s => s.isBigChance && !s.isGoal && s.shotOutcome !== 'goal').length;
         const accuracy = total > 0 ? Math.round((onTarget / total) * 100) : 0;
         const totalXG = filteredShots.reduce((sum, s) => sum + (s.xG || calculateXG(s.x, s.y)), 0);
 
-        return { total, goals, onTarget, bigChances, bigChancesMissed, accuracy, totalXG };
+        return { total, goals, onTarget, accuracy, totalXG };
     }, [filteredShots]);
 
-    const getShotIcon = (shot: MatchEvent & { originalIndex: number }) => {
+    // Handle click on empty field area to close popup
+    const handleFieldClick = () => {
+        setSelectedShot(null);
+    };
+
+    // Get shot marker style based on outcome
+    // Goal = filled red circle, On Target = concentric red circles (unfilled), Shot = empty red circle (unfilled)
+    const getShotStyle = (shot: MatchEvent) => {
         const isGoal = shot.isGoal || shot.shotOutcome === 'goal';
         const isOnTarget = shot.success || shot.shotOutcome === 'saved';
-        const isBigChance = shot.isBigChance;
-
+        const redColor = "hsl(var(--destructive))";
+        
         if (isGoal) {
-            return (
-                <div className="relative">
-                    <Target className="w-5 h-5 text-success" />
-                    {isBigChance && <Star className="absolute -top-1 -right-1 w-3 h-3 text-warning fill-warning" />}
-                </div>
-            );
+            return { type: 'goal', fill: redColor, stroke: redColor, fillOpacity: 0.9 };
         }
         if (isOnTarget) {
-            return (
-                <div className="relative">
-                    <Circle className="w-5 h-5 text-warning fill-warning/30" />
-                    {isBigChance && <Star className="absolute -top-1 -right-1 w-3 h-3 text-destructive fill-destructive" />}
-                </div>
-            );
+            return { type: 'onTarget', fill: "transparent", stroke: redColor, fillOpacity: 0 };
         }
-        return (
-            <div className="relative">
-                <X className="w-5 h-5 text-destructive" />
-                {isBigChance && <AlertTriangle className="absolute -top-1 -right-1 w-3 h-3 text-destructive fill-destructive/30" />}
-            </div>
-        );
+        return { type: 'shot', fill: "transparent", stroke: redColor, fillOpacity: 0 };
     };
 
-    const getShotColor = (shot: MatchEvent) => {
-        const isGoal = shot.isGoal || shot.shotOutcome === 'goal';
-        if (isGoal) return "bg-success";
-        if (shot.success) return "bg-warning";
-        return "bg-destructive";
-    };
-
-    const handleBigChanceToggle = (index: number, value: boolean) => {
-        if (onUpdateEvent) {
-            onUpdateEvent(index, { isBigChance: value });
-        }
+    // Convert backend coordinates (0-100) to SVG field coordinates
+    // Backend: x = 0 (own goal line) to 100 (opponent goal line)
+    // Backend: y = 0 (left touchline) to 100 (right touchline)
+    // SVG: x = 0 to 105 (pitch length), y = 0 to 68 (pitch width)
+    const toSvgCoords = (backendX: number, backendY: number) => {
+        const svgX = (backendX / 100) * PITCH_LENGTH;
+        const svgY = (backendY / 100) * PITCH_WIDTH;
+        return { x: svgX, y: svgY };
     };
 
     return (
@@ -151,13 +138,11 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                 {[
                     { label: "Shots", value: stats.total, color: "text-primary" },
                     { label: "On Target", value: stats.onTarget, color: "text-warning" },
                     { label: "Goals", value: stats.goals, color: "text-success" },
-                    { label: "Big Chances", value: stats.bigChances, color: "text-chart-4" },
-                    { label: "BC Missed", value: stats.bigChancesMissed, color: "text-destructive" },
                     { label: "Accuracy", value: `${stats.accuracy}%`, color: "text-success" },
                     { label: "xG", value: stats.totalXG.toFixed(2), color: "text-primary" },
                 ].map((stat) => (
@@ -168,60 +153,147 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
                 ))}
             </div>
 
-            {/* Half-Field Shot Map (attacking half only - Goal Top) */}
-            <div className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl bg-muted/20 aspect-[1.26796]">
+            {/* Full-Field Shot Map (Horizontal view) */}
+            <div 
+                className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl bg-muted/20 aspect-[105/68]"
+                onClick={handleFieldClick}
+            >
                 <TacticalField
-                    viewMode="vertical_half"
+                    viewMode="full"
                     className="w-full h-full"
-                    interactive
                 >
+                    {/* Arrow marker definition */}
+                    <defs>
+                        <marker
+                            id="shot-arrow"
+                            markerWidth="4"
+                            markerHeight="4"
+                            refX="3"
+                            refY="2"
+                            orient="auto"
+                        >
+                            <path d="M0,0 L4,2 L0,4 Z" fill="hsl(var(--destructive))" />
+                        </marker>
+                    </defs>
+
                     {/* Shot Markers */}
                     {filteredShots.map((shot, index) => {
-                        // Transform for Goal Top view (Vertical Half -90deg):
-                        // Shot X (Length): 0 (Own Goal) -> 100 (Opp Goal).
-                        // SVG X (Vertical): 0 (Bottom) -> 105 (Top).
-                        // shot.x=100 -> svgX=105. shot.x=50 -> svgX=52.5.
-                        const svgX = shot.x * 1.05;
-
-                        // Shot Y (Width): 0 (Left) -> 100 (Right).
-                        // SVG Y (Horizontal): 0 (Left) -> 68 (Right).
-                        const svgY = shot.y * 0.68;
-
+                        // Convert backend coords (0-100) to SVG coords
+                        const { x: svgX, y: svgY } = toSvgCoords(shot.x, shot.y);
                         const shotXG = shot.xG || calculateXG(shot.x, shot.y);
+                        const shotStyle = getShotStyle(shot);
+                        const isSelected = selectedShot === shot.originalIndex;
+
+                        // Circle radius - smaller fixed size for cleaner look
+                        const radius = 1.2;
+
+                        // Goal position (right side of field)
+                        const goalX = PITCH_LENGTH; // 105
+                        const goalY = PITCH_WIDTH / 2; // 34 (center of goal)
+
+                        // Calculate arrow end point (shorter arrow, not all the way to goal)
+                        const dx = goalX - svgX;
+                        const dy = goalY - svgY;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const arrowLength = Math.min(8, distance * 0.4); // Arrow length proportional to distance, max 8
+                        const arrowEndX = svgX + (dx / distance) * arrowLength;
+                        const arrowEndY = svgY + (dy / distance) * arrowLength;
 
                         return (
-                            <foreignObject
+                            <g
                                 key={`shot-${index}`}
-                                x={svgX - 2.5}
-                                y={svgY - 2.5}
-                                width={5}
-                                height={5}
-                                className="overflow-visible"
+                                style={{ cursor: 'pointer' }}
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent field click from closing popup
+                                    setSelectedShot(isSelected ? null : shot.originalIndex);
+                                }}
                             >
-                                <motion.div
-                                    className={cn(
-                                        "w-full h-full flex items-center justify-center cursor-pointer transform rotate-90", // Counter-rotate to stay upright
-                                        selectedShot === shot.originalIndex && "ring-2 ring-white ring-offset-2 ring-offset-transparent rounded-full"
-                                    )}
-                                    onClick={() => setSelectedShot(selectedShot === shot.originalIndex ? null : shot.originalIndex)}
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    whileHover={{ scale: 1.3 }}
-                                >
-                                    {getShotIcon(shot)}
+                                {/* Arrow showing shot direction to goal */}
+                                <line
+                                    x1={svgX}
+                                    y1={svgY}
+                                    x2={arrowEndX}
+                                    y2={arrowEndY}
+                                    stroke="hsl(var(--destructive))"
+                                    strokeWidth={0.3}
+                                    strokeOpacity={0.7}
+                                    markerEnd="url(#shot-arrow)"
+                                />
 
-                                    {/* xG Badge */}
-                                    {showXG && (
-                                        <div
-                                            className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-mono px-1 py-0.5 rounded bg-black/70 text-white whitespace-nowrap"
-                                            style={{ fontSize: '1.5px', lineHeight: '1.2', bottom: '-2px' }}
-                                        >
-                                            {shotXG.toFixed(2)}
-                                        </div>
+                                {/* Shot marker at origin */}
+                                <g transform={`translate(${svgX}, ${svgY})`}>
+                                    {/* Selection ring */}
+                                    {isSelected && (
+                                        <circle
+                                            r={radius + 0.8}
+                                            fill="none"
+                                            stroke="white"
+                                            strokeWidth={0.3}
+                                            opacity={0.9}
+                                        />
                                     )}
-                                </motion.div>
-                            </foreignObject>
+
+                                    {/* Shot visualization based on outcome */}
+                                    {shotStyle.type === 'goal' ? (
+                                        /* Goal: Filled red circle */
+                                        <circle
+                                            r={radius}
+                                            fill={shotStyle.fill}
+                                            fillOpacity={0.9}
+                                            stroke={shotStyle.stroke}
+                                            strokeWidth={0.25}
+                                        />
+                                    ) : shotStyle.type === 'onTarget' ? (
+                                        /* On Target: Two concentric unfilled red circles */
+                                        <>
+                                            <circle
+                                                r={radius}
+                                                fill="transparent"
+                                                stroke={shotStyle.stroke}
+                                                strokeWidth={0.3}
+                                            />
+                                            <circle
+                                                r={radius * 0.5}
+                                                fill="transparent"
+                                                stroke={shotStyle.stroke}
+                                                strokeWidth={0.3}
+                                            />
+                                        </>
+                                    ) : (
+                                        /* Missed shot: Single unfilled red circle */
+                                        <circle
+                                            r={radius}
+                                            fill="transparent"
+                                            stroke={shotStyle.stroke}
+                                            strokeWidth={0.3}
+                                        />
+                                    )}
+
+                                    {/* xG label */}
+                                    {showXG && (
+                                        <g transform={`translate(0, ${radius + 1.8})`}>
+                                            <rect
+                                                x={-3}
+                                                y={-1}
+                                                width={6}
+                                                height={2}
+                                                rx={0.4}
+                                                fill="rgba(0,0,0,0.75)"
+                                            />
+                                            <text
+                                                x={0}
+                                                y={0.4}
+                                                textAnchor="middle"
+                                                fontSize={1.3}
+                                                fill="white"
+                                                fontFamily="monospace"
+                                            >
+                                                {shotXG.toFixed(2)}
+                                            </text>
+                                        </g>
+                                    )}
+                                </g>
+                            </g>
                         );
                     })}
                 </TacticalField>
@@ -261,18 +333,6 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
                                                     {shot.isGoal || shot.shotOutcome === 'goal' ? "Goal" : shot.success ? "On Target" : "Missed"}
                                                 </Badge>
                                             </div>
-
-                                            {/* Big Chance Toggle for Analysts */}
-                                            {editable && (
-                                                <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
-                                                    <Label htmlFor="big-chance" className="text-muted-foreground">Big Chance?</Label>
-                                                    <Switch
-                                                        id="big-chance"
-                                                        checked={shot.isBigChance || false}
-                                                        onCheckedChange={(checked) => handleBigChanceToggle(selectedShot, checked)}
-                                                    />
-                                                </div>
-                                            )}
                                         </div>
                                     </>
                                 );
@@ -283,22 +343,25 @@ const ShotMap = ({ events, onUpdateEvent, editable = false }: ShotMapProps) => {
             </div>
 
             {/* Legend */}
-            <div className="flex flex-wrap items-center justify-center gap-4 text-sm py-2">
+            <div className="flex flex-wrap items-center justify-center gap-6 text-sm py-2">
                 <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-success" />
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="5" fill="hsl(var(--destructive))" fillOpacity="0.9" stroke="hsl(var(--destructive))" strokeWidth="1" />
+                    </svg>
                     <span className="text-muted-foreground">Goal</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Circle className="w-4 h-4 text-warning fill-warning/30" />
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="5" fill="transparent" stroke="hsl(var(--destructive))" strokeWidth="1.2" />
+                        <circle cx="10" cy="10" r="2.5" fill="transparent" stroke="hsl(var(--destructive))" strokeWidth="1.2" />
+                    </svg>
                     <span className="text-muted-foreground">On Target</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <X className="w-4 h-4 text-destructive" />
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="5" fill="transparent" stroke="hsl(var(--destructive))" strokeWidth="1.2" />
+                    </svg>
                     <span className="text-muted-foreground">Missed</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Star className="w-4 h-4 text-warning fill-warning" />
-                    <span className="text-muted-foreground">Big Chance</span>
                 </div>
             </div>
         </div>

@@ -3,7 +3,6 @@ import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import AuthHeader from "@/components/layout/AuthHeader";
 import Sidebar from "@/components/layout/Sidebar";
-import RadarChart from "@/components/charts/RadarChart";
 import LineChart from "@/components/charts/LineChart";
 import StatBar from "@/components/charts/StatBar";
 import MatchTimeline from "@/components/charts/MatchTimeline";
@@ -13,9 +12,10 @@ import ShotMap from "@/components/analytics/ShotMap";
 import { Player, PlayerMatch } from "@/types/player";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Target, Footprints, Flame, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search } from "lucide-react";
+import { User, Target, Footprints, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePlayers } from "@/hooks/usePlayers";
+import { useSidebarContext } from "@/contexts/SidebarContext";
 
 // Valid tab values
 const VALID_TABS = ["overall", "match", "passing", "shots"];
@@ -29,6 +29,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isCollapsed } = useSidebarContext();
 
   // Get initial tab from URL hash or default to "overall"
   const getInitialTab = () => {
@@ -47,37 +48,13 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
   // Default to first player if no id or player not found
   const currentPlayer = player || players[0];
 
-  // Set default selected match - using useEffect for side effects
-  // NOTE: This hook MUST be before any early returns to comply with Rules of Hooks
-  useEffect(() => {
-    if (defaultMatchId) {
-      setSelectedMatchId(defaultMatchId);
-    } else if (currentPlayer && currentPlayer.matchStats.length > 0 && !selectedMatchId) {
-      setSelectedMatchId(currentPlayer.matchStats[0].matchId);
-    }
-  }, [currentPlayer, selectedMatchId, defaultMatchId]);
-
-  // Scroll to top when navigating to a new player
-  useEffect(() => {
-    if (!embedded) {
-      window.scrollTo(0, 0);
-    }
-  }, [id, embedded]);
-
-  // Loading state - MUST be before any conditional logic
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-primary">Loading player data...</div>
-      </div>
-    );
-  }
-
-  // Calculate aggregated stats - after loading check
+  // Calculate aggregated stats - MUST be before any early returns (Rules of Hooks)
   const aggregatedStats = useMemo(() => {
     if (!currentPlayer) return null;
 
     const matches = currentPlayer.matchStats;
+    if (matches.length === 0) return null;
+    
     const total = {
       goals: matches.reduce((a, m) => a + m.stats.goals, 0),
       assists: matches.reduce((a, m) => a + m.stats.assists, 0),
@@ -95,13 +72,48 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     return total;
   }, [currentPlayer]);
 
-  // All events for overall view
+  // All events for overall view - MUST be before any early returns (Rules of Hooks)
   const allEvents = useMemo(() => {
     if (!currentPlayer) return [];
     return currentPlayer.matchStats.flatMap((m) => m.events);
   }, [currentPlayer]);
 
-  const selectedMatch = currentPlayer?.matchStats.find(
+  // Set default selected match - using useEffect for side effects
+  // NOTE: This hook MUST be before any early returns to comply with Rules of Hooks
+  useEffect(() => {
+    if (defaultMatchId) {
+      setSelectedMatchId(defaultMatchId);
+    } else if (currentPlayer && currentPlayer.matchStats.length > 0 && !selectedMatchId) {
+      setSelectedMatchId(currentPlayer.matchStats[0].matchId);
+    }
+  }, [currentPlayer, selectedMatchId, defaultMatchId]);
+
+  // Scroll to top when navigating to a new player
+  useEffect(() => {
+    if (!embedded) {
+      window.scrollTo(0, 0);
+    }
+  }, [id, embedded]);
+
+  // Loading state - after all hooks
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-primary">Loading player data...</div>
+      </div>
+    );
+  }
+
+  // Player not found check - after all hooks
+  if (!currentPlayer) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Player not found</p>
+      </div>
+    );
+  }
+
+  const selectedMatch = currentPlayer.matchStats.find(
     (m) => m.matchId === selectedMatchId
   );
 
@@ -126,14 +138,6 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     return String(value);
   };
 
-  if (!currentPlayer) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Player not found</p>
-      </div>
-    );
-  }
-
   // Match trend data for line chart
   const matchTrendData = currentPlayer.matchStats.map((match) => ({
     name: `vs ${match.opponent.split(" ")[0]}`,
@@ -147,7 +151,10 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
       {!embedded && <AuthHeader title="Player Stats" showBack />}
       {!embedded && <Sidebar />}
 
-      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 ml-64"}>
+      <main className={cn(
+        embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
+        !embedded && (isCollapsed ? "ml-16" : "ml-64")
+      )}>
         <div className="container mx-auto">
 
           {/* Player Header */}
@@ -246,94 +253,28 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
 
             {/* Overall Stats Tab */}
             <TabsContent value="overall" className="space-y-6">
-              {/* Top Row - Radar and Player Summary */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Radar Chart */}
-                <Card className="lg:col-span-1 bg-card border-border">
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Flame className="w-5 h-5 text-primary" />
-                      Attribute Pentagon
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex justify-center">
-                    <RadarChart attributes={currentPlayer.attributes} size="md" />
-                  </CardContent>
-                </Card>
-
-                {/* Player Summary */}
-                <Card className="lg:col-span-2 bg-card border-border">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Season Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                      {[
-                        { label: "Matches", value: currentPlayer.matchStats.length, icon: CalendarDays, color: "text-primary" },
-                        { label: "Minutes", value: currentPlayer.matchStats.reduce((a, m) => a + (m.minutesPlayed || 90), 0), icon: Activity, color: "text-muted-foreground" },
-                        { label: "Goals", value: aggregatedStats?.goals ?? null, icon: Target, color: "text-destructive" },
-                        { label: "Assists", value: aggregatedStats?.assists ?? null, icon: Footprints, color: "text-warning" },
-                      ].map((stat) => (
-                        <div key={stat.label} className="text-center p-4 rounded-lg bg-secondary/50 border border-border">
-                          <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
-                          <p className={cn("text-2xl font-bold", stat.color)}>{stat.value !== null ? stat.value : "--"}</p>
-                          <p className="text-xs uppercase text-muted-foreground mt-1">{stat.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Category Comparison Bars */}
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-medium text-muted-foreground">Category Strengths</h4>
-                      {(() => {
-                        const attrs = currentPlayer.attributes;
-                        const hasPassingData = attrs.passing !== null;
-                        const hasAttackingData = attrs.shooting !== null && attrs.dribbling !== null;
-                        const hasDefendingData = attrs.defending !== null && attrs.physical !== null;
-
-                        const categories = [
-                          {
-                            label: "Passing",
-                            value: hasPassingData ? attrs.passing : null,
-                            color: "bg-primary"
-                          },
-                          {
-                            label: "Attacking",
-                            value: hasAttackingData ? Math.round(((attrs.shooting ?? 0) + (attrs.dribbling ?? 0)) / 2) : null,
-                            color: "bg-destructive"
-                          },
-                          {
-                            label: "Defending",
-                            value: hasDefendingData ? Math.round(((attrs.defending ?? 0) + (attrs.physical ?? 0)) / 2) : null,
-                            color: "bg-success"
-                          },
-                        ];
-
-                        return categories.map((category) => (
-                          <div key={category.label} className="flex items-center gap-3">
-                            <span className="text-xs font-medium w-20 text-muted-foreground">{category.label}</span>
-                            <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                              {category.value !== null ? (
-                                <motion.div
-                                  className={cn("h-full rounded-full", category.color)}
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${category.value}%` }}
-                                  transition={{ duration: 0.5, delay: 0.2 }}
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
-                                  Data unavailable
-                                </div>
-                              )}
-                            </div>
-                            <span className="text-xs font-bold w-8 text-right">{category.value !== null ? category.value : "--"}</span>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {/* Season Summary */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="text-lg">Season Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { label: "Matches", value: currentPlayer.matchStats.length, icon: CalendarDays, color: "text-primary" },
+                      { label: "Minutes", value: currentPlayer.matchStats.reduce((a, m) => a + (m.minutesPlayed || 90), 0), icon: Activity, color: "text-muted-foreground" },
+                      { label: "Goals", value: aggregatedStats?.goals ?? null, icon: Target, color: "text-destructive" },
+                      { label: "Assists", value: aggregatedStats?.assists ?? null, icon: Footprints, color: "text-warning" },
+                    ].map((stat) => (
+                      <div key={stat.label} className="text-center p-4 rounded-lg bg-secondary/50 border border-border">
+                        <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
+                        <p className={cn("text-2xl font-bold", stat.color)}>{stat.value !== null ? stat.value : "--"}</p>
+                        <p className="text-xs uppercase text-muted-foreground mt-1">{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Aggregated Stats - Mode Wise */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -774,7 +715,6 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                 <CardContent>
                   <ShotMap
                     events={selectedMatchId === "all" ? allEvents : (selectedMatch?.events || [])}
-                    editable={true}
                   />
                 </CardContent>
               </Card>

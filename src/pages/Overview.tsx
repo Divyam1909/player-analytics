@@ -28,7 +28,9 @@ import {
   Filter
 } from "lucide-react";
 import { usePlayers } from "@/hooks/usePlayers";
+import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useMatches } from "@/hooks/useSupabaseData";
+import { cn } from "@/lib/utils";
 
 export type StatFilterMode = "none" | "passing" | "attacking" | "defending";
 
@@ -59,6 +61,7 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Player | undefined>();
   const [statFilter, setStatFilter] = useState<StatFilterMode>("none");
+  const { isCollapsed } = useSidebarContext();
 
   // Use the hooks to fetch players, matches, and teams
   const { data: players = [], isLoading: playersLoading } = usePlayers();
@@ -208,7 +211,10 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
       {!embedded && <AuthHeader title="Squad Overview" />}
       {!embedded && <Sidebar />}
 
-      <main className={embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 ml-64"}>
+      <main className={cn(
+        embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
+        !embedded && (isCollapsed ? "ml-16" : "ml-64")
+      )}>
         <div className="container mx-auto">
           {/* Page Header */}
           <motion.div

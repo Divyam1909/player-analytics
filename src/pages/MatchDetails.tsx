@@ -5,15 +5,17 @@ import AuthHeader from "@/components/layout/AuthHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { BarChart3, Users, FileText, PlayCircle, Video } from "lucide-react";
+import { BarChart3, Users, Sparkles, PlayCircle, Video } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useSidebarContext } from "@/contexts/SidebarContext";
+import { useCustomStats } from "@/contexts/CustomStatsContext";
+import { cn } from "@/lib/utils";
 
 // Import existing page components
 import TeamAnalytics from "./TeamAnalytics";
 import Overview from "./Overview";
-import PlayerStats from "./PlayerStats";
-import MatchAnnotation from "@/components/analytics/MatchAnnotation";
+import CustomStats from "./CustomStats";
 
 
 interface MatchDetailsResponse {
@@ -28,16 +30,23 @@ interface MatchDetailsResponse {
 
 const MatchDetails = () => {
     const { matchId } = useParams<{ matchId: string }>();
+    const { isCollapsed } = useSidebarContext();
     const location = useLocation();
     const navigate = useNavigate();
 
     // Valid tab values
-    const VALID_TABS = ["overview", "player-overview", "annotation", "pre-match", "match-video"];
+    const VALID_TABS = ["overview", "player-overview", "custom", "pre-match", "match-video"];
+    
+    // Custom stats context
+    const { isCustomMode, hasCustomStats } = useCustomStats();
 
-    // Get initial tab from URL hash or default to "overview"
+    // Get initial tab from URL hash or default based on custom mode
     const getInitialTab = () => {
         const hash = location.hash.replace("#", "");
-        return VALID_TABS.includes(hash) ? hash : "overview";
+        if (VALID_TABS.includes(hash)) return hash;
+        // If custom mode is enabled and has stats, default to custom tab
+        if (isCustomMode && hasCustomStats) return "custom";
+        return "overview";
     };
 
     const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -57,6 +66,14 @@ const MatchDetails = () => {
             setActiveTab(hash);
         }
     }, [location.hash]);
+
+    // Auto-navigate to custom tab when entering match details if custom mode is enabled
+    useEffect(() => {
+        if (isCustomMode && hasCustomStats && !location.hash) {
+            setActiveTab("custom");
+            navigate(`${location.pathname}#custom`, { replace: true });
+        }
+    }, [matchId]); // Only on initial mount/matchId change
 
     const { data: matchDetails, isLoading } = useQuery({
         queryKey: ['match', matchId],
@@ -156,7 +173,10 @@ const MatchDetails = () => {
             />
             <Sidebar />
 
-            <main className="pt-24 pb-12 px-6 ml-64">
+            <main className={cn(
+                "pt-24 pb-12 px-6 transition-all duration-300",
+                isCollapsed ? "ml-16" : "ml-64"
+            )}>
                 <div className="container mx-auto">
                     {/* Match Header */}
                     <motion.div
@@ -237,11 +257,14 @@ const MatchDetails = () => {
                             </TabsTrigger>
 
                             <TabsTrigger
-                                value="annotation"
+                                value="custom"
                                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
                             >
-                                <FileText className="w-4 h-4" />
-                                Annotation
+                                <Sparkles className="w-4 h-4" />
+                                Custom
+                                {isCustomMode && hasCustomStats && (
+                                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                )}
                             </TabsTrigger>
                             <TabsTrigger
                                 value="pre-match"
@@ -271,9 +294,9 @@ const MatchDetails = () => {
 
 
 
-                        {/* Annotation Tab - Full Featured */}
-                        <TabsContent value="annotation" className="space-y-6">
-                            <MatchAnnotation matchId={matchId} />
+                        {/* Custom Tab - Custom Stats View */}
+                        <TabsContent value="custom" className="space-y-6">
+                            <CustomStats embedded matchId={matchId} />
                         </TabsContent>
 
                         {/* Pre Match Tab - Placeholder */}

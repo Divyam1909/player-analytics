@@ -3,6 +3,7 @@ import { Moon, Sun, Monitor, LogOut, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -30,6 +31,7 @@ interface AuthHeaderProps {
 const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOptions, selectedMatchId, onMatchChange }: AuthHeaderProps) => {
     const { theme, setTheme, resolvedTheme } = useTheme();
     const { user, logout } = useAuth();
+    const { isCollapsed } = useSidebarContext();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -46,11 +48,28 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
     };
 
     return (
-        <header className="fixed top-0 left-64 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+        <header 
+            className={cn(
+                "fixed top-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl transition-all duration-300",
+                isCollapsed ? "left-16" : "left-64"
+            )}
+        >
             <div className="container mx-auto px-6">
                 <div className="flex h-16 items-center justify-between">
-                    {/* Left Side - Back Button & Page Title */}
+                    {/* Left Side - Logo, Back Button & Page Title */}
                     <div className="flex items-center gap-4">
+                        {/* Logo */}
+                        <Link to="/dashboard" className="flex items-center gap-2">
+                            <img
+                                src="/image.png"
+                                alt="Thinking Engines"
+                                className="w-8 h-8 rounded-lg object-cover"
+                            />
+                        </Link>
+
+                        {/* Divider */}
+                        <div className="h-6 w-px bg-border" />
+
                         {showBack && (
                             <Button
                                 variant="ghost"
