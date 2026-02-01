@@ -21,6 +21,7 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import UpcomingMatches from "./pages/UpcomingMatches";
 import MatchSchedule from "./pages/MatchSchedule";
+import StatsGlossary from "./pages/StatsGlossary";
 
 // Auth Pages
 import LoginSelection from "./pages/auth/LoginSelection";
@@ -222,6 +223,16 @@ function AnimatedRoutes() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'coach']}>
                 <TeamAnalytics />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Stats Glossary - All authenticated users */}
+          <Route
+            path="/stats-glossary"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach', 'player']}>
+                <StatsGlossary />
               </ProtectedRoute>
             }
           />

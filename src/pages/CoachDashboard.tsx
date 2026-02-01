@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebarContext } from '@/contexts/SidebarContext';
+import { StatHint } from '@/components/ui/stat-hint';
 
 // Animation variants
 const containerVariants = {
@@ -149,21 +150,29 @@ const CoachDashboard = () => {
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-2 text-muted-foreground mb-3">
                                         <Trophy className="w-4 h-4" />
-                                        <span className="text-sm font-medium">Match Record</span>
+                                        <StatHint statId="total_matches" iconSize="sm">
+                                            <span className="text-sm font-medium">Match Record</span>
+                                        </StatHint>
                                     </div>
                                     <p className="text-3xl font-bold text-foreground mb-3">
                                         {stats.totalMatches} Matches
                                     </p>
                                     <div className="flex gap-2">
-                                        <span className="px-2 py-1 rounded text-xs font-bold bg-emerald-500 text-white">
-                                            {stats.wins}W
-                                        </span>
-                                        <span className="px-2 py-1 rounded text-xs font-bold bg-gray-500 text-white">
-                                            {stats.draws}D
-                                        </span>
-                                        <span className="px-2 py-1 rounded text-xs font-bold bg-red-500 text-white">
-                                            {stats.losses}L
-                                        </span>
+                                        <StatHint statId="wins" iconSize="sm">
+                                            <span className="px-2 py-1 rounded text-xs font-bold bg-emerald-500 text-white">
+                                                {stats.wins}W
+                                            </span>
+                                        </StatHint>
+                                        <StatHint statId="draws" iconSize="sm">
+                                            <span className="px-2 py-1 rounded text-xs font-bold bg-gray-500 text-white">
+                                                {stats.draws}D
+                                            </span>
+                                        </StatHint>
+                                        <StatHint statId="losses" iconSize="sm">
+                                            <span className="px-2 py-1 rounded text-xs font-bold bg-red-500 text-white">
+                                                {stats.losses}L
+                                            </span>
+                                        </StatHint>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -178,19 +187,25 @@ const CoachDashboard = () => {
                                         <span className="text-sm font-medium">Goal Statistics</span>
                                     </div>
                                     <div className="flex items-baseline gap-3 mb-2">
-                                        <span className="text-3xl font-bold text-emerald-500">{stats.goalsScored}</span>
+                                        <StatHint statId="goals_scored" iconSize="sm">
+                                            <span className="text-3xl font-bold text-emerald-500">{stats.goalsScored}</span>
+                                        </StatHint>
                                         <span className="text-muted-foreground">-</span>
-                                        <span className="text-3xl font-bold text-red-500">{stats.goalsConceded}</span>
+                                        <StatHint statId="goals_conceded_team" iconSize="sm">
+                                            <span className="text-3xl font-bold text-red-500">{stats.goalsConceded}</span>
+                                        </StatHint>
                                     </div>
                                     <div className="flex gap-4 text-xs text-muted-foreground">
                                         <span>Scored</span>
                                         <span>Conceded</span>
                                     </div>
-                                    <p className="text-sm text-muted-foreground mt-2">
-                                        Goal Difference: <span className={stats.goalDifference >= 0 ? 'text-emerald-500' : 'text-red-500'}>
-                                            {stats.goalDifference > 0 ? '+' : ''}{stats.goalDifference}
-                                        </span>
-                                    </p>
+                                    <StatHint statId="goal_difference" iconSize="sm">
+                                        <p className="text-sm text-muted-foreground mt-2">
+                                            Goal Difference: <span className={stats.goalDifference >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+                                                {stats.goalDifference > 0 ? '+' : ''}{stats.goalDifference}
+                                            </span>
+                                        </p>
+                                    </StatHint>
                                 </CardContent>
                             </Card>
                         </motion.div>

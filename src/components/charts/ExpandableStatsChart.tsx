@@ -7,6 +7,7 @@ import { Search, X, ChevronRight } from 'lucide-react';
 export interface StatsNode {
     id: string;
     name: string;
+    shortName?: string; // Optional short name for display in tight spaces
     value: number | null;
     children?: StatsNode[];
     level: number;
@@ -14,6 +15,70 @@ export interface StatsNode {
     startAngle?: number;
     endAngle?: number;
     centerAngle?: number;
+    suffix?: string; // Optional suffix like '%' for percentage values
+}
+
+// Short name mappings for common stats
+const SHORT_NAME_MAP: Record<string, string> = {
+    // Passing
+    'Successful': 'SC',
+    'Unsuccessful': 'US',
+    'Progressive': 'PG',
+    'Key Passes': 'KP',
+    'Assists': 'AS',
+    'Crosses': 'CR',
+    'Long Passes': 'LP',
+    'Short Passes': 'SP',
+    'Through Balls': 'TB',
+    'Other': 'OT',
+    'Blocked': 'BL',
+    'Clearance': 'CL',
+    'Interception': 'IN',
+    'Offside': 'OF',
+    'Ball Recoveries': 'BR',
+    'High Pressing': 'HP',
+    // Set Pieces
+    'Set Pieces': 'SP',
+    'Goal Kicks': 'GK',
+    'Free Kicks': 'FK',
+    'Corners': 'CN',
+    'Throw-ins': 'TI',
+    'First Contact': '1C',
+    'Second Contact': '2C',
+    'Penalties': 'PN',
+    // Duels
+    'Duels': 'DU',
+    'Aerial': 'AE',
+    'Ground': 'GR',
+    'Dribbles': 'DR',
+    'Won': 'WN',
+    'Lost': 'LT',
+    'Tackles Won': 'TW',
+    'Tackles Lost': 'TL',
+    'Failed': 'FL',
+    'Dribble Success Rate': 'DS',
+    // Goalkeeper
+    'Keeper Stats': 'GK',
+    'Saves': 'SV',
+    'Inside Box': 'IB',
+    'Outside Box': 'OB',
+    'Actions': 'AC',
+    'Punches': 'PU',
+    'Catches': 'CT',
+    'Sweepings': 'SW',
+    'Conceded': 'GC',
+    // Outplays
+    'Outplays': 'OP',
+    'Passing': 'PS',
+    'Dribbling': 'DR',
+    'Players Outplayed': 'PO',
+    'Lines Broken': 'LB',
+};
+
+// Get short name for a stat
+function getShortName(name: string, providedShortName?: string): string {
+    if (providedShortName) return providedShortName;
+    return SHORT_NAME_MAP[name] || name.slice(0, 2).toUpperCase();
 }
 
 interface ExpandableStatsChartProps {
@@ -67,6 +132,11 @@ const CATEGORY_COLORS: Record<string, { main: string; light: string; lighter: st
         main: 'hsl(330, 70%, 50%)',
         light: 'hsl(330, 70%, 60%)',
         lighter: 'hsl(330, 70%, 72%)',
+    },
+    outplays: {
+        main: 'hsl(160, 70%, 45%)',
+        light: 'hsl(160, 70%, 55%)',
+        lighter: 'hsl(160, 70%, 68%)',
     },
 };
 
@@ -254,6 +324,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
             : rootCategory.includes('set') || rootCategory.includes('piece') ? CATEGORY_COLORS.setpieces
             : rootCategory.includes('goal') || rootCategory.includes('keep') || rootCategory.includes('save') ? CATEGORY_COLORS.goalkeeper
             : rootCategory.includes('foul') || rootCategory.includes('card') ? CATEGORY_COLORS.fouls
+            : rootCategory.includes('outplay') ? CATEGORY_COLORS.outplays
             : CATEGORY_COLORS.passes;
 
         if (stat.level === 1) return colors.main;
@@ -381,6 +452,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
             : category.includes('set') || category.includes('piece') ? CATEGORY_COLORS.setpieces
             : category.includes('goal') || category.includes('keep') || category.includes('save') ? CATEGORY_COLORS.goalkeeper
             : category.includes('foul') || category.includes('card') ? CATEGORY_COLORS.fouls
+            : category.includes('outplay') ? CATEGORY_COLORS.outplays
             : CATEGORY_COLORS.passes;
 
         if (node.level === 1) return colors.main;
@@ -547,7 +619,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                             <p className="text-xs text-muted-foreground mb-0.5">{getRootCategory(hoveredNode)}</p>
                             <p className="text-sm font-semibold text-foreground">{hoveredNode.name}</p>
                             <p className="text-xl font-bold" style={{ color: getNodeColor(hoveredNode) }}>
-                                {hoveredNode.value !== null ? hoveredNode.value.toLocaleString() : '--'}
+                                {hoveredNode.value !== null ? `${hoveredNode.value.toLocaleString()}${hoveredNode.suffix || ''}` : '--'}
                             </p>
                         </div>
                     </motion.div>
@@ -678,7 +750,8 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                         const pos = polarToCartesian(0, 0, midR, midAngle);
 
                         const arcAngle = (node.endAngle ?? 0) - (node.startAngle ?? 0);
-                        if (arcAngle < 0.25) return null;
+                        // Skip labels for very small arcs
+                        if (arcAngle < 0.15) return null;
 
                         // Calculate text rotation for readability
                         let textRotation = (midAngle * 180 / Math.PI);
@@ -687,7 +760,12 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                             textRotation += 180;
                         }
 
-                        const displayName = node.name.length > 10 ? node.name.slice(0, 9) + '…' : node.name;
+                        // Determine label based on available space
+                        // Use short name for small arcs, full name for larger ones
+                        const arcLength = arcAngle * midR; // Approximate arc length in pixels
+                        const useShortName = arcAngle < 0.5 || arcLength < 50 || node.name.length > 8;
+                        const shortName = getShortName(node.name, node.shortName);
+                        const displayName = useShortName ? shortName : node.name;
 
                         return (
                             <g key={`label-${node.id}`}>
@@ -698,7 +776,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                                     dominantBaseline="middle"
                                     className="pointer-events-none select-none"
                                     fill="white"
-                                    fontSize={node.level === 1 ? 10 : 8}
+                                    fontSize={useShortName ? (node.level === 1 ? 9 : 8) : (node.level === 1 ? 10 : 8)}
                                     fontWeight={node.level === 1 ? "700" : "600"}
                                     transform={`rotate(${textRotation}, ${pos.x}, ${pos.y})`}
                                     style={{ 

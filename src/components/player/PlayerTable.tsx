@@ -15,6 +15,7 @@ import StatBar from "@/components/charts/StatBar";
 import { ArrowUpDown, User, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatFilterMode } from "@/pages/Overview";
+import { StatHintIcon } from "@/components/ui/stat-hint";
 
 interface PlayerTableProps {
   players: Player[];
@@ -86,36 +87,36 @@ const PlayerTable = ({ players, onCompare, statFilter = "none", matchId }: Playe
     switch (statFilter) {
       case "passing":
         return [
-          { label: "Pass", fullLabel: "Total Passes", key: "totalPassing", suffix: "" },
-          { label: "Crs", fullLabel: "Crosses", key: "crosses", suffix: "" },
-          { label: "Ast", fullLabel: "Assists", key: "assists", suffix: "" },
+          { label: "Pass", fullLabel: "Total Passes", key: "totalPassing", suffix: "", statId: "total_passes" },
+          { label: "Crs", fullLabel: "Crosses", key: "crosses", suffix: "", statId: "crosses" },
+          { label: "Ast", fullLabel: "Assists", key: "assists", suffix: "", statId: "assists" },
         ];
       case "defending":
         return [
-          { label: "Blk", fullLabel: "Blocks", key: "blocks", suffix: "" },
-          { label: "Int", fullLabel: "Interceptions", key: "interceptions", suffix: "" },
-          { label: "Clr", fullLabel: "Clearances", key: "clearances", suffix: "" },
-          { label: "Rec", fullLabel: "Recoveries", key: "recoveries", suffix: "" },
+          { label: "Blk", fullLabel: "Blocks", key: "blocks", suffix: "", statId: "blocks" },
+          { label: "Int", fullLabel: "Interceptions", key: "interceptions", suffix: "", statId: "interceptions" },
+          { label: "Clr", fullLabel: "Clearances", key: "clearances", suffix: "", statId: "clearances" },
+          { label: "Rec", fullLabel: "Recoveries", key: "recoveries", suffix: "", statId: "recoveries" },
         ];
       case "attacking":
         return [
-          { label: "PRn", fullLabel: "Progressive Runs", key: "progressiveRuns", suffix: "" },
-          { label: "Drb", fullLabel: "Total Dribbles", key: "totalDribbles", suffix: "" },
-          { label: "SDr", fullLabel: "Successful Dribbles", key: "successfulDribbles", suffix: "" },
-          { label: "Air", fullLabel: "Aerial Duels Won", key: "aerialDuelsWon", suffix: "" },
-          { label: "Sht", fullLabel: "Shots", key: "shots", suffix: "" },
-          { label: "OT", fullLabel: "Shots On Target", key: "shotsOnTarget", suffix: "" },
-          { label: "Cv%", fullLabel: "Conversion Rate", key: "shotConversionRate", suffix: "%" },
+          { label: "PRn", fullLabel: "Progressive Runs", key: "progressiveRuns", suffix: "", statId: "progressive_runs" },
+          { label: "Drb", fullLabel: "Total Dribbles", key: "totalDribbles", suffix: "", statId: "dribbles" },
+          { label: "SDr", fullLabel: "Successful Dribbles", key: "successfulDribbles", suffix: "", statId: "dribbles_successful" },
+          { label: "Air", fullLabel: "Aerial Duels Won", key: "aerialDuelsWon", suffix: "", statId: "aerial_duels_won" },
+          { label: "Sht", fullLabel: "Shots", key: "shots", suffix: "", statId: "shots" },
+          { label: "OT", fullLabel: "Shots On Target", key: "shotsOnTarget", suffix: "", statId: "shots_on_target" },
+          { label: "Cv%", fullLabel: "Conversion Rate", key: "shotConversionRate", suffix: "%", statId: "shot_conversion" },
         ];
       default:
         return [
-          { label: "M", fullLabel: "Matches Played", key: "matchesPlayed", suffix: "" },
-          { label: "Min", fullLabel: "Minutes Played", key: "totalMinutesPlayed", suffix: "" },
-          { label: "PAS", fullLabel: "Passing", key: "passing", suffix: "" },
-          { label: "SHO", fullLabel: "Shooting", key: "shooting", suffix: "" },
-          { label: "DRI", fullLabel: "Dribbling", key: "dribbling", suffix: "" },
-          { label: "DEF", fullLabel: "Defending", key: "defending", suffix: "" },
-          { label: "PHY", fullLabel: "Physical", key: "physical", suffix: "" },
+          { label: "M", fullLabel: "Matches Played", key: "matchesPlayed", suffix: "", statId: "matches_played" },
+          { label: "Min", fullLabel: "Minutes Played", key: "totalMinutesPlayed", suffix: "", statId: "minutes_played" },
+          { label: "PAS", fullLabel: "Passing", key: "passing", suffix: "", statId: "attr_passing" },
+          { label: "SHO", fullLabel: "Shooting", key: "shooting", suffix: "", statId: "attr_shooting" },
+          { label: "DRI", fullLabel: "Dribbling", key: "dribbling", suffix: "", statId: "attr_dribbling" },
+          { label: "DEF", fullLabel: "Defending", key: "defending", suffix: "", statId: "attr_defending" },
+          { label: "PHY", fullLabel: "Physical", key: "physical", suffix: "", statId: "attr_physical" },
         ];
     }
   }, [statFilter]);
@@ -248,7 +249,10 @@ const PlayerTable = ({ players, onCompare, statFilter = "none", matchId }: Playe
             </TableHead>
             {columnDefs.map((col) => (
               <TableHead key={col.key} className="text-center w-[45px] px-1 h-10">
-                <SortableHeader label={col.label} sortKeyValue={col.key} title={col.fullLabel} />
+                <div className="flex items-center justify-center gap-0.5">
+                  <SortableHeader label={col.label} sortKeyValue={col.key} title={col.fullLabel} />
+                  <StatHintIcon statId={col.statId} size="sm" />
+                </div>
               </TableHead>
             ))}
             {onCompare && (

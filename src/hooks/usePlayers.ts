@@ -41,6 +41,7 @@ interface DbPassEvent {
     end_x: number;
     end_y: number;
     minute: number;
+    receiver_player_id: string | null; // Who received the pass (for synergy analysis)
 }
 
 interface DbShotEvent {
@@ -78,6 +79,12 @@ export const usePlayers = () => {
             // Create team lookup map
             const teamMap = new Map<string, DbTeam>();
             (dbTeams as DbTeam[])?.forEach(t => teamMap.set(t.id, t));
+
+            // Create player lookup map (for synergy - mapping player IDs to names)
+            const playerNameMap = new Map<string, string>();
+            (dbPlayers as DbPlayer[])?.forEach(p => {
+                playerNameMap.set(p.id, `${p.first_name} ${p.last_name}`);
+            });
 
             // 2. Fetch Matches (to get dates and opponents)
             const { data: dbMatches, error: matchesError } = await supabase
@@ -174,6 +181,11 @@ export const usePlayers = () => {
                         });
                     });
                     pPasses.forEach(p => {
+                        // Look up receiver name for synergy analysis
+                        const receiverName = p.receiver_player_id 
+                            ? playerNameMap.get(p.receiver_player_id) 
+                            : undefined;
+                        
                         events.push({
                             type: 'pass',
                             minute: p.minute,
@@ -181,7 +193,8 @@ export const usePlayers = () => {
                             x: p.start_x,
                             y: p.start_y,
                             targetX: p.end_x,
-                            targetY: p.end_y
+                            targetY: p.end_y,
+                            passTarget: receiverName // For synergy analysis
                         });
                     });
 

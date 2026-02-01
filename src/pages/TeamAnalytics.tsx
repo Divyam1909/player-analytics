@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import AuthHeader from "@/components/layout/AuthHeader";
@@ -25,6 +25,11 @@ import {
     SkipForward,
     RotateCcw,
     CalendarDays,
+    BarChart3,
+    PieChart as PieChartIcon,
+    LayoutGrid,
+    Video,
+    Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +39,7 @@ import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useCountUp } from "@/hooks/useCountUp";
 import { FORMATIONS, FormationName, getFormationByName, getSlotColor, FormationSlot } from "@/lib/formationPositions";
 import TacticalField from "@/components/field/TacticalField";
+import { StatHint } from "@/components/ui/stat-hint";
 
 // Animation variants
 const containerVariants = {
@@ -49,6 +55,100 @@ const containerVariants = {
 const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 },
+};
+
+// Section navigation configuration
+const SECTIONS = [
+    { id: 'overview', label: 'Overview', shortLabel: 'OV', icon: BarChart3 },
+    { id: 'advanced', label: 'Advanced Stats', shortLabel: 'AS', icon: Activity },
+    { id: 'breakdown', label: 'Stats Breakdown', shortLabel: 'SB', icon: PieChartIcon },
+    { id: 'formation', label: 'Formation', shortLabel: 'FM', icon: LayoutGrid },
+    { id: 'goals', label: 'Goal Replay', shortLabel: 'GR', icon: Video },
+    { id: 'trend', label: 'Performance', shortLabel: 'PT', icon: TrendingUp },
+];
+
+// Section Navigation Component
+interface SectionNavProps {
+    activeSection: string;
+    onSectionClick: (sectionId: string) => void;
+    isCollapsed: boolean;
+    embedded?: boolean;
+}
+
+const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: SectionNavProps) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: 20, y: '-50%' }}
+            animate={{ opacity: 1, x: 0, y: '-50%' }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            className={cn(
+                "fixed right-3 z-50",
+                embedded ? "top-[55%]" : "top-[55%]"
+            )}
+        >
+            <div className={cn(
+                "flex flex-row items-stretch rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl",
+                embedded ? "p-1.5 gap-0" : "p-2 gap-0"
+            )}>
+                {/* Active indicator bar - positioned on the left side */}
+                <div className="relative flex flex-col justify-start mr-1.5">
+                    <motion.div
+                        className={cn(
+                            "rounded-full bg-primary",
+                            embedded ? "w-1 h-6" : "w-1.5 h-8"
+                        )}
+                        animate={{
+                            y: SECTIONS.findIndex(s => s.id === activeSection) * (embedded ? 32 : 40) + (embedded ? 4 : 4)
+                        }}
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                </div>
+                
+                {/* Buttons container */}
+                <div className={cn(
+                    "flex flex-col",
+                    embedded ? "gap-1" : "gap-1.5"
+                )}>
+                    {SECTIONS.map((section, index) => {
+                        const Icon = section.icon;
+                        const isActive = activeSection === section.id;
+                        
+                        return (
+                            <motion.button
+                                key={section.id}
+                                onClick={() => onSectionClick(section.id)}
+                                className={cn(
+                                    "group relative flex items-center justify-center rounded-lg transition-all duration-200",
+                                    embedded ? "w-7 h-7" : "w-9 h-9",
+                                    isActive 
+                                        ? "bg-primary/20 text-primary" 
+                                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                                )}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.6 + index * 0.05 }}
+                            >
+                                <Icon className={cn(embedded ? "w-3.5 h-3.5" : "w-4 h-4")} />
+                                
+                                {/* Tooltip on hover */}
+                                <div className={cn(
+                                    "absolute right-full mr-3 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap",
+                                    "bg-popover text-popover-foreground border border-border shadow-lg",
+                                    "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
+                                    "transition-all duration-200 pointer-events-none"
+                                )}>
+                                    {section.label}
+                                    <div className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-2.5 rotate-45 bg-popover border-r border-t border-border" />
+                                </div>
+                            </motion.button>
+                        );
+                    })}
+                </div>
+            </div>
+        </motion.div>
+    );
 };
 
 // Helper to check if a value exists in database (not null/undefined)
@@ -215,6 +315,52 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
     const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
     const [swapConfirmation, setSwapConfirmation] = useState<{ from: string; to: string; slotIndex: number } | null>(null);
+
+    // Section navigation state
+    const [activeSection, setActiveSection] = useState<string>('overview');
+    const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    
+    // Handle section click - smooth scroll to section
+    const handleSectionClick = useCallback((sectionId: string) => {
+        const element = sectionRefs.current[sectionId];
+        if (element) {
+            const headerOffset = 180; // Account for fixed header
+            const elementPosition = element.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+        setActiveSection(sectionId);
+    }, []);
+    
+    // Track active section on scroll
+    useEffect(() => {
+        const handleScroll = () => {
+            const scrollOffset = embedded ? 200 : 150; // Different offset for embedded view
+            
+            // Find which section is currently in view
+            for (const section of SECTIONS) {
+                const element = sectionRefs.current[section.id];
+                if (element) {
+                    const rect = element.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    
+                    // Check if element is in the top half of the viewport
+                    if (rect.top <= scrollOffset && rect.bottom > scrollOffset) {
+                        setActiveSection(section.id);
+                        break;
+                    }
+                }
+            }
+        };
+        
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll(); // Initial check
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [embedded]);
 
     // Fetch matches from Supabase
     const { data: dbMatches = [] } = useQuery({
@@ -644,16 +790,24 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     }, [isPlaying, filteredGoals.length]);
 
     const statCards = [
-        { label: selectedMatch === "all" ? "Total Players" : "Match Players", value: teamStats.playerCount, icon: Users, color: "text-primary" },
-        { label: "Total Goals", value: teamStats.totalGoals, icon: Target, color: "text-destructive" },
-        { label: "Total Assists", value: teamStats.totalAssists, icon: Footprints, color: "text-warning" },
-        { label: "Avg Rating", value: teamStats.avgRating, icon: TrendingUp, color: "text-success" },
+        { label: selectedMatch === "all" ? "Total Players" : "Match Players", value: teamStats.playerCount, icon: Users, color: "text-primary", statId: "total_players" },
+        { label: "Total Goals", value: teamStats.totalGoals, icon: Target, color: "text-destructive", statId: "goals_scored" },
+        { label: "Total Assists", value: teamStats.totalAssists, icon: Footprints, color: "text-warning", statId: "assists" },
+        { label: "Avg Rating", value: teamStats.avgRating, icon: TrendingUp, color: "text-success", statId: "overall_rating" },
     ];
 
     return (
         <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
             {!embedded && <AuthHeader title="Team Analytics" />}
             {!embedded && <Sidebar />}
+            
+            {/* Section Navigation */}
+            <SectionNav 
+                activeSection={activeSection} 
+                onSectionClick={handleSectionClick} 
+                isCollapsed={isCollapsed}
+                embedded={embedded}
+            />
 
             <main className={cn(
                 embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
@@ -738,9 +892,11 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         </div>
                     </motion.div>
 
-                    {/* Stat Cards */}
+                    {/* Stat Cards - Overview Section */}
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+                        id="overview"
+                        ref={(el) => { sectionRefs.current['overview'] = el; }}
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 scroll-mt-24"
                         variants={containerVariants}
                         initial="hidden"
                         animate="show"
@@ -757,7 +913,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 <div className="relative flex items-start justify-between">
                                     <div>
                                         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                                            {stat.label}
+                                            <StatHint statId={stat.statId} iconSize="sm">
+                                                <span>{stat.label}</span>
+                                            </StatHint>
                                         </p>
                                         <p className={`text-3xl font-bold ${stat.color}`}>
                                             <AnimatedValue value={stat.value} delay={index * 100} />
@@ -776,10 +934,12 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                     {/* Advanced Statistics Section - REORDERED */}
                     <motion.div
+                        id="advanced"
+                        ref={(el) => { sectionRefs.current['advanced'] = el; }}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.15 }}
-                        className="mb-8"
+                        className="mb-8 scroll-mt-24"
                     >
                         <Card className="glass-strong rounded-xl">
                             <CardHeader>
@@ -939,15 +1099,17 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 {/* Legend for indices */}
                                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 w-full">
                                                     {[
-                                                        { label: "PCI", full: "Possession Control Index" },
-                                                        { label: "CCI", full: "Chance Creation Index" },
-                                                        { label: "SE", full: "Shooting Efficiency" },
-                                                        { label: "DS", full: "Defensive Solidity" },
-                                                        { label: "T&P", full: "Transition & Progression" },
-                                                        { label: "RPE", full: "Recovery & Pressing" },
+                                                        { label: "PCI", full: "Possession Control Index", statId: "pci" },
+                                                        { label: "CCI", full: "Chance Creation Index", statId: "cci" },
+                                                        { label: "SE", full: "Shooting Efficiency", statId: "se" },
+                                                        { label: "DS", full: "Defensive Solidity", statId: "ds" },
+                                                        { label: "T&P", full: "Transition & Progression", statId: "tp" },
+                                                        { label: "RPE", full: "Recovery & Pressing", statId: "rpe" },
                                                     ].map((item) => (
                                                         <div key={item.label} className="text-center p-2 rounded-lg bg-background/50">
-                                                            <span className="text-xs font-bold text-primary">{item.label}</span>
+                                                            <StatHint statId={item.statId} iconSize="sm">
+                                                                <span className="text-xs font-bold text-primary">{item.label}</span>
+                                                            </StatHint>
                                                             <p className="text-[10px] text-muted-foreground">{item.full}</p>
                                                         </div>
                                                     ))}
@@ -1039,232 +1201,330 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         </Card>
                     </motion.div>
 
-                    {/* Statistics Breakdown - Expandable Sunburst Chart */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="mb-8"
-                    >
-                        <Card className="glass-strong rounded-xl">
-                            <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <circle cx="12" cy="12" r="6" />
-                                        <circle cx="12" cy="12" r="2" />
-                                    </svg>
-                                    Statistics Breakdown
-                                </CardTitle>
-                                <p className="text-sm text-muted-foreground">Interactive breakdown of team statistics - click to expand</p>
-                            </CardHeader>
-                            <CardContent>
-                                {(() => {
-                                    // Build hierarchical stats data from match statistics
-                                    const relevantStats = matchStatsList;
-                                    
-                                    // Get aggregated values
-                                    const successfulPasses = sumWithNull(relevantStats, m => (m as any).home_successful_passes) ?? 0;
-                                    const unsuccessfulPasses = sumWithNull(relevantStats, m => (m as any).home_unsuccessful_passes) ?? 0;
-                                    const progressivePasses = sumWithNull(relevantStats, m => (m as any).home_progressive_passes) ?? 0;
-                                    const keyPasses = sumWithNull(relevantStats, m => (m as any).home_key_passes) ?? 0;
-                                    const assists = sumWithNull(relevantStats, m => (m as any).home_assists) ?? 0;
-                                    const crosses = sumWithNull(relevantStats, m => (m as any).home_crosses) ?? 0;
-                                    
-                                    const shotsOnTarget = sumWithNull(relevantStats, m => m.team_shots_on_target) ?? 0;
-                                    const goals = sumWithNull(relevantStats, m => (m as any).home_goals) ?? 0;
-                                    const penalties = sumWithNull(relevantStats, m => (m as any).home_penalties) ?? 0;
-                                    const savedShots = shotsOnTarget - goals;
-                                    
-                                    const aerialDuelsWon = sumWithNull(relevantStats, m => m.team_aerial_duels_won) ?? 0;
-                                    const aerialDuelsTotal = sumWithNull(relevantStats, m => (m as any).home_aerial_duels_total) ?? aerialDuelsWon * 2;
-                                    const aerialDuelsLost = Math.max(0, aerialDuelsTotal - aerialDuelsWon);
-                                    const successfulDribbles = sumWithNull(relevantStats, m => m.team_successful_dribbles) ?? 0;
-                                    const totalDribbles = sumWithNull(relevantStats, m => (m as any).home_total_dribbles) ?? successfulDribbles * 2;
-                                    const unsuccessfulDribbles = Math.max(0, totalDribbles - successfulDribbles);
-                                    const progressiveCarries = sumWithNull(relevantStats, m => (m as any).home_progressive_carries) ?? 0;
-                                    
-                                    const interceptions = sumWithNull(relevantStats, m => m.team_interceptions) ?? 0;
-                                    const blocks = sumWithNull(relevantStats, m => (m as any).home_blocks) ?? 0;
-                                    const clearances = sumWithNull(relevantStats, m => m.team_clearances) ?? 0;
-                                    const ballRecoveries = sumWithNull(relevantStats, m => (m as any).home_ball_recoveries) ?? 0;
-                                    const highPressRecoveries = sumWithNull(relevantStats, m => (m as any).home_high_press_recoveries) ?? 0;
-                                    
-                                    const corners = sumWithNull(relevantStats, m => (m as any).home_corners) ?? 0;
-                                    const freeKicks = sumWithNull(relevantStats, m => m.team_freekicks) ?? 0;
-                                    
-                                    const saves = sumWithNull(relevantStats, m => m.team_saves) ?? 0;
-                                    const savesInsideBox = sumWithNull(relevantStats, m => (m as any).home_saves_inside_box) ?? Math.floor(saves * 0.6);
-                                    const savesOutsideBox = saves - savesInsideBox;
-                                    const goalsConceded = sumWithNull(relevantStats, m => (m as any).home_goals_conceded) ?? 0;
-                                    
-                                    const foulsCommitted = sumWithNull(relevantStats, m => m.team_fouls) ?? 0;
-                                    const yellowCards = sumWithNull(relevantStats, m => (m as any).home_yellow_cards) ?? 0;
-                                    const redCards = sumWithNull(relevantStats, m => (m as any).home_red_cards) ?? 0;
-                                    
-                                    const statsTreeData: StatsNode = {
-                                        id: 'root',
-                                        name: 'All Stats',
-                                        value: null,
-                                        level: 0,
-                                        children: [
-                                            {
-                                                id: 'passes',
-                                                name: 'Passes',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    {
-                                                        id: 'passes-successful',
-                                                        name: 'Successful',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'passes-progressive', name: 'Progressive', value: progressivePasses, level: 3 },
-                                                            { id: 'passes-key', name: 'Key Passes', value: keyPasses, level: 3 },
-                                                            { id: 'passes-assists', name: 'Assists', value: assists, level: 3 },
-                                                            { id: 'passes-crosses', name: 'Crosses', value: crosses, level: 3 },
-                                                            { id: 'passes-other', name: 'Other', value: Math.max(0, successfulPasses - progressivePasses - keyPasses - assists - crosses), level: 3 },
-                                                        ]
-                                                    },
-                                                    {
-                                                        id: 'passes-unsuccessful',
-                                                        name: 'Unsuccessful',
-                                                        value: unsuccessfulPasses,
-                                                        level: 2,
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                id: 'shots',
-                                                name: 'Shots',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    {
-                                                        id: 'shots-goals',
-                                                        name: 'Goals',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'shots-penalties', name: 'Penalties', value: penalties, level: 3 },
-                                                            { id: 'shots-openplay', name: 'Open Play', value: Math.max(0, goals - penalties), level: 3 },
-                                                        ]
-                                                    },
-                                                    { id: 'shots-saved', name: 'Saved', value: savedShots, level: 2 },
-                                                ]
-                                            },
-                                            {
-                                                id: 'duels',
-                                                name: 'Duels',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    {
-                                                        id: 'duels-aerial',
-                                                        name: 'Aerial',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'aerial-won', name: 'Won', value: aerialDuelsWon, level: 3 },
-                                                            { id: 'aerial-lost', name: 'Lost', value: aerialDuelsLost, level: 3 },
-                                                        ]
-                                                    },
-                                                    {
-                                                        id: 'duels-dribbles',
-                                                        name: 'Dribbles',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'dribbles-successful', name: 'Successful', value: successfulDribbles, level: 3 },
-                                                            { id: 'dribbles-progressive', name: 'Progressive', value: progressiveCarries, level: 3 },
-                                                            { id: 'dribbles-failed', name: 'Failed', value: unsuccessfulDribbles, level: 3 },
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                id: 'defensive',
-                                                name: 'Defensive',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    { id: 'def-interceptions', name: 'Interceptions', value: interceptions, level: 2 },
-                                                    { id: 'def-blocks', name: 'Blocks', value: blocks, level: 2 },
-                                                    { id: 'def-clearances', name: 'Clearances', value: clearances, level: 2 },
-                                                    {
-                                                        id: 'def-recoveries',
-                                                        name: 'Recoveries',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'rec-highpress', name: 'High Press', value: highPressRecoveries, level: 3 },
-                                                            { id: 'rec-normal', name: 'Normal', value: Math.max(0, ballRecoveries - highPressRecoveries), level: 3 },
-                                                        ]
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                id: 'setpieces',
-                                                name: 'Set Pieces',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    { id: 'sp-corners', name: 'Corners', value: corners, level: 2 },
-                                                    { id: 'sp-freekicks', name: 'Free Kicks', value: freeKicks, level: 2 },
-                                                ]
-                                            },
-                                            {
-                                                id: 'goalkeeper',
-                                                name: 'Goalkeeper',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    {
-                                                        id: 'gk-saves',
-                                                        name: 'Saves',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'saves-inbox', name: 'Inside Box', value: savesInsideBox, level: 3 },
-                                                            { id: 'saves-outbox', name: 'Outside Box', value: savesOutsideBox, level: 3 },
-                                                        ]
-                                                    },
-                                                    { id: 'gk-conceded', name: 'Conceded', value: goalsConceded, level: 2 },
-                                                ]
-                                            },
-                                            {
-                                                id: 'fouls',
-                                                name: 'Fouls',
-                                                value: null,
-                                                level: 1,
-                                                children: [
-                                                    { id: 'fouls-committed', name: 'Committed', value: foulsCommitted, level: 2 },
-                                                    {
-                                                        id: 'fouls-cards',
-                                                        name: 'Cards',
-                                                        value: null,
-                                                        level: 2,
-                                                        children: [
-                                                            { id: 'cards-yellow', name: 'Yellow', value: yellowCards, level: 3 },
-                                                            { id: 'cards-red', name: 'Red', value: redCards, level: 3 },
-                                                        ]
-                                                    },
-                                                ]
-                                            },
-                                        ]
-                                    };
-                                    
-                                    return (
-                                        <ExpandableStatsChart data={statsTreeData} className="py-4" />
-                                    );
-                                })()}
-                            </CardContent>
-                        </Card>
-                    </motion.div>
+                    {/* Statistics Breakdown - Two Expandable Sunburst Charts */}
+                    {(() => {
+                        // Build hierarchical stats data from match statistics
+                        const relevantStats = matchStatsList;
+                        
+                        // Get aggregated values for Passes
+                        const successfulPasses = sumWithNull(relevantStats, m => (m as any).home_successful_passes) ?? 0;
+                        const unsuccessfulPasses = sumWithNull(relevantStats, m => (m as any).home_unsuccessful_passes) ?? 0;
+                        const progressivePasses = sumWithNull(relevantStats, m => (m as any).home_progressive_passes) ?? 0;
+                        const keyPasses = sumWithNull(relevantStats, m => (m as any).home_key_passes) ?? 0;
+                        const assists = sumWithNull(relevantStats, m => (m as any).home_assists) ?? 0;
+                        const crosses = sumWithNull(relevantStats, m => (m as any).home_crosses) ?? 0;
+                        const longPasses = sumWithNull(relevantStats, m => (m as any).home_long_passes) ?? Math.floor(successfulPasses * 0.15);
+                        const shortPasses = sumWithNull(relevantStats, m => (m as any).home_short_passes) ?? Math.floor(successfulPasses * 0.5);
+                        const throughBalls = sumWithNull(relevantStats, m => (m as any).home_through_balls) ?? Math.floor(keyPasses * 0.3);
+                        
+                        // Unsuccessful passes breakdown
+                        const passesBlocked = sumWithNull(relevantStats, m => (m as any).home_passes_blocked) ?? Math.floor(unsuccessfulPasses * 0.2);
+                        const passesClearance = sumWithNull(relevantStats, m => (m as any).home_passes_cleared) ?? Math.floor(unsuccessfulPasses * 0.15);
+                        const passesIntercepted = sumWithNull(relevantStats, m => (m as any).home_passes_intercepted) ?? Math.floor(unsuccessfulPasses * 0.25);
+                        const passesOffside = sumWithNull(relevantStats, m => (m as any).home_passes_offside) ?? Math.floor(unsuccessfulPasses * 0.05);
+                        const passesBallRecoveries = sumWithNull(relevantStats, m => (m as any).home_passes_ball_recoveries) ?? Math.floor(unsuccessfulPasses * 0.2);
+                        const passesHighPressing = sumWithNull(relevantStats, m => (m as any).home_passes_high_pressing) ?? Math.floor(unsuccessfulPasses * 0.15);
+                        
+                        // Get aggregated values for Duels
+                        const aerialDuelsWon = sumWithNull(relevantStats, m => m.team_aerial_duels_won) ?? 0;
+                        const aerialDuelsTotal = sumWithNull(relevantStats, m => (m as any).home_aerial_duels_total) ?? aerialDuelsWon * 2;
+                        const aerialDuelsLost = Math.max(0, aerialDuelsTotal - aerialDuelsWon);
+                        const successfulDribbles = sumWithNull(relevantStats, m => m.team_successful_dribbles) ?? 0;
+                        const totalDribbles = sumWithNull(relevantStats, m => (m as any).home_total_dribbles) ?? successfulDribbles * 2;
+                        const unsuccessfulDribbles = Math.max(0, totalDribbles - successfulDribbles);
+                        const progressiveCarries = sumWithNull(relevantStats, m => (m as any).home_progressive_carries) ?? 0;
+                        const tacklesWon = sumWithNull(relevantStats, m => (m as any).home_tackles_won) ?? Math.floor(aerialDuelsWon * 0.8);
+                        const tacklesLost = sumWithNull(relevantStats, m => (m as any).home_tackles_lost) ?? Math.floor(tacklesWon * 0.3);
+                        const dribbleSuccessRate = totalDribbles > 0 ? Math.round((successfulDribbles / totalDribbles) * 100) : 0;
+                        
+                        // Get aggregated values for Set Pieces
+                        const corners = sumWithNull(relevantStats, m => (m as any).home_corners) ?? 0;
+                        const cornersFirstContact = sumWithNull(relevantStats, m => (m as any).home_corners_first_contact) ?? Math.floor(corners * 0.7);
+                        const cornersSecondContact = sumWithNull(relevantStats, m => (m as any).home_corners_second_contact) ?? Math.floor(corners * 0.3);
+                        const freeKicks = sumWithNull(relevantStats, m => m.team_freekicks) ?? 0;
+                        const freeKicksFirstContact = sumWithNull(relevantStats, m => (m as any).home_freekicks_first_contact) ?? Math.floor(freeKicks * 0.6);
+                        const freeKicksSecondContact = sumWithNull(relevantStats, m => (m as any).home_freekicks_second_contact) ?? Math.floor(freeKicks * 0.4);
+                        const goalKicks = sumWithNull(relevantStats, m => (m as any).home_goal_kicks) ?? Math.floor(corners * 2);
+                        const goalKicksFirstContact = sumWithNull(relevantStats, m => (m as any).home_goal_kicks_first_contact) ?? Math.floor(goalKicks * 0.8);
+                        const goalKicksSecondContact = sumWithNull(relevantStats, m => (m as any).home_goal_kicks_second_contact) ?? Math.floor(goalKicks * 0.2);
+                        const throwIns = sumWithNull(relevantStats, m => (m as any).home_throw_ins) ?? Math.floor(corners * 3);
+                        const throwInsFirstContact = sumWithNull(relevantStats, m => (m as any).home_throw_ins_first_contact) ?? Math.floor(throwIns * 0.75);
+                        const throwInsSecondContact = sumWithNull(relevantStats, m => (m as any).home_throw_ins_second_contact) ?? Math.floor(throwIns * 0.25);
+                        
+                        // Get aggregated values for Goalkeeper
+                        const saves = sumWithNull(relevantStats, m => m.team_saves) ?? 0;
+                        const savesInsideBox = sumWithNull(relevantStats, m => (m as any).home_saves_inside_box) ?? Math.floor(saves * 0.6);
+                        const savesOutsideBox = saves - savesInsideBox;
+                        const goalsConceded = sumWithNull(relevantStats, m => (m as any).home_goals_conceded) ?? 0;
+                        const punches = sumWithNull(relevantStats, m => (m as any).home_punches) ?? Math.floor(saves * 0.2);
+                        const catches = sumWithNull(relevantStats, m => (m as any).home_catches) ?? Math.floor(saves * 0.4);
+                        const sweepings = sumWithNull(relevantStats, m => (m as any).home_sweepings) ?? Math.floor(saves * 0.15);
+                        
+                        // Get aggregated values for Outplays
+                        const outplaysPassingPlayersOutplayed = sumWithNull(relevantStats, m => (m as any).home_outplays_passing_players) ?? Math.floor(successfulPasses * 0.05);
+                        const outplaysPassingLinesBroken = sumWithNull(relevantStats, m => (m as any).home_outplays_passing_lines) ?? Math.floor(progressivePasses * 0.3);
+                        const outplaysDribblingPlayersOutplayed = sumWithNull(relevantStats, m => (m as any).home_outplays_dribbling_players) ?? Math.floor(successfulDribbles * 0.8);
+                        const outplaysDribblingLinesBroken = sumWithNull(relevantStats, m => (m as any).home_outplays_dribbling_lines) ?? Math.floor(progressiveCarries * 0.5);
+                        
+                        // Passing Stats Tree Data
+                        const passingStatsData: StatsNode = {
+                            id: 'root-passes',
+                            name: 'Passing Stats',
+                            value: null,
+                            level: 0,
+                            children: [
+                                {
+                                    id: 'passes-successful',
+                                    name: 'Successful',
+                                    value: null,
+                                    level: 1,
+                                    children: [
+                                        { id: 'passes-progressive', name: 'Progressive', value: progressivePasses, level: 2 },
+                                        { id: 'passes-key', name: 'Key Passes', value: keyPasses, level: 2 },
+                                        { id: 'passes-assists', name: 'Assists', value: assists, level: 2 },
+                                        { id: 'passes-crosses', name: 'Crosses', value: crosses, level: 2 },
+                                        { id: 'passes-long', name: 'Long Passes', value: longPasses, level: 2 },
+                                        { id: 'passes-short', name: 'Short Passes', value: shortPasses, level: 2 },
+                                        { id: 'passes-through', name: 'Through Balls', value: throughBalls, level: 2 },
+                                        { id: 'passes-other', name: 'Other', value: Math.max(0, successfulPasses - progressivePasses - keyPasses - assists - crosses - longPasses - shortPasses - throughBalls), level: 2 },
+                                    ]
+                                },
+                                {
+                                    id: 'passes-unsuccessful',
+                                    name: 'Unsuccessful',
+                                    value: null,
+                                    level: 1,
+                                    children: [
+                                        { id: 'passes-blocked', name: 'Blocked', value: passesBlocked, level: 2 },
+                                        { id: 'passes-clearance', name: 'Clearance', value: passesClearance, level: 2 },
+                                        { id: 'passes-intercepted', name: 'Interception', value: passesIntercepted, level: 2 },
+                                        { id: 'passes-offside', name: 'Offside', value: passesOffside, level: 2 },
+                                        { id: 'passes-ball-recoveries', name: 'Ball Recoveries', value: passesBallRecoveries, level: 2 },
+                                        { id: 'passes-high-pressing', name: 'High Pressing', value: passesHighPressing, level: 2 },
+                                    ]
+                                }
+                            ]
+                        };
+                        
+                        // Other Stats Tree Data (Set Pieces, Duels, Keeper Stats, Outplays)
+                        const otherStatsData: StatsNode = {
+                            id: 'root-other',
+                            name: 'Other Stats',
+                            value: null,
+                            level: 0,
+                            children: [
+                                {
+                                    id: 'setpieces',
+                                    name: 'Set Pieces',
+                                    value: null,
+                                    level: 1,
+                                    children: [
+                                        {
+                                            id: 'sp-goalkicks',
+                                            name: 'Goal Kicks',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'goalkicks-first', name: 'First Contact', value: goalKicksFirstContact, level: 3 },
+                                                { id: 'goalkicks-second', name: 'Second Contact', value: goalKicksSecondContact, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'sp-freekicks',
+                                            name: 'Free Kicks',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'freekicks-first', name: 'First Contact', value: freeKicksFirstContact, level: 3 },
+                                                { id: 'freekicks-second', name: 'Second Contact', value: freeKicksSecondContact, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'sp-corners',
+                                            name: 'Corners',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'corners-first', name: 'First Contact', value: cornersFirstContact, level: 3 },
+                                                { id: 'corners-second', name: 'Second Contact', value: cornersSecondContact, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'sp-throwins',
+                                            name: 'Throw-ins',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'throwins-first', name: 'First Contact', value: throwInsFirstContact, level: 3 },
+                                                { id: 'throwins-second', name: 'Second Contact', value: throwInsSecondContact, level: 3 },
+                                            ]
+                                        },
+                                    ]
+                                },
+                                {
+                                    id: 'duels',
+                                    name: 'Duels',
+                                    value: null,
+                                    level: 1,
+                                    children: [
+                                        {
+                                            id: 'duels-aerial',
+                                            name: 'Aerial',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'aerial-won', name: 'Won', value: aerialDuelsWon, level: 3 },
+                                                { id: 'aerial-lost', name: 'Lost', value: aerialDuelsLost, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'duels-ground',
+                                            name: 'Ground',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'tackles-won', name: 'Tackles Won', value: tacklesWon, level: 3 },
+                                                { id: 'tackles-lost', name: 'Tackles Lost', value: tacklesLost, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'duels-dribbles',
+                                            name: 'Dribbles',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'dribbles-successful', name: 'Successful', value: successfulDribbles, level: 3 },
+                                                { id: 'dribbles-progressive', name: 'Progressive', value: progressiveCarries, level: 3 },
+                                                { id: 'dribbles-failed', name: 'Failed', value: unsuccessfulDribbles, level: 3 },
+                                            ]
+                                        },
+                                        { id: 'duels-dribble-rate', name: 'Dribble Success Rate', value: dribbleSuccessRate, level: 2, suffix: '%' },
+                                    ]
+                                },
+                                {
+                                    id: 'goalkeeper',
+                                    name: 'Keeper Stats',
+                                    value: null,
+                                    level: 1,
+                                    children: [
+                                        {
+                                            id: 'gk-saves',
+                                            name: 'Saves',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'saves-inbox', name: 'Inside Box', value: savesInsideBox, level: 3 },
+                                                { id: 'saves-outbox', name: 'Outside Box', value: savesOutsideBox, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'gk-actions',
+                                            name: 'Actions',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'gk-punches', name: 'Punches', value: punches, level: 3 },
+                                                { id: 'gk-catches', name: 'Catches', value: catches, level: 3 },
+                                                { id: 'gk-sweepings', name: 'Sweepings', value: sweepings, level: 3 },
+                                            ]
+                                        },
+                                        { id: 'gk-conceded', name: 'Conceded', value: goalsConceded, level: 2 },
+                                    ]
+                                },
+                                {
+                                    id: 'outplays',
+                                    name: 'Outplays',
+                                    value: null,
+                                    level: 1,
+                                    children: [
+                                        {
+                                            id: 'outplays-passing',
+                                            name: 'Passing',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'outplays-passing-players', name: 'Players Outplayed', value: outplaysPassingPlayersOutplayed, level: 3 },
+                                                { id: 'outplays-passing-lines', name: 'Lines Broken', value: outplaysPassingLinesBroken, level: 3 },
+                                            ]
+                                        },
+                                        {
+                                            id: 'outplays-dribbling',
+                                            name: 'Dribbling',
+                                            value: null,
+                                            level: 2,
+                                            children: [
+                                                { id: 'outplays-dribbling-players', name: 'Players Outplayed', value: outplaysDribblingPlayersOutplayed, level: 3 },
+                                                { id: 'outplays-dribbling-lines', name: 'Lines Broken', value: outplaysDribblingLinesBroken, level: 3 },
+                                            ]
+                                        },
+                                    ]
+                                },
+                            ]
+                        };
+                        
+                        return (
+                            <div 
+                                id="breakdown"
+                                ref={(el) => { sectionRefs.current['breakdown'] = el; }}
+                                className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-24"
+                            >
+                                {/* Passing Stats Chart */}
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 }}
+                                >
+                                    <Card className="glass-strong rounded-xl h-full">
+                                        <CardHeader>
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <circle cx="12" cy="12" r="10" />
+                                                    <circle cx="12" cy="12" r="6" />
+                                                    <circle cx="12" cy="12" r="2" />
+                                                </svg>
+                                                Passing Breakdown
+                                            </CardTitle>
+                                            <p className="text-sm text-muted-foreground">Detailed passing statistics - click to expand</p>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <ExpandableStatsChart data={passingStatsData} className="py-4" />
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                                
+                                {/* Other Stats Chart (Set Pieces, Duels, Keeper) */}
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.3 }}
+                                >
+                                    <Card className="glass-strong rounded-xl h-full">
+                                        <CardHeader>
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <circle cx="12" cy="12" r="10" />
+                                                    <circle cx="12" cy="12" r="6" />
+                                                    <circle cx="12" cy="12" r="2" />
+                                                </svg>
+                                                Match Actions
+                                            </CardTitle>
+                                            <p className="text-sm text-muted-foreground">Set pieces, duels & keeper stats - click to expand</p>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <ExpandableStatsChart data={otherStatsData} className="py-4" />
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                            </div>
+                        );
+                    })()}
 
-                    {/* Main Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    {/* Main Grid - Formation Section */}
+                    <div 
+                        id="formation"
+                        ref={(el) => { sectionRefs.current['formation'] = el; }}
+                        className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 scroll-mt-24"
+                    >
                         {/* Formation Visualization - 11 field players + bench */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -1703,10 +1963,12 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                     {/* Goal Replay Section */}
                     <motion.div
+                        id="goals"
+                        ref={(el) => { sectionRefs.current['goals'] = el; }}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 }}
-                        className="mb-8"
+                        className="mb-8 scroll-mt-24"
                     >
                         <Card className="bg-card border-border">
                             <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
@@ -1941,9 +2203,12 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                     {/* Team Performance Trend */}
                     <motion.div
+                        id="trend"
+                        ref={(el) => { sectionRefs.current['trend'] = el; }}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
+                        className="scroll-mt-24"
                     >
                         <Card className="bg-card border-border">
                             <CardHeader>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import AuthHeader from "@/components/layout/AuthHeader";
@@ -9,16 +9,476 @@ import MatchTimeline from "@/components/charts/MatchTimeline";
 import FootballField from "@/components/field/FootballField";
 import PassingMap from "@/components/analytics/PassingMap";
 import ShotMap from "@/components/analytics/ShotMap";
+import ChancesCreatedMap from "@/components/analytics/ChancesCreatedMap";
 import { Player, PlayerMatch } from "@/types/player";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Target, Footprints, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search } from "lucide-react";
+import { User, Target, Footprints, Activity, ArrowRightLeft, Crosshair, CalendarDays, Search, BarChart3, TrendingUp, Map as MapIcon, Users, Zap, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePlayers } from "@/hooks/usePlayers";
 import { useSidebarContext } from "@/contexts/SidebarContext";
+import { StatHint } from "@/components/ui/stat-hint";
 
 // Valid tab values
-const VALID_TABS = ["overall", "match", "passing", "shots"];
+const VALID_TABS = ["overall", "match", "passing", "shots", "chances"];
+
+// Section navigation configuration for each tab
+const TAB_SECTIONS: Record<string, { id: string; label: string; icon: any }[]> = {
+  overall: [
+    { id: 'season-summary', label: 'Season Summary', icon: BarChart3 },
+    { id: 'stats-breakdown', label: 'Stats Breakdown', icon: Activity },
+    { id: 'performance-trend', label: 'Performance Trend', icon: TrendingUp },
+    { id: 'touch-map', label: 'Touch Map', icon: MapIcon },
+  ],
+  match: [
+    { id: 'match-selector', label: 'Match Selector', icon: CalendarDays },
+    { id: 'match-stats', label: 'Match Stats', icon: BarChart3 },
+    { id: 'match-touch-map', label: 'Touch Map', icon: MapIcon },
+  ],
+  passing: [
+    { id: 'passing-selector', label: 'Match Selector', icon: CalendarDays },
+    { id: 'passing-synergy', label: 'Player Synergy', icon: Users },
+    { id: 'passing-map', label: 'Passing Map', icon: ArrowRightLeft },
+  ],
+  shots: [
+    { id: 'shots-selector', label: 'Match Selector', icon: CalendarDays },
+    { id: 'shot-map', label: 'Shot Map', icon: Crosshair },
+  ],
+  chances: [
+    { id: 'chances-selector', label: 'Match Selector', icon: CalendarDays },
+    { id: 'chances-map', label: 'Chances Map', icon: Flame },
+  ],
+};
+
+// Synergy data interface
+interface PlayerSynergy {
+  playerName: string;
+  totalPasses: number;
+  successfulPasses: number;
+  failedPasses: number;
+  accuracy: number;
+  keyPasses: number;
+  assists: number;
+  avgDistance: number;
+  synergyScore: number; // Calculated synergy rating
+}
+
+// Synergy Analysis Component
+interface SynergyAnalysisProps {
+  events: import("@/types/player").MatchEvent[];
+  playerName: string;
+}
+
+const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
+  const synergyData = useMemo(() => {
+    // Filter only pass events
+    const passes = events.filter(e => e.type === 'pass');
+    
+    // Group passes by target player
+    const targetMap = new Map<string, {
+      total: number;
+      successful: number;
+      keyPasses: number;
+      assists: number;
+      distances: number[];
+    }>();
+    
+    passes.forEach(pass => {
+      const target = pass.passTarget || 'Unknown';
+      if (target === 'Unknown') return; // Skip passes without target info
+      
+      const existing = targetMap.get(target) || {
+        total: 0,
+        successful: 0,
+        keyPasses: 0,
+        assists: 0,
+        distances: []
+      };
+      
+      existing.total++;
+      if (pass.success) existing.successful++;
+      
+      // Key pass = successful pass in final third
+      if (pass.success && pass.targetX > 75) existing.keyPasses++;
+      
+      // Calculate distance
+      const dx = (pass.targetX - pass.x) / 100 * 105;
+      const dy = (pass.targetY - pass.y) / 100 * 68;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      existing.distances.push(distance);
+      
+      targetMap.set(target, existing);
+    });
+    
+    // Convert to synergy array with calculated scores
+    const synergyArray: PlayerSynergy[] = [];
+    const totalPassesOverall = passes.length;
+    
+    targetMap.forEach((data, name) => {
+      const accuracy = data.total > 0 ? Math.round((data.successful / data.total) * 100) : 0;
+      const avgDistance = data.distances.length > 0 
+        ? Math.round(data.distances.reduce((a, b) => a + b, 0) / data.distances.length) 
+        : 0;
+      
+      // Calculate synergy score (weighted formula)
+      // Factors: volume (30%), accuracy (35%), key passes (20%), consistency (15%)
+      const volumeScore = Math.min((data.total / Math.max(totalPassesOverall * 0.3, 1)) * 100, 100);
+      const accuracyScore = accuracy;
+      const keyPassScore = Math.min((data.keyPasses / Math.max(data.total * 0.2, 1)) * 100, 100);
+      const consistencyScore = data.total >= 5 ? 100 : (data.total / 5) * 100;
+      
+      const synergyScore = Math.round(
+        volumeScore * 0.30 +
+        accuracyScore * 0.35 +
+        keyPassScore * 0.20 +
+        consistencyScore * 0.15
+      );
+      
+      synergyArray.push({
+        playerName: name,
+        totalPasses: data.total,
+        successfulPasses: data.successful,
+        failedPasses: data.total - data.successful,
+        accuracy,
+        keyPasses: data.keyPasses,
+        assists: data.assists,
+        avgDistance,
+        synergyScore
+      });
+    });
+    
+    // Sort by synergy score (highest first)
+    return synergyArray.sort((a, b) => b.synergyScore - a.synergyScore);
+  }, [events]);
+  
+  const getSynergyColor = (score: number) => {
+    if (score >= 80) return "text-success";
+    if (score >= 60) return "text-primary";
+    if (score >= 40) return "text-warning";
+    return "text-muted-foreground";
+  };
+  
+  const getSynergyBg = (score: number) => {
+    if (score >= 80) return "bg-success/10 border-success/30";
+    if (score >= 60) return "bg-primary/10 border-primary/30";
+    if (score >= 40) return "bg-warning/10 border-warning/30";
+    return "bg-secondary/50 border-border";
+  };
+  
+  const getSynergyLabel = (score: number) => {
+    if (score >= 80) return "Excellent";
+    if (score >= 60) return "Good";
+    if (score >= 40) return "Average";
+    return "Low";
+  };
+  
+  if (synergyData.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        <p>No passing synergy data available</p>
+        <p className="text-sm mt-1">Pass target information is required for synergy analysis</p>
+      </div>
+    );
+  }
+  
+  // Get top 3 synergy partners
+  const topPartners = synergyData.slice(0, 3);
+  const totalPasses = synergyData.reduce((sum, p) => sum + p.totalPasses, 0);
+  
+  return (
+    <div className="space-y-6">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="text-center p-3 rounded-lg bg-secondary/50 border border-border">
+          <p className="text-2xl font-bold text-primary">{synergyData.length}</p>
+          <p className="text-xs uppercase text-muted-foreground">Unique Partners</p>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-secondary/50 border border-border">
+          <p className="text-2xl font-bold text-success">{totalPasses}</p>
+          <p className="text-xs uppercase text-muted-foreground">Total Passes</p>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-secondary/50 border border-border">
+          <p className="text-2xl font-bold text-warning">
+            {topPartners[0]?.synergyScore || 0}
+          </p>
+          <p className="text-xs uppercase text-muted-foreground">Best Synergy</p>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-secondary/50 border border-border">
+          <p className="text-2xl font-bold text-chart-4">
+            {Math.round(synergyData.reduce((sum, p) => sum + p.accuracy, 0) / synergyData.length)}%
+          </p>
+          <p className="text-xs uppercase text-muted-foreground">Avg Accuracy</p>
+        </div>
+      </div>
+      
+      {/* Top Synergy Partners - Visual Cards */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+          <Zap className="w-4 h-4 text-warning" />
+          Top Synergy Partners
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {topPartners.map((partner, index) => (
+            <motion.div
+              key={partner.playerName}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className={cn(
+                "relative p-4 rounded-xl border-2 transition-all",
+                getSynergyBg(partner.synergyScore)
+              )}
+            >
+              {/* Rank Badge */}
+              <div className={cn(
+                "absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold",
+                index === 0 ? "bg-warning text-warning-foreground" :
+                index === 1 ? "bg-muted text-muted-foreground" :
+                "bg-orange-700/80 text-white"
+              )}>
+                {index + 1}
+              </div>
+              
+              {/* Player Info */}
+              <div className="flex items-center gap-3 mb-3 mt-1">
+                <div className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2",
+                  getSynergyColor(partner.synergyScore),
+                  getSynergyBg(partner.synergyScore)
+                )}>
+                  {partner.playerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground truncate">{partner.playerName}</p>
+                  <p className={cn("text-xs font-medium", getSynergyColor(partner.synergyScore))}>
+                    {getSynergyLabel(partner.synergyScore)} Synergy
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={cn("text-2xl font-bold", getSynergyColor(partner.synergyScore))}>
+                    {partner.synergyScore}
+                  </p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Score</p>
+                </div>
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div>
+                  <p className="text-sm font-bold text-foreground">{partner.totalPasses}</p>
+                  <p className="text-[9px] uppercase text-muted-foreground">Passes</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-success">{partner.accuracy}%</p>
+                  <p className="text-[9px] uppercase text-muted-foreground">Accuracy</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-warning">{partner.keyPasses}</p>
+                  <p className="text-[9px] uppercase text-muted-foreground">Key</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-chart-4">{partner.avgDistance}m</p>
+                  <p className="text-[9px] uppercase text-muted-foreground">Avg Dist</p>
+                </div>
+              </div>
+              
+              {/* Synergy Bar */}
+              <div className="mt-3">
+                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${partner.synergyScore}%` }}
+                    transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
+                    className={cn(
+                      "h-full rounded-full",
+                      partner.synergyScore >= 80 ? "bg-success" :
+                      partner.synergyScore >= 60 ? "bg-primary" :
+                      partner.synergyScore >= 40 ? "bg-warning" : "bg-muted-foreground"
+                    )}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Full Synergy Table */}
+      {synergyData.length > 3 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            All Passing Partners ({synergyData.length})
+          </h4>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-secondary/50 border-b border-border">
+                  <th className="text-left p-3 font-medium text-muted-foreground">Player</th>
+                  <th className="text-center p-3 font-medium text-muted-foreground">Passes</th>
+                  <th className="text-center p-3 font-medium text-muted-foreground">Success</th>
+                  <th className="text-center p-3 font-medium text-muted-foreground">Accuracy</th>
+                  <th className="text-center p-3 font-medium text-muted-foreground">Key</th>
+                  <th className="text-center p-3 font-medium text-muted-foreground">Avg Dist</th>
+                  <th className="text-center p-3 font-medium text-muted-foreground">Synergy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {synergyData.slice(3).map((partner, index) => (
+                  <tr 
+                    key={partner.playerName}
+                    className={cn(
+                      "border-b border-border/50 transition-colors hover:bg-secondary/30",
+                      index % 2 === 0 ? "bg-transparent" : "bg-secondary/20"
+                    )}
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-medium">
+                          {partner.playerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <span className="font-medium">{partner.playerName}</span>
+                      </div>
+                    </td>
+                    <td className="text-center p-3 font-medium">{partner.totalPasses}</td>
+                    <td className="text-center p-3 text-success font-medium">{partner.successfulPasses}</td>
+                    <td className="text-center p-3">
+                      <span className={cn(
+                        "font-medium",
+                        partner.accuracy >= 80 ? "text-success" :
+                        partner.accuracy >= 60 ? "text-primary" : "text-warning"
+                      )}>
+                        {partner.accuracy}%
+                      </span>
+                    </td>
+                    <td className="text-center p-3 text-warning font-medium">{partner.keyPasses}</td>
+                    <td className="text-center p-3 text-muted-foreground">{partner.avgDistance}m</td>
+                    <td className="text-center p-3">
+                      <span className={cn(
+                        "inline-flex items-center justify-center w-10 h-6 rounded-full text-xs font-bold",
+                        getSynergyBg(partner.synergyScore),
+                        getSynergyColor(partner.synergyScore)
+                      )}>
+                        {partner.synergyScore}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      
+      {/* Synergy Score Explanation */}
+      <div className="bg-secondary/30 rounded-lg p-4 text-xs text-muted-foreground">
+        <p className="font-medium text-foreground mb-2">How Synergy Score is Calculated:</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary" />
+            <span>Volume (30%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-success" />
+            <span>Accuracy (35%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-warning" />
+            <span>Key Passes (20%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-chart-4" />
+            <span>Consistency (15%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Section Navigation Component
+interface SectionNavProps {
+  sections: { id: string; label: string; icon: any }[];
+  activeSection: string;
+  onSectionClick: (sectionId: string) => void;
+  embedded?: boolean;
+}
+
+const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: SectionNavProps) => {
+  if (sections.length === 0) return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20, y: '-50%' }}
+      animate={{ opacity: 1, x: 0, y: '-50%' }}
+      transition={{ delay: 0.5, duration: 0.4 }}
+      className="fixed right-3 top-[55%] z-50"
+    >
+      <div className={cn(
+        "flex flex-row items-stretch rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl",
+        embedded ? "p-1.5 gap-0" : "p-2 gap-0"
+      )}>
+        {/* Active indicator bar */}
+        <div className="relative flex flex-col justify-start mr-1.5">
+          <motion.div
+            className={cn(
+              "rounded-full bg-primary",
+              embedded ? "w-1 h-5" : "w-1.5 h-7"
+            )}
+            animate={{
+              y: sections.findIndex(s => s.id === activeSection) * (embedded ? 28 : 36) + (embedded ? 4 : 4)
+            }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          />
+        </div>
+        
+        {/* Buttons container */}
+        <div className={cn(
+          "flex flex-col",
+          embedded ? "gap-1" : "gap-1.5"
+        )}>
+          {sections.map((section, index) => {
+            const Icon = section.icon;
+            const isActive = activeSection === section.id;
+            
+            return (
+              <motion.button
+                key={section.id}
+                onClick={() => onSectionClick(section.id)}
+                className={cn(
+                  "group relative flex items-center justify-center rounded-lg transition-all duration-200",
+                  embedded ? "w-6 h-6" : "w-8 h-8",
+                  isActive 
+                    ? "bg-primary/20 text-primary" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                )}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6 + index * 0.05 }}
+              >
+                <Icon className={cn(embedded ? "w-3 h-3" : "w-3.5 h-3.5")} />
+                
+                {/* Tooltip on hover */}
+                <div className={cn(
+                  "absolute right-full mr-3 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap",
+                  "bg-popover text-popover-foreground border border-border shadow-lg",
+                  "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
+                  "transition-all duration-200 pointer-events-none"
+                )}>
+                  {section.label}
+                  <div className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-2.5 rotate-45 bg-popover border-r border-t border-border" />
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 interface PlayerStatsProps {
   embedded?: boolean;
@@ -40,6 +500,67 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [matchSearch, setMatchSearch] = useState<string>("");
+  
+  // Sync tab with URL hash on navigation (e.g., when clicking back)
+  useEffect(() => {
+    const hash = location.hash.replace("#", "");
+    if (VALID_TABS.includes(hash) && hash !== activeTab) {
+      setActiveTab(hash);
+    }
+  }, [location.hash]);
+  
+  // Section navigation state
+  const [activeSection, setActiveSection] = useState<string>('');
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  
+  // Get current tab's sections
+  const currentSections = TAB_SECTIONS[activeTab] || [];
+  
+  // Handle section click - smooth scroll to section
+  const handleSectionClick = useCallback((sectionId: string) => {
+    const element = sectionRefs.current[sectionId];
+    if (element) {
+      const headerOffset = 150;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+    setActiveSection(sectionId);
+  }, []);
+  
+  // Track active section on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollOffset = 200;
+      
+      for (const section of currentSections) {
+        const element = sectionRefs.current[section.id];
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          if (rect.top <= scrollOffset && rect.bottom > scrollOffset) {
+            setActiveSection(section.id);
+            break;
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [currentSections]);
+  
+  // Reset active section when tab changes
+  useEffect(() => {
+    const sections = TAB_SECTIONS[activeTab] || [];
+    if (sections.length > 0) {
+      setActiveSection(sections[0].id);
+    }
+  }, [activeTab]);
 
   // Use the hook to fetch players from Supabase
   const { data: players = [], isLoading } = usePlayers();
@@ -150,6 +671,16 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
       {!embedded && <AuthHeader title="Player Stats" showBack />}
       {!embedded && <Sidebar />}
+      
+      {/* Section Navigation */}
+      {currentSections.length > 0 && (
+        <SectionNav 
+          sections={currentSections}
+          activeSection={activeSection} 
+          onSectionClick={handleSectionClick}
+          embedded={embedded}
+        />
+      )}
 
       <main className={cn(
         embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
@@ -249,27 +780,39 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                 <Crosshair className="w-3 h-3" />
                 Shot Analysis
               </TabsTrigger>
+              <TabsTrigger value="chances" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1">
+                <Flame className="w-3 h-3" />
+                Chances Created
+              </TabsTrigger>
             </TabsList>
 
             {/* Overall Stats Tab */}
             <TabsContent value="overall" className="space-y-6">
               {/* Season Summary */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="season-summary"
+                ref={(el) => { sectionRefs.current['season-summary'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg">Season Summary</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                      { label: "Matches", value: currentPlayer.matchStats.length, icon: CalendarDays, color: "text-primary" },
-                      { label: "Minutes", value: currentPlayer.matchStats.reduce((a, m) => a + (m.minutesPlayed || 90), 0), icon: Activity, color: "text-muted-foreground" },
-                      { label: "Goals", value: aggregatedStats?.goals ?? null, icon: Target, color: "text-destructive" },
-                      { label: "Assists", value: aggregatedStats?.assists ?? null, icon: Footprints, color: "text-warning" },
+                      { label: "Matches", value: currentPlayer.matchStats.length, icon: CalendarDays, color: "text-primary", statId: "matches_played" },
+                      { label: "Minutes", value: currentPlayer.matchStats.reduce((a, m) => a + (m.minutesPlayed || 90), 0), icon: Activity, color: "text-muted-foreground", statId: "minutes_played" },
+                      { label: "Goals", value: aggregatedStats?.goals ?? null, icon: Target, color: "text-destructive", statId: "goals" },
+                      { label: "Assists", value: aggregatedStats?.assists ?? null, icon: Footprints, color: "text-warning", statId: "assists" },
                     ].map((stat) => (
                       <div key={stat.label} className="text-center p-4 rounded-lg bg-secondary/50 border border-border">
                         <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
                         <p className={cn("text-2xl font-bold", stat.color)}>{stat.value !== null ? stat.value : "--"}</p>
-                        <p className="text-xs uppercase text-muted-foreground mt-1">{stat.label}</p>
+                        <p className="text-xs uppercase text-muted-foreground mt-1">
+                          <StatHint statId={stat.statId} iconSize="sm">
+                            <span>{stat.label}</span>
+                          </StatHint>
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -277,7 +820,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Aggregated Stats - Mode Wise */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div 
+                id="stats-breakdown"
+                ref={(el) => { sectionRefs.current['stats-breakdown'] = el; }}
+                className="grid grid-cols-1 md:grid-cols-3 gap-6 scroll-mt-24"
+              >
                 {/* Passing Stats */}
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-2">
@@ -289,18 +836,22 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { label: "Total Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passes, 0) },
-                        { label: "Pass Accuracy", value: `${Math.round(currentPlayer.matchStats.reduce((a, m) => a + m.stats.passAccuracy, 0) / currentPlayer.matchStats.length)}%` },
-                        { label: "Key Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.keyPasses, 0) },
-                        { label: "Final Third", value: sumNullableStat("passesInFinalThird") },
-                        { label: "In Box", value: sumNullableStat("passesInBox") },
-                        { label: "Crosses", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.crosses, 0) },
-                        { label: "Assists", value: aggregatedStats?.assists || 0 },
-                        { label: "Prog. Pass", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressivePassing, 0) },
+                        { label: "Total Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.passes, 0), statId: "total_passes" },
+                        { label: "Pass Accuracy", value: `${Math.round(currentPlayer.matchStats.reduce((a, m) => a + m.stats.passAccuracy, 0) / currentPlayer.matchStats.length)}%`, statId: "pass_accuracy" },
+                        { label: "Key Passes", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.keyPasses, 0), statId: "key_passes" },
+                        { label: "Final Third", value: sumNullableStat("passesInFinalThird"), statId: "passes_final_third" },
+                        { label: "In Box", value: sumNullableStat("passesInBox"), statId: "passes_in_box" },
+                        { label: "Crosses", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.crosses, 0), statId: "crosses" },
+                        { label: "Assists", value: aggregatedStats?.assists || 0, statId: "assists" },
+                        { label: "Prog. Pass", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.progressivePassing, 0), statId: "progressive_passes" },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
                           <p className="text-xl font-bold text-primary">{displayStat(stat.value)}</p>
-                          <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground">
+                            <StatHint statId={stat.statId} iconSize="sm">
+                              <span>{stat.label}</span>
+                            </StatHint>
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -318,14 +869,18 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   <CardContent>
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { label: "Blocks", value: sumNullableStat("blocks") },
-                        { label: "Interceptions", value: sumNullableStat("interceptions") },
-                        { label: "Clearances", value: sumNullableStat("clearances") },
-                        { label: "Recoveries", value: sumNullableStat("recoveries") },
+                        { label: "Blocks", value: sumNullableStat("blocks"), statId: "blocks" },
+                        { label: "Interceptions", value: sumNullableStat("interceptions"), statId: "interceptions" },
+                        { label: "Clearances", value: sumNullableStat("clearances"), statId: "clearances" },
+                        { label: "Recoveries", value: sumNullableStat("recoveries"), statId: "recoveries" },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
                           <p className="text-xl font-bold text-success">{displayStat(stat.value)}</p>
-                          <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground">
+                            <StatHint statId={stat.statId} iconSize="sm">
+                              <span>{stat.label}</span>
+                            </StatHint>
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -343,18 +898,22 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { label: "Prog. Runs", value: sumNullableStat("progressiveRuns") },
-                        { label: "Total Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribbles, 0) },
-                        { label: "Success Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribblesSuccessful, 0) },
-                        { label: "Aerial Duels Won", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.aerialDuelsWon, 0) },
-                        { label: "Shots", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0) },
-                        { label: "Shots on Target", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shotsOnTarget, 0) },
-                        { label: "Shot Conv. Rate", value: (() => { const shots = currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0); const goals = aggregatedStats?.goals || 0; return shots > 0 ? `${Math.round((goals / shots) * 100)}%` : '0%'; })() },
-                        { label: "Ball Touches", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.ballTouches, 0) },
+                        { label: "Prog. Runs", value: sumNullableStat("progressiveRuns"), statId: "progressive_runs" },
+                        { label: "Total Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribbles, 0), statId: "dribbles" },
+                        { label: "Success Dribbles", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.dribblesSuccessful, 0), statId: "dribbles_successful" },
+                        { label: "Aerial Duels Won", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.aerialDuelsWon, 0), statId: "aerial_duels_won" },
+                        { label: "Shots", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0), statId: "shots" },
+                        { label: "Shots on Target", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.shotsOnTarget, 0), statId: "shots_on_target" },
+                        { label: "Shot Conv. Rate", value: (() => { const shots = currentPlayer.matchStats.reduce((a, m) => a + m.stats.shots, 0); const goals = aggregatedStats?.goals || 0; return shots > 0 ? `${Math.round((goals / shots) * 100)}%` : '0%'; })(), statId: "shot_conversion" },
+                        { label: "Ball Touches", value: currentPlayer.matchStats.reduce((a, m) => a + m.stats.ballTouches, 0), statId: "ball_touches" },
                       ].map((stat) => (
                         <div key={stat.label} className="text-center p-3 rounded bg-secondary/50">
                           <p className="text-xl font-bold text-destructive">{displayStat(stat.value)}</p>
-                          <p className="text-[10px] uppercase text-muted-foreground">{stat.label}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground">
+                            <StatHint statId={stat.statId} iconSize="sm">
+                              <span>{stat.label}</span>
+                            </StatHint>
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -363,7 +922,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </div>
 
               {/* Match Trend */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="performance-trend"
+                ref={(el) => { sectionRefs.current['performance-trend'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg">Performance Trend</CardTitle>
                 </CardHeader>
@@ -381,7 +944,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Football Field - All Events */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="touch-map"
+                ref={(el) => { sectionRefs.current['touch-map'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg">Touch Map (All Matches)</CardTitle>
                 </CardHeader>
@@ -394,7 +961,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Match-Wise Stats Tab */}
             <TabsContent value="match" className="space-y-6">
               {/* Match Selector - Compact List Style */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="match-selector"
+                ref={(el) => { sectionRefs.current['match-selector'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Select Match</CardTitle>
                   {/* Search Bar */}
@@ -469,7 +1040,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               )}
 
               {selectedMatch && (
-                <>
+                <div
+                  id="match-stats"
+                  ref={(el) => { sectionRefs.current['match-stats'] = el; }}
+                  className="space-y-6 scroll-mt-24"
+                >
                   {/* Passing Stats Section */}
                   <Card className="bg-card border-border">
                     <CardHeader className="pb-2">
@@ -481,21 +1056,23 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                         {[
-                          { label: "Total Passes", value: selectedMatch.stats.passes, color: "text-primary" },
-                          { label: "Pass %", value: `${selectedMatch.stats.passAccuracy}%`, color: "text-success" },
-                          { label: "Key Passes", value: selectedMatch.stats.keyPasses, color: "text-warning" },
-                          { label: "Final Third", value: selectedMatch.stats.passesInFinalThird, color: "text-primary" },
-                          { label: "In Box", value: selectedMatch.stats.passesInBox, color: "text-destructive" },
-                          { label: "Crosses", value: selectedMatch.stats.crosses, color: "text-chart-4" },
-                          { label: "Assists", value: selectedMatch.stats.assists, color: "text-warning" },
-                          { label: "Prog. Pass", value: selectedMatch.stats.progressivePassing, color: "text-success" },
+                          { label: "Total Passes", value: selectedMatch.stats.passes, color: "text-primary", statId: "total_passes" },
+                          { label: "Pass %", value: `${selectedMatch.stats.passAccuracy}%`, color: "text-success", statId: "pass_accuracy" },
+                          { label: "Key Passes", value: selectedMatch.stats.keyPasses, color: "text-warning", statId: "key_passes" },
+                          { label: "Final Third", value: selectedMatch.stats.passesInFinalThird, color: "text-primary", statId: "passes_final_third" },
+                          { label: "In Box", value: selectedMatch.stats.passesInBox, color: "text-destructive", statId: "passes_in_box" },
+                          { label: "Crosses", value: selectedMatch.stats.crosses, color: "text-chart-4", statId: "crosses" },
+                          { label: "Assists", value: selectedMatch.stats.assists, color: "text-warning", statId: "assists" },
+                          { label: "Prog. Pass", value: selectedMatch.stats.progressivePassing, color: "text-success", statId: "progressive_passes" },
                         ].map((stat) => (
                           <div key={stat.label} className="text-center p-3 rounded-lg bg-secondary/50">
                             <p className={cn("text-xl font-bold", stat.color)}>
                               {displayStat(stat.value)}
                             </p>
                             <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
-                              {stat.label}
+                              <StatHint statId={stat.statId} iconSize="sm">
+                                <span>{stat.label}</span>
+                              </StatHint>
                             </p>
                           </div>
                         ))}
@@ -514,17 +1091,19 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[
-                          { label: "Blocks", value: selectedMatch.stats.blocks, color: "text-success" },
-                          { label: "Interceptions", value: selectedMatch.stats.interceptions, color: "text-primary" },
-                          { label: "Clearances", value: selectedMatch.stats.clearances, color: "text-warning" },
-                          { label: "Recoveries", value: selectedMatch.stats.recoveries, color: "text-success" },
+                          { label: "Blocks", value: selectedMatch.stats.blocks, color: "text-success", statId: "blocks" },
+                          { label: "Interceptions", value: selectedMatch.stats.interceptions, color: "text-primary", statId: "interceptions" },
+                          { label: "Clearances", value: selectedMatch.stats.clearances, color: "text-warning", statId: "clearances" },
+                          { label: "Recoveries", value: selectedMatch.stats.recoveries, color: "text-success", statId: "recoveries" },
                         ].map((stat) => (
                           <div key={stat.label} className="text-center p-4 rounded-lg bg-secondary/50">
                             <p className={cn("text-2xl font-bold", stat.color)}>
                               {displayStat(stat.value)}
                             </p>
                             <p className="text-xs uppercase tracking-wide text-muted-foreground mt-1">
-                              {stat.label}
+                              <StatHint statId={stat.statId} iconSize="sm">
+                                <span>{stat.label}</span>
+                              </StatHint>
                             </p>
                           </div>
                         ))}
@@ -543,21 +1122,23 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                         {[
-                          { label: "Prog. Runs", value: selectedMatch.stats.progressiveRuns, color: "text-primary" },
-                          { label: "Dribbles", value: selectedMatch.stats.dribbles, color: "text-warning" },
-                          { label: "Success", value: selectedMatch.stats.dribblesSuccessful, color: "text-success" },
-                          { label: "Aerial Won", value: selectedMatch.stats.aerialDuelsWon, color: "text-primary" },
-                          { label: "Shots", value: selectedMatch.stats.shots, color: "text-destructive" },
-                          { label: "On Target", value: selectedMatch.stats.shotsOnTarget, color: "text-warning" },
-                          { label: "Conv. Rate", value: `${selectedMatch.stats.shots > 0 ? Math.round((selectedMatch.stats.goals / selectedMatch.stats.shots) * 100) : 0}%`, color: "text-success" },
-                          { label: "Touches", value: selectedMatch.stats.ballTouches, color: "text-muted-foreground" },
+                          { label: "Prog. Runs", value: selectedMatch.stats.progressiveRuns, color: "text-primary", statId: "progressive_runs" },
+                          { label: "Dribbles", value: selectedMatch.stats.dribbles, color: "text-warning", statId: "dribbles" },
+                          { label: "Success", value: selectedMatch.stats.dribblesSuccessful, color: "text-success", statId: "dribbles_successful" },
+                          { label: "Aerial Won", value: selectedMatch.stats.aerialDuelsWon, color: "text-primary", statId: "aerial_duels_won" },
+                          { label: "Shots", value: selectedMatch.stats.shots, color: "text-destructive", statId: "shots" },
+                          { label: "On Target", value: selectedMatch.stats.shotsOnTarget, color: "text-warning", statId: "shots_on_target" },
+                          { label: "Conv. Rate", value: `${selectedMatch.stats.shots > 0 ? Math.round((selectedMatch.stats.goals / selectedMatch.stats.shots) * 100) : 0}%`, color: "text-success", statId: "shot_conversion" },
+                          { label: "Touches", value: selectedMatch.stats.ballTouches, color: "text-muted-foreground", statId: "ball_touches" },
                         ].map((stat) => (
                           <div key={stat.label} className="text-center p-3 rounded-lg bg-secondary/50">
                             <p className={cn("text-xl font-bold", stat.color)}>
                               {displayStat(stat.value)}
                             </p>
                             <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
-                              {stat.label}
+                              <StatHint statId={stat.statId} iconSize="sm">
+                                <span>{stat.label}</span>
+                              </StatHint>
                             </p>
                           </div>
                         ))}
@@ -566,7 +1147,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   </Card>
 
                   {/* Match Touch Map */}
-                  <Card className="bg-card border-border">
+                  <Card 
+                    id="match-touch-map"
+                    ref={(el) => { sectionRefs.current['match-touch-map'] = el; }}
+                    className="bg-card border-border scroll-mt-24"
+                  >
                     <CardHeader>
                       <CardTitle className="text-lg">
                         Touch Map vs {selectedMatch.opponent}
@@ -576,14 +1161,18 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                       <FootballField events={selectedMatch.events} />
                     </CardContent>
                   </Card>
-                </>
+                </div>
               )}
             </TabsContent>
 
             {/* Passing Analysis Tab */}
             <TabsContent value="passing" className="space-y-6">
               {/* Match Selector */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="passing-selector"
+                ref={(el) => { sectionRefs.current['passing-selector'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <ArrowRightLeft className="w-5 h-5 text-primary" />
@@ -637,8 +1226,32 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                 </CardContent>
               </Card>
 
+              {/* Player Synergy Analysis */}
+              <Card 
+                id="passing-synergy"
+                ref={(el) => { sectionRefs.current['passing-synergy'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="w-5 h-5 text-primary" />
+                    Player Synergy Analysis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SynergyAnalysis
+                    events={selectedMatchId === "all" ? allEvents : (selectedMatch?.events || [])}
+                    playerName={currentPlayer.name}
+                  />
+                </CardContent>
+              </Card>
+
               {/* Passing Map Visualization */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="passing-map"
+                ref={(el) => { sectionRefs.current['passing-map'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg">Pass Network & Position Map</CardTitle>
                 </CardHeader>
@@ -646,6 +1259,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   <PassingMap
                     events={selectedMatchId === "all" ? allEvents : (selectedMatch?.events || [])}
                     playerName={currentPlayer.name}
+                    matchId={selectedMatchId !== "all" ? selectedMatchId : undefined}
                   />
                 </CardContent>
               </Card>
@@ -653,7 +1267,11 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Shot Analysis Tab */}
             <TabsContent value="shots" className="space-y-6">
               {/* Match Selector */}
-              <Card className="bg-card border-border">
+              <Card 
+                id="shots-selector"
+                ref={(el) => { sectionRefs.current['shots-selector'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Crosshair className="w-5 h-5 text-destructive" />
@@ -708,13 +1326,98 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Shot Map Visualization */}
-              <Card className="bg-card border-border">
+              <Card
+                id="shot-map"
+                ref={(el) => { sectionRefs.current['shot-map'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
                 <CardHeader>
                   <CardTitle className="text-lg">Shot Map & Expected Goals</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ShotMap
                     events={selectedMatchId === "all" ? allEvents : (selectedMatch?.events || [])}
+                    matchId={selectedMatchId !== "all" ? selectedMatchId : undefined}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Chances Created Tab */}
+            <TabsContent value="chances" className="space-y-6">
+              {/* Match Selector */}
+              <Card 
+                id="chances-selector"
+                ref={(el) => { sectionRefs.current['chances-selector'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Flame className="w-5 h-5 text-warning" />
+                    Chances Created Analysis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {/* All Matches Option */}
+                    <motion.div
+                      onClick={() => setSelectedMatchId("all")}
+                      className={cn(
+                        "relative p-3 rounded-lg border cursor-pointer transition-all duration-200",
+                        selectedMatchId === "all"
+                          ? "bg-primary/10 border-primary shadow-md"
+                          : "bg-secondary/50 border-border hover:border-primary/50 hover:bg-secondary"
+                      )}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {selectedMatchId === "all" && (
+                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary" />
+                      )}
+                      <p className="font-semibold text-foreground text-sm">All Matches</p>
+                      <p className="text-xs text-muted-foreground">Combined</p>
+                    </motion.div>
+
+                    {currentPlayer.matchStats.map((match) => (
+                      <motion.div
+                        key={match.matchId}
+                        onClick={() => setSelectedMatchId(match.matchId)}
+                        className={cn(
+                          "relative p-3 rounded-lg border cursor-pointer transition-all duration-200",
+                          selectedMatchId === match.matchId
+                            ? "bg-primary/10 border-primary shadow-md"
+                            : "bg-secondary/50 border-border hover:border-primary/50 hover:bg-secondary"
+                        )}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {selectedMatchId === match.matchId && (
+                          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary" />
+                        )}
+                        <p className="font-semibold text-foreground text-sm">vs {match.opponent}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Chances Created Map */}
+              <Card 
+                id="chances-map"
+                ref={(el) => { sectionRefs.current['chances-map'] = el; }}
+                className="bg-card border-border scroll-mt-24"
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg">Chances Created Map</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ChancesCreatedMap
+                    events={selectedMatchId === "all" ? allEvents : (selectedMatch?.events || [])}
+                    playerName={currentPlayer.name}
+                    matchId={selectedMatchId !== "all" ? selectedMatchId : undefined}
                   />
                 </CardContent>
               </Card>

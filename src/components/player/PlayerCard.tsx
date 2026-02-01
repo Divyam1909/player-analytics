@@ -7,6 +7,7 @@ import StatBar from "@/components/charts/StatBar";
 import { ChevronRight, User, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatFilterMode } from "@/pages/Overview";
+import { StatHint } from "@/components/ui/stat-hint";
 
 interface PlayerCardProps {
   player: Player;
@@ -72,26 +73,26 @@ const PlayerCard = ({ player, onCompare, statFilter = "none", matchId }: PlayerC
     switch (statFilter) {
       case "passing":
         return [
-          { label: "Total Pass", value: stats.totalPassing },
-          { label: "Crosses", value: stats.crosses },
-          { label: "Assists", value: stats.assists },
+          { label: "Total Pass", value: stats.totalPassing, statId: "total_passes" },
+          { label: "Crosses", value: stats.crosses, statId: "crosses" },
+          { label: "Assists", value: stats.assists, statId: "assists" },
         ];
       case "defending":
         return [
-          { label: "Blocks", value: stats.blocks },
-          { label: "Intercept", value: stats.interceptions },
-          { label: "Clear", value: stats.clearances },
-          { label: "Recover", value: stats.recoveries },
+          { label: "Blocks", value: stats.blocks, statId: "blocks" },
+          { label: "Intercept", value: stats.interceptions, statId: "interceptions" },
+          { label: "Clear", value: stats.clearances, statId: "clearances" },
+          { label: "Recover", value: stats.recoveries, statId: "recoveries" },
         ];
       case "attacking":
         return [
-          { label: "Prog Runs", value: stats.progressiveRuns },
-          { label: "Dribbles", value: stats.totalDribbles },
-          { label: "Success", value: stats.successfulDribbles },
-          { label: "Aerial", value: stats.aerialDuelsWon },
-          { label: "Shots", value: stats.shots },
-          { label: "On Target", value: stats.shotsOnTarget },
-          { label: "Conv %", value: `${stats.shotConversionRate}%` },
+          { label: "Prog Runs", value: stats.progressiveRuns, statId: "progressive_runs" },
+          { label: "Dribbles", value: stats.totalDribbles, statId: "dribbles" },
+          { label: "Success", value: stats.successfulDribbles, statId: "dribbles_successful" },
+          { label: "Aerial", value: stats.aerialDuelsWon, statId: "aerial_duels_won" },
+          { label: "Shots", value: stats.shots, statId: "shots" },
+          { label: "On Target", value: stats.shotsOnTarget, statId: "shots_on_target" },
+          { label: "Conv %", value: `${stats.shotConversionRate}%`, statId: "shot_conversion" },
         ];
       default:
         return [];
@@ -189,7 +190,9 @@ const PlayerCard = ({ player, onCompare, statFilter = "none", matchId }: PlayerC
                         {stat.value}
                       </div>
                       <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
-                        {stat.label}
+                        <StatHint statId={stat.statId} iconSize="sm">
+                          <span>{stat.label}</span>
+                        </StatHint>
                       </div>
                     </div>
                   ))}

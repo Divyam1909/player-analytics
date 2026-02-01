@@ -31,6 +31,7 @@ import { usePlayers } from "@/hooks/usePlayers";
 import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useMatches } from "@/hooks/useSupabaseData";
 import { cn } from "@/lib/utils";
+import { StatHint } from "@/components/ui/stat-hint";
 
 export type StatFilterMode = "none" | "passing" | "attacking" | "defending";
 
@@ -178,12 +179,14 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
       value: filteredPlayers.length,
       icon: Users,
       color: "text-primary",
+      statId: "total_players",
     },
     {
       label: matchId ? "Match" : "Total Matches",
       value: teamMatches,
       icon: CalendarDays,
       color: "text-success",
+      statId: "total_matches",
     },
     {
       label: "Top Scorer",
@@ -191,6 +194,7 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
       subValue: topScorer ? `${getPlayerGoals(topScorer)} goals` : "No data",
       icon: Target,
       color: "text-destructive",
+      statId: "goals",
     },
     {
       label: "Top Assister",
@@ -198,6 +202,7 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
       subValue: topAssister ? `${getPlayerAssists(topAssister)} assists` : "No data",
       icon: Zap,
       color: "text-warning",
+      statId: "assists",
     },
   ];
 
@@ -250,7 +255,9 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                      {stat.label}
+                      <StatHint statId={stat.statId} iconSize="sm">
+                        <span>{stat.label}</span>
+                      </StatHint>
                     </p>
                     <p className={`text-2xl font-bold ${stat.color}`}>
                       {stat.value}
