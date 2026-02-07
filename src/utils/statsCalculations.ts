@@ -314,8 +314,8 @@ export function shotEventToMatchEvent(shot: DbShotOnTarget): MatchEvent {
         type: 'shot',
         x: shot.shot_x ?? 0,
         y: shot.shot_y ?? 0,
-        targetX: 100, // Goal is at x=100
-        targetY: 50, // Center of goal
+        targetX: shot.shot_end_x ?? 100, // Default to goal line if not set
+        targetY: shot.shot_end_y ?? 50, // Default to center of goal if not set
         success: shot.is_goal,
         minute: shot.minute ?? 0,
         isGoal: shot.is_goal,

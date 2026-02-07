@@ -39,6 +39,7 @@ import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useCountUp } from "@/hooks/useCountUp";
 import { FORMATIONS, FormationName, getFormationByName, getSlotColor, FormationSlot } from "@/lib/formationPositions";
 import TacticalField from "@/components/field/TacticalField";
+import TeamPassingMap from "@/components/analytics/TeamPassingMap";
 import { StatHint } from "@/components/ui/stat-hint";
 
 // Animation variants
@@ -63,6 +64,7 @@ const SECTIONS = [
     { id: 'advanced', label: 'Advanced Stats', shortLabel: 'AS', icon: Activity },
     { id: 'breakdown', label: 'Stats Breakdown', shortLabel: 'SB', icon: PieChartIcon },
     { id: 'formation', label: 'Formation', shortLabel: 'FM', icon: LayoutGrid },
+    { id: 'passing', label: 'Passing Map', shortLabel: 'PM', icon: Footprints },
     { id: 'goals', label: 'Goal Replay', shortLabel: 'GR', icon: Video },
     { id: 'trend', label: 'Performance', shortLabel: 'PT', icon: TrendingUp },
 ];
@@ -103,7 +105,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                     />
                 </div>
-                
+
                 {/* Buttons container */}
                 <div className={cn(
                     "flex flex-col",
@@ -112,7 +114,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                     {SECTIONS.map((section, index) => {
                         const Icon = section.icon;
                         const isActive = activeSection === section.id;
-                        
+
                         return (
                             <motion.button
                                 key={section.id}
@@ -120,8 +122,8 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                                 className={cn(
                                     "group relative flex items-center justify-center rounded-lg transition-all duration-200",
                                     embedded ? "w-7 h-7" : "w-9 h-9",
-                                    isActive 
-                                        ? "bg-primary/20 text-primary" 
+                                    isActive
+                                        ? "bg-primary/20 text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
                                 )}
                                 whileHover={{ scale: 1.05 }}
@@ -131,7 +133,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                                 transition={{ delay: 0.6 + index * 0.05 }}
                             >
                                 <Icon className={cn(embedded ? "w-3.5 h-3.5" : "w-4 h-4")} />
-                                
+
                                 {/* Tooltip on hover */}
                                 <div className={cn(
                                     "absolute right-full mr-3 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap",
@@ -319,7 +321,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     // Section navigation state
     const [activeSection, setActiveSection] = useState<string>('overview');
     const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
-    
+
     // Handle section click - smooth scroll to section
     const handleSectionClick = useCallback((sectionId: string) => {
         const element = sectionRefs.current[sectionId];
@@ -327,7 +329,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
             const headerOffset = 180; // Account for fixed header
             const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-            
+
             window.scrollTo({
                 top: offsetPosition,
                 behavior: 'smooth'
@@ -335,19 +337,19 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         }
         setActiveSection(sectionId);
     }, []);
-    
+
     // Track active section on scroll
     useEffect(() => {
         const handleScroll = () => {
             const scrollOffset = embedded ? 200 : 150; // Different offset for embedded view
-            
+
             // Find which section is currently in view
             for (const section of SECTIONS) {
                 const element = sectionRefs.current[section.id];
                 if (element) {
                     const rect = element.getBoundingClientRect();
                     const viewportHeight = window.innerHeight;
-                    
+
                     // Check if element is in the top half of the viewport
                     if (rect.top <= scrollOffset && rect.bottom > scrollOffset) {
                         setActiveSection(section.id);
@@ -356,7 +358,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                 }
             }
         };
-        
+
         window.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll(); // Initial check
         return () => window.removeEventListener('scroll', handleScroll);
@@ -800,11 +802,11 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
             {!embedded && <AuthHeader title="Team Analytics" />}
             {!embedded && <Sidebar />}
-            
+
             {/* Section Navigation */}
-            <SectionNav 
-                activeSection={activeSection} 
-                onSectionClick={handleSectionClick} 
+            <SectionNav
+                activeSection={activeSection}
+                onSectionClick={handleSectionClick}
                 isCollapsed={isCollapsed}
                 embedded={embedded}
             />
@@ -1205,7 +1207,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     {(() => {
                         // Build hierarchical stats data from match statistics
                         const relevantStats = matchStatsList;
-                        
+
                         // Get aggregated values for Passes
                         const successfulPasses = sumWithNull(relevantStats, m => (m as any).home_successful_passes) ?? 0;
                         const unsuccessfulPasses = sumWithNull(relevantStats, m => (m as any).home_unsuccessful_passes) ?? 0;
@@ -1216,7 +1218,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const longPasses = sumWithNull(relevantStats, m => (m as any).home_long_passes) ?? Math.floor(successfulPasses * 0.15);
                         const shortPasses = sumWithNull(relevantStats, m => (m as any).home_short_passes) ?? Math.floor(successfulPasses * 0.5);
                         const throughBalls = sumWithNull(relevantStats, m => (m as any).home_through_balls) ?? Math.floor(keyPasses * 0.3);
-                        
+
                         // Unsuccessful passes breakdown
                         const passesBlocked = sumWithNull(relevantStats, m => (m as any).home_passes_blocked) ?? Math.floor(unsuccessfulPasses * 0.2);
                         const passesClearance = sumWithNull(relevantStats, m => (m as any).home_passes_cleared) ?? Math.floor(unsuccessfulPasses * 0.15);
@@ -1224,7 +1226,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const passesOffside = sumWithNull(relevantStats, m => (m as any).home_passes_offside) ?? Math.floor(unsuccessfulPasses * 0.05);
                         const passesBallRecoveries = sumWithNull(relevantStats, m => (m as any).home_passes_ball_recoveries) ?? Math.floor(unsuccessfulPasses * 0.2);
                         const passesHighPressing = sumWithNull(relevantStats, m => (m as any).home_passes_high_pressing) ?? Math.floor(unsuccessfulPasses * 0.15);
-                        
+
                         // Get aggregated values for Duels
                         const aerialDuelsWon = sumWithNull(relevantStats, m => m.team_aerial_duels_won) ?? 0;
                         const aerialDuelsTotal = sumWithNull(relevantStats, m => (m as any).home_aerial_duels_total) ?? aerialDuelsWon * 2;
@@ -1236,7 +1238,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const tacklesWon = sumWithNull(relevantStats, m => (m as any).home_tackles_won) ?? Math.floor(aerialDuelsWon * 0.8);
                         const tacklesLost = sumWithNull(relevantStats, m => (m as any).home_tackles_lost) ?? Math.floor(tacklesWon * 0.3);
                         const dribbleSuccessRate = totalDribbles > 0 ? Math.round((successfulDribbles / totalDribbles) * 100) : 0;
-                        
+
                         // Get aggregated values for Set Pieces
                         const corners = sumWithNull(relevantStats, m => (m as any).home_corners) ?? 0;
                         const cornersFirstContact = sumWithNull(relevantStats, m => (m as any).home_corners_first_contact) ?? Math.floor(corners * 0.7);
@@ -1250,7 +1252,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const throwIns = sumWithNull(relevantStats, m => (m as any).home_throw_ins) ?? Math.floor(corners * 3);
                         const throwInsFirstContact = sumWithNull(relevantStats, m => (m as any).home_throw_ins_first_contact) ?? Math.floor(throwIns * 0.75);
                         const throwInsSecondContact = sumWithNull(relevantStats, m => (m as any).home_throw_ins_second_contact) ?? Math.floor(throwIns * 0.25);
-                        
+
                         // Get aggregated values for Goalkeeper
                         const saves = sumWithNull(relevantStats, m => m.team_saves) ?? 0;
                         const savesInsideBox = sumWithNull(relevantStats, m => (m as any).home_saves_inside_box) ?? Math.floor(saves * 0.6);
@@ -1259,13 +1261,13 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const punches = sumWithNull(relevantStats, m => (m as any).home_punches) ?? Math.floor(saves * 0.2);
                         const catches = sumWithNull(relevantStats, m => (m as any).home_catches) ?? Math.floor(saves * 0.4);
                         const sweepings = sumWithNull(relevantStats, m => (m as any).home_sweepings) ?? Math.floor(saves * 0.15);
-                        
+
                         // Get aggregated values for Outplays
                         const outplaysPassingPlayersOutplayed = sumWithNull(relevantStats, m => (m as any).home_outplays_passing_players) ?? Math.floor(successfulPasses * 0.05);
                         const outplaysPassingLinesBroken = sumWithNull(relevantStats, m => (m as any).home_outplays_passing_lines) ?? Math.floor(progressivePasses * 0.3);
                         const outplaysDribblingPlayersOutplayed = sumWithNull(relevantStats, m => (m as any).home_outplays_dribbling_players) ?? Math.floor(successfulDribbles * 0.8);
                         const outplaysDribblingLinesBroken = sumWithNull(relevantStats, m => (m as any).home_outplays_dribbling_lines) ?? Math.floor(progressiveCarries * 0.5);
-                        
+
                         // Passing Stats Tree Data
                         const passingStatsData: StatsNode = {
                             id: 'root-passes',
@@ -1305,7 +1307,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 }
                             ]
                         };
-                        
+
                         // Other Stats Tree Data (Set Pieces, Duels, Keeper Stats, Outplays)
                         const otherStatsData: StatsNode = {
                             id: 'root-other',
@@ -1461,9 +1463,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 },
                             ]
                         };
-                        
+
                         return (
-                            <div 
+                            <div
                                 id="breakdown"
                                 ref={(el) => { sectionRefs.current['breakdown'] = el; }}
                                 className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-24"
@@ -1491,7 +1493,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                         </CardContent>
                                     </Card>
                                 </motion.div>
-                                
+
                                 {/* Other Stats Chart (Set Pieces, Duels, Keeper) */}
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
@@ -1520,7 +1522,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     })()}
 
                     {/* Main Grid - Formation Section */}
-                    <div 
+                    <div
                         id="formation"
                         ref={(el) => { sectionRefs.current['formation'] = el; }}
                         className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 scroll-mt-24"
@@ -1803,7 +1805,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 </span>
                                             </div>
                                             <div className="flex gap-3 overflow-x-auto pb-2">
-                                                        {benchPlayers.map((player) => (
+                                                {benchPlayers.map((player) => (
                                                     <div
                                                         key={player.id}
                                                         className={cn(
@@ -1960,6 +1962,37 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             </Card>
                         </motion.div>
                     </div>
+
+                    {/* Team Passing Map Section */}
+                    <motion.div
+                        id="passing"
+                        ref={(el) => { sectionRefs.current['passing'] = el; }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35 }}
+                        className="mb-8 scroll-mt-24"
+                    >
+                        <Card className="bg-card border-border">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Footprints className="w-5 h-5 text-primary" />
+                                    Team Passing Map
+                                </CardTitle>
+                                <p className="text-sm text-muted-foreground">Click on a player to view their individual passing analysis</p>
+                            </CardHeader>
+                            <CardContent>
+                                <TeamPassingMap
+                                    playerPasses={activePlayers.map(player => ({
+                                        player,
+                                        events: player.matchStats
+                                            .filter(m => selectedMatch === "all" || m.matchId === selectedMatch)
+                                            .flatMap(m => m.events)
+                                    }))}
+                                    matchId={selectedMatch !== "all" ? selectedMatch : undefined}
+                                />
+                            </CardContent>
+                        </Card>
+                    </motion.div>
 
                     {/* Goal Replay Section */}
                     <motion.div

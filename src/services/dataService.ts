@@ -393,7 +393,7 @@ export async function getPlayersWithStats(): Promise<Player[]> {
                         passesInBox: 0, // Not directly in view yet, would need update
                         crosses: stat.crosses || 0,
                         progressivePassing: stat.progressive_passes || 0,
-                        shots: (stat.shots_on_target || 0) + (stat.goals || 0), // Rough est
+                        shots: (stat.shots_on_target || 0) + (stat.shots_off_target || 0),
                         shotsOnTarget: stat.shots_on_target || 0,
                         dribbles: stat.total_dribbles || 0,
                         dribblesSuccessful: stat.successful_dribbles || 0,
@@ -406,8 +406,8 @@ export async function getPlayersWithStats(): Promise<Player[]> {
                         recoveries: stat.ball_recoveries,
                         tackles: null, // Not in view
                         progressiveRuns: stat.progressive_carries,
-                        distanceCovered: null,
-                        sprints: null,
+                        distanceCovered: stat.distance_covered_meters,
+                        sprints: stat.sprint_count,
                     },
                     events: [], // detailed events loaded on demand if needed
                 };

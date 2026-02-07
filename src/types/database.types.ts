@@ -159,6 +159,8 @@ export interface Database {
                     crosses: number | null;
                     total_players_outplayed_passing: number | null;
                     total_lines_outplayed: number | null;
+                    long_passes: number | null;
+                    short_passes: number | null;
 
                     // Defensive
                     interceptions: number | null;
@@ -171,6 +173,7 @@ export interface Database {
                     shots_on_target: number | null;
                     goals: number | null;
                     penalties_scored: number | null;
+                    shots_off_target: number | null;
 
                     // Duels
                     aerial_duels_won: number | null;
@@ -199,6 +202,11 @@ export interface Database {
 
                     // Final Third
                     final_third_touches: number | null;
+
+                    // Physical Stats (new)
+                    distance_covered_meters: number | null;
+                    sprint_count: number | null;
+                    high_intensity_runs: number | null;
                 };
                 Insert: never;
                 Update: never;
@@ -218,11 +226,16 @@ export interface Database {
                     is_successful: boolean;
                     is_key_pass: boolean | null;
                     is_progressive_pass: boolean | null;
-                    failure_reason: 'block' | 'offside' | 'interception' | null;
+                    failure_reason: 'block' | 'offside' | 'interception' | 'clearance' | 'ball_collection' | 'unsuccessful_cross' | 'tackle' | null;
+                    failure_subtype: 'tackle' | 'unsuccessful_cross' | 'ball_collection' | null;
                     is_assist: boolean | null;
                     assist_pass_type: 'normal' | 'key' | 'progressive' | null;
                     is_cross: boolean | null;
                     cross_pass_type: 'normal' | 'key' | 'progressive' | null;
+                    pass_length: 'short' | 'long' | null;
+                    video_time_sec: number | null;
+                    formatted_time: string | null;
+                    ball_recovery_result: 'successful' | 'unsuccessful' | null;
                     created_at: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['pass_events']['Row'], 'id' | 'created_at'>;
@@ -238,8 +251,16 @@ export interface Database {
                     second: number | null;
                     shot_x: number | null;
                     shot_y: number | null;
+                    shot_end_x: number | null;
+                    shot_end_y: number | null;
                     is_goal: boolean;
                     is_penalty: boolean | null;
+                    is_saved: boolean | null;
+                    shot_result: 'goal' | 'saved' | 'off_target' | null;
+                    save_location: 'inside_box' | 'outside_box' | null;
+                    shot_opponent_id: string | null;
+                    video_time_sec: number | null;
+                    formatted_time: string | null;
                     created_at: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['shots_on_target']['Row'], 'id' | 'created_at'>;
@@ -257,6 +278,9 @@ export interface Database {
                     duel_y: number | null;
                     duel_type: 'aerial' | 'dribble';
                     is_successful: boolean;
+                    duel_outcome: 'won' | 'lost' | 'successful' | 'unsuccessful' | null;
+                    video_time_sec: number | null;
+                    formatted_time: string | null;
                     created_at: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['duels']['Row'], 'id' | 'created_at'>;
@@ -293,6 +317,11 @@ export interface Database {
                     corner_type: 'short' | 'long' | null;
                     long_corner_success: boolean | null;
                     is_in_box: boolean | null;
+                    chance_receiver_id: string | null;
+                    chance_sub_type: 'corner' | 'normal' | null;
+                    chance_side: 'left' | 'right' | 'centre' | null;
+                    video_time_sec: number | null;
+                    formatted_time: string | null;
                     created_at: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['final_third_chances']['Row'], 'id' | 'created_at'>;
@@ -345,6 +374,34 @@ export interface Database {
                 Insert: Omit<Database['public']['Tables']['player_attributes']['Row'], 'id' | 'created_at' | 'updated_at'>;
                 Update: Partial<Database['public']['Tables']['player_attributes']['Insert']>;
             };
+            player_heatmaps: {
+                Row: {
+                    id: string;
+                    match_id: string;
+                    player_id: string;
+                    heatmap_image_url: string;
+                    created_at: string | null;
+                    updated_at: string | null;
+                };
+                Insert: Omit<Database['public']['Tables']['player_heatmaps']['Row'], 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Database['public']['Tables']['player_heatmaps']['Insert']>;
+            };
+            physical_stats: {
+                Row: {
+                    id: string;
+                    match_id: string;
+                    player_id: string;
+                    distance_covered_meters: number | null;
+                    sprint_count: number | null;
+                    high_intensity_runs: number | null;
+                    top_speed_kmh: number | null;
+                    average_speed_kmh: number | null;
+                    created_at: string | null;
+                    updated_at: string | null;
+                };
+                Insert: Omit<Database['public']['Tables']['physical_stats']['Row'], 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Database['public']['Tables']['physical_stats']['Insert']>;
+            };
         };
     };
 }
@@ -372,3 +429,5 @@ export type DbFinalThirdChance = Database['public']['Tables']['final_third_chanc
 export type DbLeague = Database['public']['Tables']['leagues']['Row'];
 export type DbPlayerMatchStatistics = Database['public']['Tables']['player_match_statistics']['Row'];
 export type DbPlayerAttributes = Database['public']['Tables']['player_attributes']['Row'];
+export type DbPlayerHeatmap = Database['public']['Tables']['player_heatmaps']['Row'];
+export type DbPhysicalStats = Database['public']['Tables']['physical_stats']['Row'];

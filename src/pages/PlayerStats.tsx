@@ -73,7 +73,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
   const synergyData = useMemo(() => {
     // Filter only pass events
     const passes = events.filter(e => e.type === 'pass');
-    
+
     // Group passes by target player
     const targetMap = new Map<string, {
       total: number;
@@ -81,59 +81,76 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
       keyPasses: number;
       assists: number;
       distances: number[];
+      forwardProgress: number[]; // Track forward progress for progressive score
     }>();
-    
+
     passes.forEach(pass => {
       const target = pass.passTarget || 'Unknown';
       if (target === 'Unknown') return; // Skip passes without target info
-      
+
       const existing = targetMap.get(target) || {
         total: 0,
         successful: 0,
         keyPasses: 0,
         assists: 0,
-        distances: []
+        distances: [],
+        forwardProgress: []
       };
-      
+
       existing.total++;
       if (pass.success) existing.successful++;
-      
+
       // Key pass = successful pass in final third
       if (pass.success && pass.targetX > 75) existing.keyPasses++;
-      
+
       // Calculate distance
       const dx = (pass.targetX - pass.x) / 100 * 105;
       const dy = (pass.targetY - pass.y) / 100 * 68;
       const distance = Math.sqrt(dx * dx + dy * dy);
       existing.distances.push(distance);
-      
+
+      // Calculate forward progress (positive = towards opponent goal)
+      // Assuming x increases towards opponent goal (0-100 scale)
+      const forwardProgress = pass.targetX - pass.x;
+      existing.forwardProgress.push(forwardProgress);
+
       targetMap.set(target, existing);
     });
-    
+
     // Convert to synergy array with calculated scores
     const synergyArray: PlayerSynergy[] = [];
     const totalPassesOverall = passes.length;
-    
+
     targetMap.forEach((data, name) => {
       const accuracy = data.total > 0 ? Math.round((data.successful / data.total) * 100) : 0;
-      const avgDistance = data.distances.length > 0 
-        ? Math.round(data.distances.reduce((a, b) => a + b, 0) / data.distances.length) 
+      const avgDistance = data.distances.length > 0
+        ? Math.round(data.distances.reduce((a, b) => a + b, 0) / data.distances.length)
         : 0;
-      
-      // Calculate synergy score (weighted formula)
-      // Factors: volume (30%), accuracy (35%), key passes (20%), consistency (15%)
+
+      // Calculate average forward progress
+      const avgForwardProgress = data.forwardProgress.length > 0
+        ? data.forwardProgress.reduce((a, b) => a + b, 0) / data.forwardProgress.length
+        : 0;
+
+      // NEW SYNERGY FORMULA:
+      // Volume (30%): Percentage of total passes to this partner
+      // Key Passes (25%): Ratio of key passes to total passes
+      // Consistency (20%): Having enough passes to be reliable (≥5 passes = 100%)
+      // Progressive Distance (25%): Average forward progress normalized (positive = good)
+
       const volumeScore = Math.min((data.total / Math.max(totalPassesOverall * 0.3, 1)) * 100, 100);
-      const accuracyScore = accuracy;
-      const keyPassScore = Math.min((data.keyPasses / Math.max(data.total * 0.2, 1)) * 100, 100);
+      const keyPassScore = Math.min((data.keyPasses / Math.max(data.total * 0.15, 1)) * 100, 100);
       const consistencyScore = data.total >= 5 ? 100 : (data.total / 5) * 100;
-      
+      // Progressive score: normalize forward progress (0-30 units forward = 0-100 score)
+      const progressiveScore = Math.min(Math.max((avgForwardProgress / 30) * 100, 0), 100);
+
       const synergyScore = Math.round(
         volumeScore * 0.30 +
-        accuracyScore * 0.35 +
-        keyPassScore * 0.20 +
-        consistencyScore * 0.15
+        keyPassScore * 0.25 +
+        consistencyScore * 0.20 +
+        progressiveScore * 0.25
       );
-      
+
       synergyArray.push({
         playerName: name,
         totalPasses: data.total,
@@ -146,32 +163,32 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
         synergyScore
       });
     });
-    
+
     // Sort by synergy score (highest first)
     return synergyArray.sort((a, b) => b.synergyScore - a.synergyScore);
   }, [events]);
-  
+
   const getSynergyColor = (score: number) => {
     if (score >= 80) return "text-success";
     if (score >= 60) return "text-primary";
     if (score >= 40) return "text-warning";
     return "text-muted-foreground";
   };
-  
+
   const getSynergyBg = (score: number) => {
     if (score >= 80) return "bg-success/10 border-success/30";
     if (score >= 60) return "bg-primary/10 border-primary/30";
     if (score >= 40) return "bg-warning/10 border-warning/30";
     return "bg-secondary/50 border-border";
   };
-  
+
   const getSynergyLabel = (score: number) => {
     if (score >= 80) return "Excellent";
     if (score >= 60) return "Good";
     if (score >= 40) return "Average";
     return "Low";
   };
-  
+
   if (synergyData.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -181,11 +198,11 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
       </div>
     );
   }
-  
+
   // Get top 3 synergy partners
   const topPartners = synergyData.slice(0, 3);
   const totalPasses = synergyData.reduce((sum, p) => sum + p.totalPasses, 0);
-  
+
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
@@ -211,7 +228,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
           <p className="text-xs uppercase text-muted-foreground">Avg Accuracy</p>
         </div>
       </div>
-      
+
       {/* Top Synergy Partners - Visual Cards */}
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
@@ -234,12 +251,12 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
               <div className={cn(
                 "absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold",
                 index === 0 ? "bg-warning text-warning-foreground" :
-                index === 1 ? "bg-muted text-muted-foreground" :
-                "bg-orange-700/80 text-white"
+                  index === 1 ? "bg-muted text-muted-foreground" :
+                    "bg-orange-700/80 text-white"
               )}>
                 {index + 1}
               </div>
-              
+
               {/* Player Info */}
               <div className="flex items-center gap-3 mb-3 mt-1">
                 <div className={cn(
@@ -262,7 +279,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
                   <p className="text-[10px] uppercase text-muted-foreground">Score</p>
                 </div>
               </div>
-              
+
               {/* Stats Grid */}
               <div className="grid grid-cols-4 gap-2 text-center">
                 <div>
@@ -282,7 +299,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
                   <p className="text-[9px] uppercase text-muted-foreground">Avg Dist</p>
                 </div>
               </div>
-              
+
               {/* Synergy Bar */}
               <div className="mt-3">
                 <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
@@ -293,8 +310,8 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
                     className={cn(
                       "h-full rounded-full",
                       partner.synergyScore >= 80 ? "bg-success" :
-                      partner.synergyScore >= 60 ? "bg-primary" :
-                      partner.synergyScore >= 40 ? "bg-warning" : "bg-muted-foreground"
+                        partner.synergyScore >= 60 ? "bg-primary" :
+                          partner.synergyScore >= 40 ? "bg-warning" : "bg-muted-foreground"
                     )}
                   />
                 </div>
@@ -303,7 +320,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
           ))}
         </div>
       </div>
-      
+
       {/* Full Synergy Table */}
       {synergyData.length > 3 && (
         <div className="space-y-3">
@@ -326,7 +343,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
               </thead>
               <tbody>
                 {synergyData.slice(3).map((partner, index) => (
-                  <tr 
+                  <tr
                     key={partner.playerName}
                     className={cn(
                       "border-b border-border/50 transition-colors hover:bg-secondary/30",
@@ -347,7 +364,7 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
                       <span className={cn(
                         "font-medium",
                         partner.accuracy >= 80 ? "text-success" :
-                        partner.accuracy >= 60 ? "text-primary" : "text-warning"
+                          partner.accuracy >= 60 ? "text-primary" : "text-warning"
                       )}>
                         {partner.accuracy}%
                       </span>
@@ -370,26 +387,38 @@ const SynergyAnalysis = ({ events, playerName }: SynergyAnalysisProps) => {
           </div>
         </div>
       )}
-      
+
       {/* Synergy Score Explanation */}
       <div className="bg-secondary/30 rounded-lg p-4 text-xs text-muted-foreground">
         <p className="font-medium text-foreground mb-2">How Synergy Score is Calculated:</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary" />
-            <span>Volume (30%)</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              <span className="font-medium">Volume (30%)</span>
+            </div>
+            <span className="text-[10px] pl-4">Passing frequency to partner</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-success" />
-            <span>Accuracy (35%)</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-warning" />
+              <span className="font-medium">Key Passes (25%)</span>
+            </div>
+            <span className="text-[10px] pl-4">Passes into final third</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-warning" />
-            <span>Key Passes (20%)</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-chart-4" />
+              <span className="font-medium">Consistency (20%)</span>
+            </div>
+            <span className="text-[10px] pl-4">Reliability (≥5 passes = 100%)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-chart-4" />
-            <span>Consistency (15%)</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-success" />
+              <span className="font-medium">Progressive (25%)</span>
+            </div>
+            <span className="text-[10px] pl-4">Average forward progress</span>
           </div>
         </div>
       </div>
@@ -407,7 +436,7 @@ interface SectionNavProps {
 
 const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: SectionNavProps) => {
   if (sections.length === 0) return null;
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20, y: '-50%' }}
@@ -432,7 +461,7 @@ const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: Secti
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
           />
         </div>
-        
+
         {/* Buttons container */}
         <div className={cn(
           "flex flex-col",
@@ -441,7 +470,7 @@ const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: Secti
           {sections.map((section, index) => {
             const Icon = section.icon;
             const isActive = activeSection === section.id;
-            
+
             return (
               <motion.button
                 key={section.id}
@@ -449,8 +478,8 @@ const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: Secti
                 className={cn(
                   "group relative flex items-center justify-center rounded-lg transition-all duration-200",
                   embedded ? "w-6 h-6" : "w-8 h-8",
-                  isActive 
-                    ? "bg-primary/20 text-primary" 
+                  isActive
+                    ? "bg-primary/20 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
                 )}
                 whileHover={{ scale: 1.05 }}
@@ -460,7 +489,7 @@ const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: Secti
                 transition={{ delay: 0.6 + index * 0.05 }}
               >
                 <Icon className={cn(embedded ? "w-3 h-3" : "w-3.5 h-3.5")} />
-                
+
                 {/* Tooltip on hover */}
                 <div className={cn(
                   "absolute right-full mr-3 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap",
@@ -500,7 +529,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [matchSearch, setMatchSearch] = useState<string>("");
-  
+
   // Sync tab with URL hash on navigation (e.g., when clicking back)
   useEffect(() => {
     const hash = location.hash.replace("#", "");
@@ -508,14 +537,14 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
       setActiveTab(hash);
     }
   }, [location.hash]);
-  
+
   // Section navigation state
   const [activeSection, setActiveSection] = useState<string>('');
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  
+
   // Get current tab's sections
   const currentSections = TAB_SECTIONS[activeTab] || [];
-  
+
   // Handle section click - smooth scroll to section
   const handleSectionClick = useCallback((sectionId: string) => {
     const element = sectionRefs.current[sectionId];
@@ -523,7 +552,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
       const headerOffset = 150;
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-      
+
       window.scrollTo({
         top: offsetPosition,
         behavior: 'smooth'
@@ -531,12 +560,12 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     }
     setActiveSection(sectionId);
   }, []);
-  
+
   // Track active section on scroll
   useEffect(() => {
     const handleScroll = () => {
       const scrollOffset = 200;
-      
+
       for (const section of currentSections) {
         const element = sectionRefs.current[section.id];
         if (element) {
@@ -548,12 +577,12 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
         }
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, [currentSections]);
-  
+
   // Reset active section when tab changes
   useEffect(() => {
     const sections = TAB_SECTIONS[activeTab] || [];
@@ -575,7 +604,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
 
     const matches = currentPlayer.matchStats;
     if (matches.length === 0) return null;
-    
+
     const total = {
       goals: matches.reduce((a, m) => a + m.stats.goals, 0),
       assists: matches.reduce((a, m) => a + m.stats.assists, 0),
@@ -671,12 +700,12 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
     <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
       {!embedded && <AuthHeader title="Player Stats" showBack />}
       {!embedded && <Sidebar />}
-      
+
       {/* Section Navigation */}
       {currentSections.length > 0 && (
-        <SectionNav 
+        <SectionNav
           sections={currentSections}
-          activeSection={activeSection} 
+          activeSection={activeSection}
           onSectionClick={handleSectionClick}
           embedded={embedded}
         />
@@ -789,7 +818,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Overall Stats Tab */}
             <TabsContent value="overall" className="space-y-6">
               {/* Season Summary */}
-              <Card 
+              <Card
                 id="season-summary"
                 ref={(el) => { sectionRefs.current['season-summary'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -820,7 +849,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Aggregated Stats - Mode Wise */}
-              <div 
+              <div
                 id="stats-breakdown"
                 ref={(el) => { sectionRefs.current['stats-breakdown'] = el; }}
                 className="grid grid-cols-1 md:grid-cols-3 gap-6 scroll-mt-24"
@@ -922,7 +951,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </div>
 
               {/* Match Trend */}
-              <Card 
+              <Card
                 id="performance-trend"
                 ref={(el) => { sectionRefs.current['performance-trend'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -944,7 +973,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Football Field - All Events */}
-              <Card 
+              <Card
                 id="touch-map"
                 ref={(el) => { sectionRefs.current['touch-map'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -961,7 +990,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Match-Wise Stats Tab */}
             <TabsContent value="match" className="space-y-6">
               {/* Match Selector - Compact List Style */}
-              <Card 
+              <Card
                 id="match-selector"
                 ref={(el) => { sectionRefs.current['match-selector'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -1147,7 +1176,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
                   </Card>
 
                   {/* Match Touch Map */}
-                  <Card 
+                  <Card
                     id="match-touch-map"
                     ref={(el) => { sectionRefs.current['match-touch-map'] = el; }}
                     className="bg-card border-border scroll-mt-24"
@@ -1168,7 +1197,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Passing Analysis Tab */}
             <TabsContent value="passing" className="space-y-6">
               {/* Match Selector */}
-              <Card 
+              <Card
                 id="passing-selector"
                 ref={(el) => { sectionRefs.current['passing-selector'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -1227,7 +1256,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Player Synergy Analysis */}
-              <Card 
+              <Card
                 id="passing-synergy"
                 ref={(el) => { sectionRefs.current['passing-synergy'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -1247,7 +1276,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Passing Map Visualization */}
-              <Card 
+              <Card
                 id="passing-map"
                 ref={(el) => { sectionRefs.current['passing-map'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -1267,7 +1296,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Shot Analysis Tab */}
             <TabsContent value="shots" className="space-y-6">
               {/* Match Selector */}
-              <Card 
+              <Card
                 id="shots-selector"
                 ref={(el) => { sectionRefs.current['shots-selector'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -1346,7 +1375,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             {/* Chances Created Tab */}
             <TabsContent value="chances" className="space-y-6">
               {/* Match Selector */}
-              <Card 
+              <Card
                 id="chances-selector"
                 ref={(el) => { sectionRefs.current['chances-selector'] = el; }}
                 className="bg-card border-border scroll-mt-24"
@@ -1405,7 +1434,7 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
               </Card>
 
               {/* Chances Created Map */}
-              <Card 
+              <Card
                 id="chances-map"
                 ref={(el) => { sectionRefs.current['chances-map'] = el; }}
                 className="bg-card border-border scroll-mt-24"
