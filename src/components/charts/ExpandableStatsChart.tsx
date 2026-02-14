@@ -84,6 +84,7 @@ function getShortName(name: string, providedShortName?: string): string {
 interface ExpandableStatsChartProps {
     data: StatsNode;
     className?: string;
+    variant?: 'doughnut' | 'pie';
 }
 
 // Flattened stat item for search
@@ -151,11 +152,11 @@ function polarToCartesian(centerX: number, centerY: number, radius: number, angl
 // Helper: Describe an arc path with smooth corners
 function describeArc(x: number, y: number, innerRadius: number, outerRadius: number, startAngle: number, endAngle: number, padding: number = 0.01) {
     if (innerRadius >= outerRadius) return "";
-    
+
     // Add small padding between segments
     const paddedStart = startAngle + padding;
     const paddedEnd = endAngle - padding;
-    
+
     if (paddedStart >= paddedEnd) return "";
 
     const start = polarToCartesian(x, y, outerRadius, paddedEnd);
@@ -204,12 +205,12 @@ function assignAngles(node: StatsNode, startAngle: number, endAngle: number) {
     }
 }
 
-const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) => {
+const ExpandableStatsChart = ({ data, className, variant = 'doughnut' }: ExpandableStatsChartProps) => {
     const [activePath, setActivePath] = useState<string[]>([]);
     const [hoveredNode, setHoveredNode] = useState<StatsNode | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
-    
+
     // Search state
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -228,7 +229,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     // Flatten all stats for search
     const flattenedStats = useMemo(() => {
         const result: FlatStatItem[] = [];
-        
+
         const flatten = (node: StatsNode, pathIds: string[], pathNames: string[]) => {
             if (node.level > 0) {
                 result.push({
@@ -240,18 +241,18 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                     level: node.level,
                 });
             }
-            
+
             if (node.children) {
                 node.children.forEach(child => {
                     flatten(
-                        child, 
+                        child,
                         node.level > 0 ? [...pathIds, node.id] : pathIds,
                         node.level > 0 ? [...pathNames, node.name] : pathNames
                     );
                 });
             }
         };
-        
+
         flatten(processedData, [], []);
         return result;
     }, [processedData]);
@@ -259,9 +260,9 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     // Filter stats based on search query
     const filteredStats = useMemo(() => {
         if (!searchQuery.trim()) return flattenedStats;
-        
+
         const query = searchQuery.toLowerCase();
-        return flattenedStats.filter(stat => 
+        return flattenedStats.filter(stat =>
             stat.name.toLowerCase().includes(query) ||
             stat.pathNames.some(name => name.toLowerCase().includes(query))
         );
@@ -276,7 +277,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setSelectedSearchIndex(prev => 
+            setSelectedSearchIndex(prev =>
                 prev < filteredStats.length - 1 ? prev + 1 : prev
             );
         } else if (e.key === 'ArrowUp') {
@@ -307,25 +308,37 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                 setIsSearchOpen(false);
             }
         };
-        
+
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Reset pie chart to main view when clicking outside the chart
+    useEffect(() => {
+        const handleChartClickOutside = (e: MouseEvent) => {
+            if (activePath.length > 0 && containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setActivePath([]);
+            }
+        };
+
+        document.addEventListener('mousedown', handleChartClickOutside);
+        return () => document.removeEventListener('mousedown', handleChartClickOutside);
+    }, [activePath]);
 
     // Get color for search result based on path
     const getSearchResultColor = useCallback((stat: FlatStatItem): string => {
         // Get the root category from the path
         const rootCategory = stat.pathNames[0]?.toLowerCase() || stat.name.toLowerCase();
-        
+
         const colors = rootCategory.includes('pass') ? CATEGORY_COLORS.passes
             : rootCategory.includes('shot') ? CATEGORY_COLORS.shots
-            : rootCategory.includes('duel') ? CATEGORY_COLORS.duels
-            : rootCategory.includes('defen') ? CATEGORY_COLORS.defensive
-            : rootCategory.includes('set') || rootCategory.includes('piece') ? CATEGORY_COLORS.setpieces
-            : rootCategory.includes('goal') || rootCategory.includes('keep') || rootCategory.includes('save') ? CATEGORY_COLORS.goalkeeper
-            : rootCategory.includes('foul') || rootCategory.includes('card') ? CATEGORY_COLORS.fouls
-            : rootCategory.includes('outplay') ? CATEGORY_COLORS.outplays
-            : CATEGORY_COLORS.passes;
+                : rootCategory.includes('duel') ? CATEGORY_COLORS.duels
+                    : rootCategory.includes('defen') ? CATEGORY_COLORS.defensive
+                        : rootCategory.includes('set') || rootCategory.includes('piece') ? CATEGORY_COLORS.setpieces
+                            : rootCategory.includes('goal') || rootCategory.includes('keep') || rootCategory.includes('save') ? CATEGORY_COLORS.goalkeeper
+                                : rootCategory.includes('foul') || rootCategory.includes('card') ? CATEGORY_COLORS.fouls
+                                    : rootCategory.includes('outplay') ? CATEGORY_COLORS.outplays
+                                        : CATEGORY_COLORS.passes;
 
         if (stat.level === 1) return colors.main;
         if (stat.level === 2) return colors.light;
@@ -333,7 +346,13 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     }, []);
 
     // Level configuration - tighter rings for better appearance
-    const LEVELS: Record<number, { inner: number; outer: number }> = {
+    const LEVELS: Record<number, { inner: number; outer: number }> = variant === 'pie' ? {
+        0: { inner: 0, outer: 0 },
+        1: { inner: 0, outer: 120 },
+        2: { inner: 130, outer: 160 },
+        3: { inner: 170, outer: 195 },
+        4: { inner: 205, outer: 215 },
+    } : {
         0: { inner: 0, outer: 45 },
         1: { inner: 55, outer: 95 },
         2: { inner: 105, outer: 140 },
@@ -371,16 +390,16 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     const getRootCategory = useCallback((node: StatsNode): string => {
         let current = node;
         let item = allNodes.find(n => n.node.id === node.id);
-        
+
         while (item && item.path.length > 1) {
             current = item.path[1];
             item = allNodes.find(n => n.node.id === current.id);
         }
-        
+
         if (current.level === 1) {
             return current.name.toLowerCase();
         }
-        
+
         return node.name.toLowerCase();
     }, [allNodes]);
 
@@ -444,16 +463,16 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     // Get node color
     const getNodeColor = useCallback((node: StatsNode): string => {
         const category = getRootCategory(node);
-        
+
         const colors = category.includes('pass') ? CATEGORY_COLORS.passes
             : category.includes('shot') ? CATEGORY_COLORS.shots
-            : category.includes('duel') ? CATEGORY_COLORS.duels
-            : category.includes('defen') ? CATEGORY_COLORS.defensive
-            : category.includes('set') || category.includes('piece') ? CATEGORY_COLORS.setpieces
-            : category.includes('goal') || category.includes('keep') || category.includes('save') ? CATEGORY_COLORS.goalkeeper
-            : category.includes('foul') || category.includes('card') ? CATEGORY_COLORS.fouls
-            : category.includes('outplay') ? CATEGORY_COLORS.outplays
-            : CATEGORY_COLORS.passes;
+                : category.includes('duel') ? CATEGORY_COLORS.duels
+                    : category.includes('defen') ? CATEGORY_COLORS.defensive
+                        : category.includes('set') || category.includes('piece') ? CATEGORY_COLORS.setpieces
+                            : category.includes('goal') || category.includes('keep') || category.includes('save') ? CATEGORY_COLORS.goalkeeper
+                                : category.includes('foul') || category.includes('card') ? CATEGORY_COLORS.fouls
+                                    : category.includes('outplay') ? CATEGORY_COLORS.outplays
+                                        : CATEGORY_COLORS.passes;
 
         if (node.level === 1) return colors.main;
         if (node.level === 2) return colors.light;
@@ -499,7 +518,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
     }, [activePath, allNodes]);
 
     return (
-        <div 
+        <div
             ref={containerRef}
             className={cn("relative select-none", className)}
             onMouseMove={handleMouseMove}
@@ -533,7 +552,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                         </button>
                     )}
                 </div>
-                
+
                 {/* Search Dropdown */}
                 <AnimatePresence>
                     {isSearchOpen && searchQuery && (
@@ -557,12 +576,12 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                                             onMouseEnter={() => setSelectedSearchIndex(index)}
                                             className={cn(
                                                 "w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors",
-                                                index === selectedSearchIndex 
-                                                    ? "bg-primary/10" 
+                                                index === selectedSearchIndex
+                                                    ? "bg-primary/10"
                                                     : "hover:bg-secondary/50"
                                             )}
                                         >
-                                            <div 
+                                            <div
                                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                                 style={{ backgroundColor: getSearchResultColor(stat) }}
                                             />
@@ -632,8 +651,8 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                     onClick={() => setActivePath([])}
                     className={cn(
                         "text-xs font-medium px-2 py-1 rounded transition-colors",
-                        activePath.length === 0 
-                            ? "text-primary bg-primary/10" 
+                        activePath.length === 0
+                            ? "text-primary bg-primary/10"
                             : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                     )}
                 >
@@ -678,6 +697,10 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                         <filter id="shadow-stats">
                             <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" />
                         </filter>
+                        <filter id="pie-hover-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="rgba(0,0,0,0.5)" floodOpacity="0.6" />
+                            <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="rgba(255,255,255,0.15)" floodOpacity="0.3" />
+                        </filter>
                     </defs>
 
                     {/* Background rings for depth */}
@@ -703,17 +726,27 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                         if (node.level === 0) return null;
                         const { innerR, outerR, opacity } = getArcProps(node);
                         const isHovered = hoveredNode?.id === node.id;
-                        
+                        const isPieSlice = variant === 'pie' && node.level === 1;
+
                         const d = describeArc(
                             0, 0,
                             innerR,
-                            isHovered ? outerR + 5 : outerR,
+                            isHovered ? outerR + (isPieSlice ? 8 : 5) : outerR,
                             node.startAngle ?? 0,
                             node.endAngle ?? 0,
-                            0.015
+                            variant === 'pie' && node.level === 1 ? 0.008 : 0.015
                         );
 
                         if (!d) return null;
+
+                        // For pie slices, compute a slight outward translation on hover for 3D lift
+                        let hoverTranslateX = 0;
+                        let hoverTranslateY = 0;
+                        if (isPieSlice && isHovered) {
+                            const midAngle = (node.startAngle ?? 0) + ((node.endAngle ?? 0) - (node.startAngle ?? 0)) / 2;
+                            hoverTranslateX = Math.cos(midAngle) * 6;
+                            hoverTranslateY = Math.sin(midAngle) * 6;
+                        }
 
                         return (
                             <motion.path
@@ -721,26 +754,79 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                                 d={d}
                                 fill={getNodeColor(node)}
                                 fillOpacity={opacity}
-                                stroke="hsl(var(--background))"
-                                strokeWidth={1.5}
+                                stroke={isPieSlice ? 'hsl(var(--card))' : 'hsl(var(--background))'}
+                                strokeWidth={isPieSlice ? 2.5 : 1.5}
                                 className="cursor-pointer"
-                                style={{ filter: isHovered ? 'url(#glow-stats)' : undefined }}
+                                style={{
+                                    filter: isHovered
+                                        ? (isPieSlice ? 'url(#pie-hover-shadow)' : 'url(#glow-stats)')
+                                        : undefined,
+                                }}
                                 onClick={() => handleNodeClick(node)}
                                 onMouseEnter={() => setHoveredNode(node)}
                                 onMouseLeave={() => setHoveredNode(null)}
                                 initial={false}
                                 animate={{
-                                    fillOpacity: opacity,
-                                    scale: isHovered ? 1.02 : 1,
+                                    fillOpacity: isHovered && isPieSlice ? Math.min(opacity + 0.15, 1) : opacity,
+                                    x: hoverTranslateX,
+                                    y: hoverTranslateY,
+                                    scale: isHovered ? (isPieSlice ? 1.04 : 1.02) : 1,
                                 }}
-                                transition={{ duration: 0.2, ease: "easeOut" }}
+                                transition={{ duration: 0.25, ease: "easeOut" }}
                             />
                         );
                     })}
 
-                    {/* Labels for visible segments */}
+                    {/* Value labels on pie slices (pie variant only) */}
+                    {variant === 'pie' && allNodes.map(({ node }) => {
+                        if (node.level !== 1) return null;
+                        const { opacity, isVisible } = getArcProps(node);
+                        if (!isVisible || opacity < 0.5) return null;
+
+                        const levelConfig = LEVELS[node.level] || LEVELS[3];
+                        const midAngle = (node.startAngle ?? 0) + ((node.endAngle ?? 0) - (node.startAngle ?? 0)) / 2;
+                        const midR = levelConfig.outer * 0.55;
+                        const pos = polarToCartesian(0, 0, midR, midAngle);
+
+                        const arcAngle = (node.endAngle ?? 0) - (node.startAngle ?? 0);
+                        if (arcAngle < 0.25) return null;
+
+                        return (
+                            <g key={`pie-val-${node.id}`}>
+                                <text
+                                    x={pos.x}
+                                    y={pos.y - 6}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="pointer-events-none select-none"
+                                    fill="white"
+                                    fontSize={13}
+                                    fontWeight="700"
+                                    style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.5)' }}
+                                >
+                                    {node.name}
+                                </text>
+                                <text
+                                    x={pos.x}
+                                    y={pos.y + 10}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="pointer-events-none select-none"
+                                    fill="white"
+                                    fontSize={16}
+                                    fontWeight="800"
+                                    style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.5)' }}
+                                >
+                                    {node.value?.toLocaleString() ?? 0}
+                                </text>
+                            </g>
+                        );
+                    })}
+
+                    {/* Labels for visible segments (skip level 1 in pie mode — already has value labels) */}
                     {allNodes.map(({ node }) => {
                         if (node.level === 0) return null;
+                        if (variant === 'pie' && node.level === 1) return null;
                         const { opacity, isVisible } = getArcProps(node);
                         if (!isVisible || opacity < 0.5) return null;
 
@@ -779,9 +865,9 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                                     fontSize={useShortName ? (node.level === 1 ? 9 : 8) : (node.level === 1 ? 10 : 8)}
                                     fontWeight={node.level === 1 ? "700" : "600"}
                                     transform={`rotate(${textRotation}, ${pos.x}, ${pos.y})`}
-                                    style={{ 
+                                    style={{
                                         textShadow: '0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5)',
-                                        opacity: opacity > 0.5 ? 1 : 0 
+                                        opacity: opacity > 0.5 ? 1 : 0
                                     }}
                                 >
                                     {displayName}
@@ -790,38 +876,44 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                         );
                     })}
 
-                    {/* Center circle with total */}
-                    <circle
-                        cx={0}
-                        cy={0}
-                        r={45}
-                        fill="hsl(var(--card))"
-                        stroke="hsl(var(--border))"
-                        strokeWidth={2}
-                        filter="url(#shadow-stats)"
-                    />
-                    <text
-                        x={0}
-                        y={-10}
-                        textAnchor="middle"
-                        fill="hsl(var(--muted-foreground))"
-                        fontSize={9}
-                        fontWeight="500"
-                        className="select-none uppercase tracking-wider"
-                    >
-                        Total
-                    </text>
-                    <text
-                        x={0}
-                        y={12}
-                        textAnchor="middle"
-                        fill="hsl(var(--primary))"
-                        fontSize={18}
-                        fontWeight="bold"
-                        className="select-none"
-                    >
-                        {processedData.value?.toLocaleString() ?? 0}
-                    </text>
+                    {/* Center circle with total (doughnut only) */}
+                    {variant === 'doughnut' && (
+                        <circle
+                            cx={0}
+                            cy={0}
+                            r={45}
+                            fill="hsl(var(--card))"
+                            stroke="hsl(var(--border))"
+                            strokeWidth={2}
+                            filter="url(#shadow-stats)"
+                        />
+                    )}
+                    {variant === 'doughnut' && (
+                        <>
+                            <text
+                                x={0}
+                                y={-10}
+                                textAnchor="middle"
+                                fill="hsl(var(--muted-foreground))"
+                                fontSize={9}
+                                fontWeight="500"
+                                className="select-none uppercase tracking-wider"
+                            >
+                                Total
+                            </text>
+                            <text
+                                x={0}
+                                y={12}
+                                textAnchor="middle"
+                                fill="hsl(var(--primary))"
+                                fontSize={18}
+                                fontWeight="bold"
+                                className="select-none"
+                            >
+                                {processedData.value?.toLocaleString() ?? 0}
+                            </text>
+                        </>
+                    )}
                 </svg>
             </div>
 
@@ -830,7 +922,7 @@ const ExpandableStatsChart = ({ data, className }: ExpandableStatsChartProps) =>
                 {processedData.children?.map(child => {
                     const isActive = activePath.includes(child.id);
                     const hasActiveChild = child.children?.some(c => activePath.includes(c.id));
-                    
+
                     return (
                         <motion.button
                             key={child.id}

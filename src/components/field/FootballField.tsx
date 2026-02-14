@@ -18,7 +18,7 @@ interface FootballFieldProps {
   showHeatmap?: boolean;
 }
 
-type ViewMode = "dots" | "heatmap" | "zones";
+type ViewMode = "heatmap";
 
 // ViewBox constants for coordinate mapping
 // Full field viewBox: '-8 -6 126 80' means x: -8 to 118, y: -6 to 74
@@ -36,21 +36,21 @@ const toContainerPercent = (eventX: number, eventY: number) => {
   // Event coords are 0-100, map to pitch coords (0-105 for x, 0-68 for y)
   const pitchX = (eventX / 100) * PITCH_WIDTH;
   const pitchY = (eventY / 100) * PITCH_HEIGHT;
-  
+
   // Convert pitch coords to viewBox coords, then to percentage
   const viewBoxX = pitchX - VIEWBOX_X_START;
   const viewBoxY = pitchY - VIEWBOX_Y_START;
-  
+
   const percentX = (viewBoxX / VIEWBOX_WIDTH) * 100;
   const percentY = (viewBoxY / VIEWBOX_HEIGHT) * 100;
-  
+
   return { x: percentX, y: percentY };
 };
 
 const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
   const uniqueId = useId();
   const [selectedEvent, setSelectedEvent] = useState<MatchEvent | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>(showHeatmap ? "heatmap" : "dots");
+  const [viewMode, setViewMode] = useState<ViewMode>("heatmap");
   const [activeFilters, setActiveFilters] = useState<string[]>(["pass", "shot", "dribble", "interception", "tackle"]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationIndex, setAnimationIndex] = useState(-1);
@@ -174,18 +174,8 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
       {/* Controls Bar */}
       <div className="flex flex-wrap items-center gap-3">
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
-          {(["dots", "heatmap", "zones"] as ViewMode[]).map((mode) => (
-            <Button
-              key={mode}
-              variant={viewMode === mode ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode(mode)}
-              className="h-7 px-3 text-xs capitalize"
-            >
-              {mode === "dots" ? "Touches" : mode}
-            </Button>
-          ))}
+        <div className="flex items-center gap-1 bg-secondary rounded-lg p-1 px-3">
+          <span className="text-xs font-medium text-muted-foreground">Heatmap</span>
         </div>
 
         {/* Filter Dropdown */}
@@ -239,62 +229,6 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
         {/* Subtle overlay for better visibility of markers */}
         <div className="absolute inset-0 bg-black/10" />
 
-        {/* Zone View - Third Divisions */}
-        <AnimatePresence>
-          {viewMode === "zones" && (() => {
-            // Calculate the pitch area within the container (accounting for viewBox padding)
-            const pitchLeft = ((-VIEWBOX_X_START) / VIEWBOX_WIDTH) * 100;
-            const pitchTop = ((-VIEWBOX_Y_START) / VIEWBOX_HEIGHT) * 100;
-            const pitchWidthPercent = (PITCH_WIDTH / VIEWBOX_WIDTH) * 100;
-            const pitchHeightPercent = (PITCH_HEIGHT / VIEWBOX_HEIGHT) * 100;
-            
-            return (
-              <motion.div
-                className="absolute flex"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{
-                  left: `${pitchLeft}%`,
-                  top: `${pitchTop}%`,
-                  width: `${pitchWidthPercent}%`,
-                  height: `${pitchHeightPercent}%`,
-                }}
-              >
-                {[
-                  { label: "Defensive", value: zoneStats.defensive, color: "from-blue-500/20" },
-                  { label: "Middle", value: zoneStats.middle, color: "from-yellow-500/20" },
-                  { label: "Attacking", value: zoneStats.attacking, color: "from-red-500/20" },
-                ].map((zone, i) => (
-                  <motion.div
-                    key={zone.label}
-                    className={cn(
-                      "flex-1 flex items-center justify-center",
-                      i < 2 && "border-r border-dashed border-white/30",
-                      `bg-gradient-to-b ${zone.color} to-transparent`
-                    )}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                  >
-                    <div className="text-center bg-black/30 backdrop-blur-sm rounded-lg px-4 py-3">
-                      <motion.div
-                        className="text-3xl font-bold text-white"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.2 + i * 0.1, type: "spring" }}
-                      >
-                        {zone.value}%
-                      </motion.div>
-                      <div className="text-xs text-white/70 uppercase tracking-wide mt-1">{zone.label}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            );
-          })()}
-        </AnimatePresence>
 
         {/* Heatmap Grid */}
         <AnimatePresence>
@@ -304,7 +238,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
             const pitchTop = ((-VIEWBOX_Y_START) / VIEWBOX_HEIGHT) * 100;
             const pitchWidthPercent = (PITCH_WIDTH / VIEWBOX_WIDTH) * 100;
             const pitchHeightPercent = (PITCH_HEIGHT / VIEWBOX_HEIGHT) * 100;
-            
+
             return (
               <motion.div
                 className="absolute"
@@ -345,7 +279,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
 
         {/* Event points */}
         <AnimatePresence>
-          {(viewMode === "dots" || viewMode === "zones") && filteredEvents.map((event, index) => {
+          {filteredEvents.map((event, index) => {
             const isAnimated = animationIndex >= 0 && index <= animationIndex;
             const isCurrentAnimation = index === animationIndex;
 
@@ -361,8 +295,8 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
                 return { background: "hsl(var(--destructive))", border: "none" };
               }
               if (isOnTarget) {
-                return { 
-                  background: "transparent", 
+                return {
+                  background: "transparent",
                   border: "2px solid hsl(var(--destructive))",
                   boxShadow: "inset 0 0 0 3px transparent, inset 0 0 0 5px hsl(var(--destructive))"
                 };
@@ -374,7 +308,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
             };
 
             const shotStyle = isShot ? getShotStyle() : {};
-            
+
             // Convert event coordinates to container percentages
             const pos = toContainerPercent(event.x, event.y);
 
@@ -387,7 +321,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
                   opacity: (!isAnimated && animationIndex >= 0) ? 0.3 : 1,
                 }}
                 exit={{ scale: 0, opacity: 0 }}
-                transition={{ duration: 0.2, delay: viewMode === "dots" ? index * 0.02 : 0 }}
+                transition={{ duration: 0.2 }}
                 className={cn(
                   "absolute cursor-pointer z-10",
                   !isShot && eventColors[event.type].bg,
@@ -411,7 +345,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
               >
                 {/* Inner circle for on-target shots (concentric effect) */}
                 {isOnTarget && (
-                  <div 
+                  <div
                     className="absolute rounded-full border-2 border-destructive"
                     style={{
                       width: "6px",

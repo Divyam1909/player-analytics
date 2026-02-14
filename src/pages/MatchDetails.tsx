@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useCustomStats } from "@/contexts/CustomStatsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 // Import existing page components
@@ -31,12 +32,14 @@ interface MatchDetailsResponse {
 const MatchDetails = () => {
     const { matchId } = useParams<{ matchId: string }>();
     const { isCollapsed } = useSidebarContext();
+    const { user } = useAuth();
+    const isPremium = user?.subscriptionType === 'premium';
     const location = useLocation();
     const navigate = useNavigate();
 
     // Valid tab values
     const VALID_TABS = ["overview", "player-overview", "custom", "pre-match", "match-video"];
-    
+
     // Custom stats context
     const { isCustomMode, hasCustomStats } = useCustomStats();
 
@@ -248,13 +251,15 @@ const MatchDetails = () => {
                                 <BarChart3 className="w-4 h-4" />
                                 Overview
                             </TabsTrigger>
-                            <TabsTrigger
-                                value="player-overview"
-                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
-                            >
-                                <Users className="w-4 h-4" />
-                                Player Overview
-                            </TabsTrigger>
+                            {isPremium && (
+                                <TabsTrigger
+                                    value="player-overview"
+                                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+                                >
+                                    <Users className="w-4 h-4" />
+                                    Player Overview
+                                </TabsTrigger>
+                            )}
 
                             <TabsTrigger
                                 value="custom"

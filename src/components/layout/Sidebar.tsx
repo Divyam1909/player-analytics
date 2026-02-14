@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Home,
     User,
+    Users,
     Calendar,
     ChevronDown,
     ChevronLeft,
@@ -29,22 +30,27 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
     {
         label: 'Home',
-        icon: <Home className="w-[18px] h-[18px]" />,
+        icon: <Home className="w-[22px] h-[22px]" />,
         href: '/dashboard',
     },
     {
-        label: 'Profile',
-        icon: <User className="w-[18px] h-[18px]" />,
-        href: '/profile',
+        label: 'Player Overview',
+        icon: <Users className="w-[22px] h-[22px]" />,
+        href: '/players',
     },
     {
         label: 'Matches',
-        icon: <Calendar className="w-[18px] h-[18px]" />,
+        icon: <Calendar className="w-[22px] h-[22px]" />,
         children: [
-            { label: 'Upcoming Matches', href: '/matches/upcoming', icon: <Clock className="w-4 h-4" /> },
-            { label: 'Past Matches', href: '/matches', icon: <History className="w-4 h-4" /> },
-            { label: 'Match Schedule', href: '/matches/schedule', icon: <CalendarDays className="w-4 h-4" /> },
+            { label: 'Upcoming Matches', href: '/matches/upcoming', icon: <Clock className="w-[18px] h-[18px]" /> },
+            { label: 'All Matches', href: '/matches', icon: <History className="w-[18px] h-[18px]" /> },
+            { label: 'Match Schedule', href: '/matches/schedule', icon: <CalendarDays className="w-[18px] h-[18px]" /> },
         ],
+    },
+    {
+        label: 'Profile',
+        icon: <User className="w-[22px] h-[22px]" />,
+        href: '/profile',
     },
 ];
 
@@ -113,7 +119,7 @@ const Sidebar = ({ className }: SidebarProps) => {
                                     <button
                                         onClick={() => toggleExpand(item.label)}
                                         className={cn(
-                                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left",
+                                            "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-left",
                                             isCollapsed ? "justify-center" : "justify-between",
                                             isChildActive(item.children)
                                                 ? "bg-primary/10 text-primary"
@@ -133,7 +139,7 @@ const Sidebar = ({ className }: SidebarProps) => {
                                                         animate={{ opacity: 1, width: "auto" }}
                                                         exit={{ opacity: 0, width: 0 }}
                                                         transition={{ duration: 0.2 }}
-                                                        className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                                                        className="text-[15px] font-medium whitespace-nowrap overflow-hidden"
                                                     >
                                                         {item.label}
                                                     </motion.span>
@@ -164,7 +170,7 @@ const Sidebar = ({ className }: SidebarProps) => {
                                                             key={child.href}
                                                             to={child.href}
                                                             className={cn(
-                                                                "flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm",
+                                                                "flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-[14px]",
                                                                 isActive(child.href)
                                                                     ? "bg-primary/10 text-primary"
                                                                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -184,7 +190,7 @@ const Sidebar = ({ className }: SidebarProps) => {
                                 <Link
                                     to={item.href!}
                                     className={cn(
-                                        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                                        "flex items-center gap-3 px-3 py-3 rounded-lg transition-colors",
                                         isCollapsed && "justify-center",
                                         isActive(item.href)
                                             ? "bg-primary/10 text-primary"
@@ -200,7 +206,7 @@ const Sidebar = ({ className }: SidebarProps) => {
                                                 animate={{ opacity: 1, width: "auto" }}
                                                 exit={{ opacity: 0, width: 0 }}
                                                 transition={{ duration: 0.2 }}
-                                                className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                                                className="text-[15px] font-medium whitespace-nowrap overflow-hidden"
                                             >
                                                 {item.label}
                                             </motion.span>

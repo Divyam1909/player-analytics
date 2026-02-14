@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthHeader from "@/components/layout/AuthHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { Player, MatchEvent } from "@/types/player";
@@ -304,12 +304,14 @@ interface MatchStatistics {
 
 const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { isCollapsed } = useSidebarContext();
     // const players = playersData.players as Player[]; // Remove
     const { data: players = [], isLoading: isPlayersLoading } = usePlayers(); // Use hook
     const [selectedMatch, setSelectedMatch] = useState<string>(defaultMatchId || "all");
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
+    const [goalHalfFilter, setGoalHalfFilter] = useState<'full' | '1st' | '2nd'>('full');
 
     // Formation state
     const [selectedFormation, setSelectedFormation] = useState<FormationName>('4-3-3');
@@ -363,6 +365,26 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         handleScroll(); // Initial check
         return () => window.removeEventListener('scroll', handleScroll);
     }, [embedded]);
+
+    // Scroll restoration: scroll to section from hash on mount / back-navigation
+    useEffect(() => {
+        const hash = location.hash?.replace('#', '');
+        const stateSection = (location.state as any)?.scrollToSection;
+        const target = hash || stateSection;
+        if (target) {
+            // Small delay to let DOM render
+            const timer = setTimeout(() => {
+                const el = sectionRefs.current[target] || document.getElementById(target);
+                if (el) {
+                    const headerOffset = 180;
+                    const top = el.getBoundingClientRect().top + window.pageYOffset - headerOffset;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                    setActiveSection(target);
+                }
+            }, 200);
+            return () => clearTimeout(timer);
+        }
+    }, [location]);
 
     // Fetch matches from Supabase
     const { data: dbMatches = [] } = useQuery({
@@ -750,11 +772,16 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         });
     }, [players]);
 
-    // Filter goal moments by selected match
+    // Filter goal moments by selected match and half
     const filteredGoals = useMemo(() => {
-        if (selectedMatch === "all") return goalMoments;
-        return goalMoments.filter((g) => g.matchId === selectedMatch);
-    }, [goalMoments, selectedMatch]);
+        let goals = selectedMatch === "all" ? goalMoments : goalMoments.filter((g) => g.matchId === selectedMatch);
+        if (goalHalfFilter === '1st') {
+            goals = goals.filter(g => g.minute <= 45);
+        } else if (goalHalfFilter === '2nd') {
+            goals = goals.filter(g => g.minute > 45);
+        }
+        return goals;
+    }, [goalMoments, selectedMatch, goalHalfFilter]);
 
     const currentGoal = filteredGoals[currentGoalIndex];
 
@@ -791,13 +818,6 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         }
     }, [isPlaying, filteredGoals.length]);
 
-    const statCards = [
-        { label: selectedMatch === "all" ? "Total Players" : "Match Players", value: teamStats.playerCount, icon: Users, color: "text-primary", statId: "total_players" },
-        { label: "Total Goals", value: teamStats.totalGoals, icon: Target, color: "text-destructive", statId: "goals_scored" },
-        { label: "Total Assists", value: teamStats.totalAssists, icon: Footprints, color: "text-warning", statId: "assists" },
-        { label: "Avg Rating", value: teamStats.avgRating, icon: TrendingUp, color: "text-success", statId: "overall_rating" },
-    ];
-
     return (
         <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
             {!embedded && <AuthHeader title="Team Analytics" />}
@@ -833,7 +853,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                     {/* Match Selector */}
                     <motion.div
-                        className="mb-8"
+                        id="overview"
+                        ref={(el) => { sectionRefs.current['overview'] = el; }}
+                        className="mb-8 scroll-mt-24"
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
@@ -894,45 +916,6 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         </div>
                     </motion.div>
 
-                    {/* Stat Cards - Overview Section */}
-                    <motion.div
-                        id="overview"
-                        ref={(el) => { sectionRefs.current['overview'] = el; }}
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 scroll-mt-24"
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="show"
-                    >
-                        {statCards.map((stat, index) => (
-                            <motion.div
-                                key={stat.label}
-                                variants={itemVariants}
-                                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                                className="relative overflow-hidden rounded-xl glass card-glow p-5 group hover:border-primary/40 transition-all duration-300"
-                            >
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/15 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
-                                <div className="relative flex items-start justify-between">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                                            <StatHint statId={stat.statId} iconSize="sm">
-                                                <span>{stat.label}</span>
-                                            </StatHint>
-                                        </p>
-                                        <p className={`text-3xl font-bold ${stat.color}`}>
-                                            <AnimatedValue value={stat.value} delay={index * 100} />
-                                        </p>
-                                    </div>
-                                    <motion.div
-                                        className={`p-3 rounded-xl glass-subtle ${stat.color}`}
-                                        whileHover={{ rotate: 10, scale: 1.1 }}
-                                    >
-                                        <stat.icon className="w-6 h-6" />
-                                    </motion.div>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </motion.div>
 
                     {/* Advanced Statistics Section - REORDERED */}
                     <motion.div
@@ -998,7 +981,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
                                     // Match info for header
                                     const currentMatchInfo = dbMatches.find(m => m.id === selectedMatch);
-                                    const teamName = currentMatchInfo?.homeTeam || "Bombay Gymkhana Men";
+                                    const teamName = currentMatchInfo?.homeTeam || "Our Team";
                                     const opponentName = selectedMatch === "all" ? "All Opponents" : currentMatchInfo?.opponent || "Opponent";
 
                                     const advancedStats = [
@@ -1070,7 +1053,6 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                         { label: "SE", teamValue: se, opponentValue: oppSe, maxValue: 100 },
                                         { label: "DS", teamValue: ds, opponentValue: oppDs, maxValue: 100 },
                                         { label: "T&P", teamValue: tp, opponentValue: oppTp, maxValue: 100 },
-                                        { label: "RPE", teamValue: rpe, opponentValue: oppRpe, maxValue: 100 },
                                     ];
 
 
@@ -1106,7 +1088,6 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                         { label: "SE", full: "Shooting Efficiency", statId: "se" },
                                                         { label: "DS", full: "Defensive Solidity", statId: "ds" },
                                                         { label: "T&P", full: "Transition & Progression", statId: "tp" },
-                                                        { label: "RPE", full: "Recovery & Pressing", statId: "rpe" },
                                                     ].map((item) => (
                                                         <div key={item.label} className="text-center p-2 rounded-lg bg-background/50">
                                                             <StatHint statId={item.statId} iconSize="sm">
@@ -1118,84 +1099,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 </div>
                                             </div>
 
-                                            {/* Match Stats Grid */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-                                                {advancedStats.map((stat, index) => {
-                                                    // Only compare if both values have data
-                                                    const bothHaveData = stat.team !== null && stat.opponent !== null;
-                                                    const teamLeading = bothHaveData && stat.team > stat.opponent;
-                                                    const oppLeading = bothHaveData && stat.opponent > stat.team;
-                                                    const difference = bothHaveData ? Math.abs(stat.team - stat.opponent) : null;
 
-                                                    return (
-                                                        <motion.div
-                                                            key={stat.label}
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: index * 0.05 }}
-                                                            className="p-4 rounded-xl glass-subtle hover:border-primary/30 transition-all duration-300"
-                                                        >
-                                                            <div className="flex items-center gap-2 mb-3 text-primary">
-                                                                {stat.icon}
-                                                                <span className="text-xs font-semibold">{stat.label}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="flex-1 flex items-center gap-1.5">
-                                                                    <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-sm shadow-primary/50" />
-                                                                    <span className={cn(
-                                                                        "text-xl font-bold",
-                                                                        teamLeading ? "text-primary" : "text-foreground"
-                                                                    )}>
-                                                                        {stat.team !== null ? <AnimatedValue value={stat.team} delay={index * 80} duration={1200} /> : "--"}
-                                                                    </span>
-                                                                    {teamLeading && difference !== null && (
-                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/20 text-primary font-semibold">
-                                                                            +{difference}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <span className="text-sm font-medium text-muted-foreground">vs</span>
-                                                                <div className="flex-1 flex items-center gap-1.5 justify-end">
-                                                                    {oppLeading && difference !== null && (
-                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
-                                                                            +{difference}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className={cn(
-                                                                        "text-xl font-bold",
-                                                                        oppLeading ? "text-foreground" : "text-muted-foreground"
-                                                                    )}>
-                                                                        {stat.opponent !== null ? <AnimatedValue value={stat.opponent} delay={index * 80 + 100} duration={1200} /> : "--"}
-                                                                    </span>
-                                                                    <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/60" />
-                                                                </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Bottom Stats Row */}
-                                            <div className="border-t border-border pt-4">
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                                    {bottomStats.map((stat) => (
-                                                        <div key={stat.label} className="text-center p-2 rounded-lg bg-secondary/20">
-                                                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                                                                {stat.label}
-                                                            </p>
-                                                            <div className="flex items-center justify-center gap-2">
-                                                                <span className="text-lg font-bold text-primary">
-                                                                    {stat.team !== null ? stat.team : "--"}
-                                                                </span>
-                                                                <span className="text-xs text-muted-foreground">vs</span>
-                                                                <span className="text-lg font-bold text-foreground">
-                                                                    {stat.opponent !== null ? stat.opponent : "--"}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
                                         </>
                                     );
                                 })()}
@@ -1513,7 +1417,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                             <p className="text-sm text-muted-foreground">Set pieces, duels & keeper stats - click to expand</p>
                                         </CardHeader>
                                         <CardContent>
-                                            <ExpandableStatsChart data={otherStatsData} className="py-4" />
+                                            <ExpandableStatsChart data={otherStatsData} className="py-4" variant="pie" />
                                         </CardContent>
                                     </Card>
                                 </motion.div>
@@ -1608,6 +1512,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 if (player && !draggedPlayerId) {
                                                     e.preventDefault();
                                                     e.stopPropagation();
+                                                    window.history.replaceState(null, '', '/team#formation');
                                                     navigate(`/player/${player.id}`);
                                                 }
                                             };
@@ -1821,7 +1726,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                             e.dataTransfer.setDragImage(emptyImg, 0, 0);
                                                         }}
                                                     >
-                                                        <Link to={`/player/${player.id}`} onClick={(e) => draggedPlayerId && e.preventDefault()}>
+                                                        <Link to={`/player/${player.id}`} onClick={(e) => { if (draggedPlayerId) { e.preventDefault(); } else { window.history.replaceState(null, '', '/team#formation'); } }}>
                                                             <motion.div
                                                                 className="flex flex-col items-center p-2 rounded-lg hover:bg-secondary/50 transition-colors"
                                                                 whileHover={{ scale: 1.05 }}
@@ -1877,6 +1782,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                             <Link
                                                 to={`/player/${topPerformers.topScorer.id}`}
                                                 className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                                                onClick={() => window.history.replaceState(null, '', '/team#stats')}
                                             >
                                                 <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center">
                                                     <Target className="w-6 h-6 text-destructive" />
@@ -1908,6 +1814,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                             <Link
                                                 to={`/player/${topPerformers.topAssister.id}`}
                                                 className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                                                onClick={() => window.history.replaceState(null, '', '/team#stats')}
                                             >
                                                 <div className="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center">
                                                     <Footprints className="w-6 h-6 text-warning" />
@@ -1939,6 +1846,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                             <Link
                                                 to={`/player/${topPerformers.topRated.id}`}
                                                 className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                                                onClick={() => window.history.replaceState(null, '', '/team#stats')}
                                             >
                                                 <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center">
                                                     <Flame className="w-6 h-6 text-success" />
@@ -1976,9 +1884,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             <CardHeader>
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Footprints className="w-5 h-5 text-primary" />
-                                    Team Passing Map
+                                    Passing Network
                                 </CardTitle>
-                                <p className="text-sm text-muted-foreground">Click on a player to view their individual passing analysis</p>
+                                <p className="text-sm text-muted-foreground">Player-to-player passing connections — hover lines for details, click players to filter</p>
                             </CardHeader>
                             <CardContent>
                                 <TeamPassingMap
@@ -2009,230 +1917,160 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                     <Target className="w-5 h-5 text-destructive" />
                                     Goal Replay ({filteredGoals.length} Goals)
                                 </CardTitle>
-                                <div className="flex items-center gap-3">
-                                    {/* Removed Select dropdown as we have global selector now */}
-                                    <div className="flex items-center gap-1">
+                                {/* Half selection toggle */}
+                                <div className="flex items-center gap-1 border border-border rounded-md overflow-hidden">
+                                    {(['full', '1st', '2nd'] as const).map((half) => (
                                         <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={handleReset}
-                                            disabled={filteredGoals.length === 0}
+                                            key={half}
+                                            variant={goalHalfFilter === half ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => { setGoalHalfFilter(half); setCurrentGoalIndex(0); }}
+                                            className="h-7 px-3 text-xs rounded-none border-0"
                                         >
-                                            <RotateCcw className="w-4 h-4" />
+                                            {half === 'full' ? 'Full Match' : half === '1st' ? '1st Half' : '2nd Half'}
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => setIsPlaying(!isPlaying)}
-                                            disabled={filteredGoals.length === 0}
-                                        >
-                                            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={handleNextGoal}
-                                            disabled={filteredGoals.length === 0}
-                                        >
-                                            <SkipForward className="w-4 h-4" />
-                                        </Button>
-                                    </div>
+                                    ))}
                                 </div>
                             </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Goal Pitch Visualization - HORIZONTAL (goal on right) */}
-                                    <div className="relative w-full max-w-lg mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 aspect-[4/3]">
-                                        <TacticalField
-                                            viewMode="right_half"
-                                            className="w-full h-full"
-                                            interactive
-                                        >
-                                            {/* Current Goal Animation */}
-                                            <AnimatePresence mode="wait">
-                                                {currentGoal && (
-                                                    <g key={`${currentGoal.matchId}-${currentGoal.minute}`}>
-                                                        {(() => {
-                                                            // For right_half view: viewBox '47 -5 63 78' shows x from 47-110, y from -5 to 73
-                                                            // Goal is on RIGHT at x=105, center y=34
-
-                                                            // Normalize event coords (0-100) 
-                                                            // If shot is from left side (x < 50), flip to show on right half
-                                                            const isFlipped = currentGoal.event.x < 50;
-                                                            const normX = isFlipped ? 100 - currentGoal.event.x : currentGoal.event.x;
-                                                            const normY = isFlipped ? 100 - currentGoal.event.y : currentGoal.event.y;
-
-                                                            // Map to SVG coordinates for right half of field
-                                                            // normX (50-100) maps to SVG x (52.5-105)
-                                                            // normY (0-100) maps to SVG y (0-68)
-                                                            const svgX = 52.5 + ((normX - 50) / 50) * 52.5;
-                                                            const svgY = (normY / 100) * 68;
-
-                                                            // Goal position (right side)
-                                                            const goalX = 105;
-                                                            const goalY = 34;
-
-                                                            return (
-                                                                <>
-                                                                    {/* Shot trajectory line */}
-                                                                    <motion.line
-                                                                        x1={svgX}
-                                                                        y1={svgY}
-                                                                        x2={goalX}
-                                                                        y2={goalY}
-                                                                        stroke="hsl(var(--destructive))"
-                                                                        strokeWidth="0.5"
-                                                                        strokeDasharray="1.5 0.8"
-                                                                        initial={{ pathLength: 0, opacity: 0 }}
-                                                                        animate={{ pathLength: 1, opacity: 1 }}
-                                                                        transition={{ duration: 0.8, ease: "easeOut" }}
-                                                                    />
-
-                                                                    {/* Shooter position - Goal: Filled red circle */}
-                                                                    <motion.g
-                                                                        initial={{ scale: 0 }}
-                                                                        animate={{ scale: 1 }}
-                                                                        transition={{ delay: 0.2, type: "spring" }}
-                                                                    >
-                                                                        <circle
-                                                                            cx={svgX}
-                                                                            cy={svgY}
-                                                                            r={2.2}
-                                                                            fill="hsl(var(--destructive))"
-                                                                            fillOpacity={0.9}
-                                                                            stroke="hsl(var(--destructive))"
-                                                                            strokeWidth="0.3"
-                                                                        />
-                                                                        <text
-                                                                            x={svgX}
-                                                                            y={svgY + 0.5}
-                                                                            textAnchor="middle"
-                                                                            fill="white"
-                                                                            fontSize="1.4"
-                                                                            fontWeight="bold"
-                                                                            fontFamily="Arial"
-                                                                        >
-                                                                            {currentGoal.scorer.jerseyNumber}
-                                                                        </text>
-                                                                    </motion.g>
-
-                                                                    {/* Goal indicator (Ball in net) */}
-                                                                    <motion.circle
-                                                                        cx={goalX}
-                                                                        cy={goalY}
-                                                                        r={1}
-                                                                        fill="white"
-                                                                        stroke="black"
-                                                                        strokeWidth="0.15"
-                                                                        initial={{ scale: 0, opacity: 0 }}
-                                                                        animate={{ scale: 1, opacity: 1 }}
-                                                                        transition={{ delay: 0.8, type: "spring" }}
-                                                                    />
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </g>
-                                                )}
-                                            </AnimatePresence>
-                                        </TacticalField>
-                                    </div>
-
-                                    {/* Goal Details */}
-                                    <div className="space-y-4">
-                                        <AnimatePresence mode="wait">
-                                            {currentGoal && (
-                                                <motion.div
-                                                    key={`details-${currentGoal.matchId}-${currentGoal.minute}`}
-                                                    initial={{ opacity: 0, x: 20 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: -20 }}
-                                                    className="space-y-4"
-                                                >
-                                                    <div className="p-4 rounded-lg bg-secondary/50">
-                                                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                                                            Goal #{currentGoalIndex + 1} of {filteredGoals.length}
-                                                        </p>
-                                                        <h3 className="text-xl font-bold text-foreground">
-                                                            {currentGoal.scorer.name}
-                                                        </h3>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            vs {currentGoal.opponent} • {currentGoal.minute}'
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div className="p-3 rounded-lg bg-secondary/30 text-center">
-                                                            <p className="text-2xl font-bold text-destructive">
-                                                                {currentGoal.minute}'
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground">Minute</p>
-                                                        </div>
-                                                        <div className="p-3 rounded-lg bg-secondary/30 text-center">
-                                                            <p className="text-2xl font-bold text-primary">
-                                                                #{currentGoal.scorer.jerseyNumber}
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground">Jersey</p>
-                                                        </div>
-                                                    </div>
-
-                                                    <Link
-                                                        to={`/player/${currentGoal.scorer.id}`}
-                                                        className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
-                                                    >
-                                                        View Player Stats
-                                                        <ArrowRight className="w-4 h-4" />
-                                                    </Link>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-
-                                        {/* Empty state when no goals */}
-                                        {filteredGoals.length === 0 && (
-                                            <div className="flex flex-col items-center justify-center py-8 text-center">
-                                                <Target className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                                                <p className="text-muted-foreground font-medium">No goals recorded</p>
-                                                <p className="text-sm text-muted-foreground/60">
-                                                    {selectedMatch === "all"
-                                                        ? "No goals have been scored yet"
-                                                        : "No goals scored in this match"}
-                                                </p>
-                                            </div>
+                            <CardContent className="space-y-4">
+                                {/* Goal Pitch Visualization - full field */}
+                                <div className="relative w-full max-w-3xl mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 aspect-[16/10]">
+                                    <TacticalField
+                                        viewMode="full"
+                                        className="w-full h-full"
+                                        interactive
+                                    >
+                                        {/* Half dimming overlay — dims the INACTIVE half */}
+                                        {goalHalfFilter === '1st' && (
+                                            <rect x={52.5} y={-6} width={56} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
+                                        )}
+                                        {goalHalfFilter === '2nd' && (
+                                            <rect x={-8} y={-6} width={60.5} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
                                         )}
 
-                                        {/* Goal List */}
-                                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                                            {filteredGoals.map((goal, i) => (
-                                                <button
-                                                    key={`${goal.matchId}-${goal.minute}-${i}`}
-                                                    onClick={() => setCurrentGoalIndex(i)}
-                                                    className={cn(
-                                                        "w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors",
-                                                        i === currentGoalIndex
-                                                            ? "bg-primary/20 border border-primary/30"
-                                                            : "bg-secondary/30 hover:bg-secondary/50"
-                                                    )}
-                                                >
-                                                    <div className="w-8 h-8 rounded-full bg-destructive/20 flex items-center justify-center text-sm font-bold text-destructive">
-                                                        {goal.scorer.jerseyNumber}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium text-foreground truncate">
-                                                            {goal.scorer.name}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {goal.minute}' vs {goal.opponent}
-                                                        </p>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                        {/* Current Goal Animation */}
+                                        <AnimatePresence mode="wait">
+                                            {currentGoal && (
+                                                <g key={`${currentGoal.matchId}-${currentGoal.minute}`}>
+                                                    {(() => {
+                                                        // Map normalised event coords (0-100) to full pitch SVG coords
+                                                        const svgX = (currentGoal.event.x / 100) * 105;
+                                                        const svgY = (currentGoal.event.y / 100) * 68;
+                                                        // Goal on the right side
+                                                        const goalX = 105;
+                                                        const goalY = 34;
+
+                                                        return (
+                                                            <>
+                                                                {/* Shot trajectory line */}
+                                                                <motion.line
+                                                                    x1={svgX} y1={svgY} x2={goalX} y2={goalY}
+                                                                    stroke="hsl(var(--destructive))"
+                                                                    strokeWidth="0.5"
+                                                                    strokeDasharray="1.5 0.8"
+                                                                    initial={{ pathLength: 0, opacity: 0 }}
+                                                                    animate={{ pathLength: 1, opacity: 1 }}
+                                                                    transition={{ duration: 0.8, ease: "easeOut" }}
+                                                                />
+
+                                                                {/* Shooter circle — click to go to player shot map */}
+                                                                <motion.g
+                                                                    initial={{ scale: 0 }}
+                                                                    animate={{ scale: 1 }}
+                                                                    transition={{ delay: 0.2, type: "spring" }}
+                                                                    style={{ cursor: 'pointer' }}
+                                                                    onClick={() => {
+                                                                        // Stamp current URL with #goals so back-button returns to this section
+                                                                        window.history.replaceState(null, '', '/team#goals');
+                                                                        navigate(`/player/${currentGoal.scorer.id}#shots`);
+                                                                    }}
+                                                                >
+                                                                    <circle cx={svgX} cy={svgY} r={2.2}
+                                                                        fill="hsl(var(--destructive))" fillOpacity={0.9}
+                                                                        stroke="hsl(var(--destructive))" strokeWidth="0.3"
+                                                                    />
+                                                                    <text x={svgX} y={svgY + 0.5}
+                                                                        textAnchor="middle" fill="white"
+                                                                        fontSize="1.4" fontWeight="bold" fontFamily="Arial"
+                                                                    >
+                                                                        {currentGoal.scorer.jerseyNumber}
+                                                                    </text>
+                                                                </motion.g>
+
+                                                                {/* Ball in net */}
+                                                                <motion.circle
+                                                                    cx={goalX} cy={goalY} r={1}
+                                                                    fill="white" stroke="black" strokeWidth="0.15"
+                                                                    initial={{ scale: 0, opacity: 0 }}
+                                                                    animate={{ scale: 1, opacity: 1 }}
+                                                                    transition={{ delay: 0.8, type: "spring" }}
+                                                                />
+
+                                                                {/* Scorer label below circle */}
+                                                                <motion.text
+                                                                    x={svgX} y={svgY + 4}
+                                                                    textAnchor="middle" fill="white"
+                                                                    fontSize="1.8" fontWeight="600" fontFamily="Arial"
+                                                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                                    transition={{ delay: 0.4 }}
+                                                                >
+                                                                    {currentGoal.scorer.name.split(' ').pop()} {currentGoal.minute}'
+                                                                </motion.text>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </g>
+                                            )}
+                                        </AnimatePresence>
+                                    </TacticalField>
                                 </div>
+
+                                {/* Goal counter */}
+                                {currentGoal && filteredGoals.length > 0 && (
+                                    <p className="text-xs text-center text-muted-foreground">
+                                        Goal {currentGoalIndex + 1} of {filteredGoals.length}
+                                    </p>
+                                )}
+
+                                {/* Empty state */}
+                                {filteredGoals.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                                        <Target className="w-10 h-10 text-muted-foreground/30 mb-2" />
+                                        <p className="text-muted-foreground font-medium text-sm">No goals recorded</p>
+                                        <p className="text-xs text-muted-foreground/60">
+                                            {goalHalfFilter !== 'full'
+                                                ? `No goals in the ${goalHalfFilter === '1st' ? 'first' : 'second'} half`
+                                                : selectedMatch === "all"
+                                                    ? "No goals have been scored yet"
+                                                    : "No goals scored in this match"}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Compact goal list */}
+                                {filteredGoals.length > 1 && (
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {filteredGoals.map((goal, i) => (
+                                            <button
+                                                key={`${goal.matchId}-${goal.minute}-${i}`}
+                                                onClick={() => setCurrentGoalIndex(i)}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors",
+                                                    i === currentGoalIndex
+                                                        ? "bg-destructive/20 border border-destructive/40 text-destructive font-semibold"
+                                                        : "bg-secondary/40 hover:bg-secondary/60 text-muted-foreground"
+                                                )}
+                                            >
+                                                <span className="font-bold">{goal.scorer.jerseyNumber}</span>
+                                                <span>{goal.scorer.name.split(' ').pop()}</span>
+                                                <span className="opacity-60">{goal.minute}'</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </motion.div>
-
-
 
                     {/* Team Performance Trend */}
                     <motion.div
@@ -2266,30 +2104,32 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
             </main>
 
             {/* Swap Confirmation Dialog */}
-            {swapConfirmation && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-card border-2 border-primary rounded-xl p-6 max-w-md mx-4 shadow-2xl"
-                    >
-                        <h3 className="text-xl font-bold text-foreground mb-4">Confirm Player Swap</h3>
-                        <p className="text-muted-foreground mb-6">
-                            Swap <span className="font-semibold text-primary">{swapConfirmation.from}</span> with{' '}
-                            <span className="font-semibold text-primary">{swapConfirmation.to}</span>?
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                            <Button variant="outline" onClick={cancelSwap}>
-                                Cancel
-                            </Button>
-                            <Button onClick={confirmSwap}>
-                                Confirm Swap
-                            </Button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
-        </div>
+            {
+                swapConfirmation && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-card border-2 border-primary rounded-xl p-6 max-w-md mx-4 shadow-2xl"
+                        >
+                            <h3 className="text-xl font-bold text-foreground mb-4">Confirm Player Swap</h3>
+                            <p className="text-muted-foreground mb-6">
+                                Swap <span className="font-semibold text-primary">{swapConfirmation.from}</span> with{' '}
+                                <span className="font-semibold text-primary">{swapConfirmation.to}</span>?
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <Button variant="outline" onClick={cancelSwap}>
+                                    Cancel
+                                </Button>
+                                <Button onClick={confirmSwap}>
+                                    Confirm Swap
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 

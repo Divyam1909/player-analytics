@@ -1,12 +1,11 @@
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MatchEvent, Player } from "@/types/player";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Layers, Users, ExternalLink } from "lucide-react";
-import TacticalField from "@/components/field/TacticalField";
+import { Users } from "lucide-react";
 import { StatHint } from "@/components/ui/stat-hint";
 
 interface PlayerPassData {
@@ -24,6 +23,16 @@ interface TimeInterval {
     start: number;
     end: number;
     category?: 'all' | '10min' | 'half' | 'overtime';
+}
+
+interface PassConnection {
+    fromId: string;
+    toId: string;
+    fromName: string;
+    toName: string;
+    total: number;
+    successful: number;
+    accuracy: number;
 }
 
 // 10-minute interval options
@@ -48,34 +57,28 @@ const HALF_INTERVALS: TimeInterval[] = [
 
 const ALL_INTERVAL: TimeInterval = { label: "Full Match", start: 0, end: 120, category: 'all' };
 
-// Calculate distance in meters (field is 105m x 68m)
-const calculateDistance = (x1: number, y1: number, x2: number, y2: number): number => {
-    const dx = (x2 - x1) / 100 * 105;
-    const dy = (y2 - y1) / 100 * 68;
-    return Math.sqrt(dx * dx + dy * dy);
+// Get connection color based on accuracy
+const getConnectionColor = (accuracy: number): string => {
+    if (accuracy >= 85) return "hsl(142, 76%, 42%)";   // Green — high accuracy
+    if (accuracy >= 70) return "hsl(38, 92%, 50%)";    // Orange — medium
+    return "hsl(0, 72%, 50%)";                          // Red — low
 };
 
-// Get pass type based on distance (same as individual PassingMap)
-const getPassType = (distance: number): { type: string; color: string } => {
-    if (distance < 10) return { type: "Short", color: "hsl(199, 89%, 48%)" };  // Cyan
-    if (distance < 25) return { type: "Medium", color: "hsl(142, 76%, 36%)" }; // Green
-    return { type: "Long", color: "hsl(38, 92%, 50%)" };                        // Orange
+const getConnectionColorWithOpacity = (accuracy: number, opacity: number): string => {
+    if (accuracy >= 85) return `hsla(142, 76%, 42%, ${opacity})`;
+    if (accuracy >= 70) return `hsla(38, 92%, 50%, ${opacity})`;
+    return `hsla(0, 72%, 50%, ${opacity})`;
 };
 
-const TeamPassingMap = ({ playerPasses, matchId }: TeamPassingMapProps) => {
-    const uniqueId = useId();
+const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
     const navigate = useNavigate();
     const [selectedInterval, setSelectedInterval] = useState<TimeInterval>(ALL_INTERVAL);
     const [intervalMode, setIntervalMode] = useState<'10min' | 'half'>('10min');
-    const [showConnections, setShowConnections] = useState(true);
-    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
+    const [hoveredConnection, setHoveredConnection] = useState<PassConnection | null>(null);
+    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-    // Navigate to individual player's passing map
-    const handlePlayerClick = (playerId: string) => {
-        navigate(`/player/${playerId}#passing`);
-    };
-
-    // Filter passes from all players
+    // Filter pass events by time interval
     const allPassEvents = useMemo(() => {
         return playerPasses.flatMap(pp =>
             pp.events.filter(e => e.type === "pass").map(e => ({
@@ -99,79 +102,343 @@ const TeamPassingMap = ({ playerPasses, matchId }: TeamPassingMapProps) => {
         return TEN_MIN_INTERVALS;
     }, [intervalMode, hasOvertime]);
 
-    // Filter by time interval and selected player
+    // Filter by time interval
     const filteredPasses = useMemo(() => {
-        let passes = allPassEvents.filter(
+        return allPassEvents.filter(
             e => e.minute >= selectedInterval.start && e.minute < selectedInterval.end
         );
-        if (selectedPlayerId) {
-            passes = passes.filter(e => e.playerId === selectedPlayerId);
-        }
-        return passes;
-    }, [allPassEvents, selectedInterval, selectedPlayerId]);
+    }, [allPassEvents, selectedInterval]);
 
-    // Sample passes when there are too many
-    const MAX_VISIBLE_PASSES = 120;
-    const displayPasses = useMemo(() => {
-        if (filteredPasses.length <= MAX_VISIBLE_PASSES) return filteredPasses;
-        const step = filteredPasses.length / MAX_VISIBLE_PASSES;
-        return filteredPasses.filter((_, index) => Math.floor(index % step) === 0).slice(0, MAX_VISIBLE_PASSES);
-    }, [filteredPasses]);
+    // Build player map
+    const playerMap = useMemo(() => {
+        const map = new Map<string, Player>();
+        playerPasses.forEach(pp => {
+            map.set(pp.player.id, pp.player);
+        });
+        return map;
+    }, [playerPasses]);
 
-    // Calculate passing stats
-    const stats = useMemo(() => {
-        const total = filteredPasses.length;
-        const successful = filteredPasses.filter(p => p.success).length;
-        const accuracy = total > 0 ? Math.round((successful / total) * 100) : 0;
-        const keyPasses = filteredPasses.filter(p => p.success && p.targetX > 75).length;
-
-        const distances = filteredPasses.map(p => calculateDistance(p.x, p.y, p.targetX, p.targetY));
-        const avgDistance = distances.length > 0 ? Math.round(distances.reduce((a, b) => a + b, 0) / distances.length) : 0;
-
-        // Pass type breakdown
-        const shortPasses = filteredPasses.filter(p => calculateDistance(p.x, p.y, p.targetX, p.targetY) < 10).length;
-        const mediumPasses = filteredPasses.filter(p => {
-            const d = calculateDistance(p.x, p.y, p.targetX, p.targetY);
-            return d >= 10 && d < 25;
-        }).length;
-        const longPasses = filteredPasses.filter(p => calculateDistance(p.x, p.y, p.targetX, p.targetY) >= 25).length;
-
-        return { total, successful, accuracy, keyPasses, avgDistance, shortPasses, mediumPasses, longPasses };
-    }, [filteredPasses]);
-
-    // Get players who have passes in current filter (only show these)
-    const playersWithPasses = useMemo(() => {
-        const playerIds = new Set(filteredPasses.map(p => p.playerId));
-        return playerPasses.filter(pp => playerIds.has(pp.player.id));
-    }, [filteredPasses, playerPasses]);
-
-    // Calculate heatmap zones
-    const positionHeatmap = useMemo(() => {
-        const gridCols = 10;
-        const gridRows = 6;
-        const zones: number[][] = Array(gridRows).fill(null).map(() => Array(gridCols).fill(0));
+    // Build passing connections (bidirectional — combine A→B and B→A)
+    const connections = useMemo(() => {
+        const connMap = new Map<string, { total: number; successful: number }>();
 
         filteredPasses.forEach(pass => {
-            const zoneX = Math.min(Math.floor(pass.x / (100 / gridCols)), gridCols - 1);
-            const zoneY = Math.min(Math.floor(pass.y / (100 / gridRows)), gridRows - 1);
-            zones[zoneY][zoneX]++;
+            if (!pass.passTarget) return;
+            // Only count connections between known players in the squad
+            if (!playerMap.has(pass.playerId) || !playerMap.has(pass.passTarget)) return;
+
+            // Create sorted key so A→B and B→A merge into one connection
+            const key = [pass.playerId, pass.passTarget].sort().join('::');
+            const existing = connMap.get(key) || { total: 0, successful: 0 };
+            existing.total++;
+            if (pass.success) existing.successful++;
+            connMap.set(key, existing);
         });
 
-        const maxIntensity = Math.max(...zones.flat());
-        return { zones, maxIntensity, gridCols, gridRows };
-    }, [filteredPasses]);
+        const result: PassConnection[] = [];
+        connMap.forEach((data, key) => {
+            const [fromId, toId] = key.split('::');
+            const fromPlayer = playerMap.get(fromId);
+            const toPlayer = playerMap.get(toId);
+            if (fromPlayer && toPlayer) {
+                result.push({
+                    fromId,
+                    toId,
+                    fromName: fromPlayer.name,
+                    toName: toPlayer.name,
+                    total: data.total,
+                    successful: data.successful,
+                    accuracy: data.total > 0 ? Math.round((data.successful / data.total) * 100) : 0,
+                });
+            }
+        });
 
-    const getHeatmapColor = (intensity: number, max: number) => {
-        if (max === 0 || intensity === 0) return "transparent";
-        const normalized = intensity / max;
-        if (normalized < 0.3) return `hsla(199, 80%, 50%, ${normalized * 0.8})`;
-        if (normalized < 0.6) return `hsla(142, 70%, 45%, ${0.15 + normalized * 0.25})`;
-        return `hsla(38, 90%, 50%, ${0.2 + normalized * 0.25})`;
-    };
+        // Sort by total passes descending
+        return result.sort((a, b) => b.total - a.total);
+    }, [filteredPasses, playerMap]);
+
+    // Players that appear in connections (have pass data)
+    const activePlayerIds = useMemo(() => {
+        const ids = new Set<string>();
+        connections.forEach(c => {
+            ids.add(c.fromId);
+            ids.add(c.toId);
+        });
+        return ids;
+    }, [connections]);
+
+    const activePlayers = useMemo(() => {
+        return playerPasses
+            .filter(pp => activePlayerIds.has(pp.player.id))
+            .map(pp => pp.player);
+    }, [playerPasses, activePlayerIds]);
+
+    // Filter connections by selected players
+    const visibleConnections = useMemo(() => {
+        if (selectedPlayerIds.size === 0) return connections;
+        return connections.filter(c =>
+            selectedPlayerIds.has(c.fromId) || selectedPlayerIds.has(c.toId)
+        );
+    }, [connections, selectedPlayerIds]);
+
+    const maxPasses = useMemo(() => {
+        return Math.max(1, ...visibleConnections.map(c => c.total));
+    }, [visibleConnections]);
+
+    // Passing stats
+    const stats = useMemo(() => {
+        const relevantPasses = selectedPlayerIds.size > 0
+            ? filteredPasses.filter(p => selectedPlayerIds.has(p.playerId) || (p.passTarget && selectedPlayerIds.has(p.passTarget)))
+            : filteredPasses;
+
+        const total = relevantPasses.length;
+        const successful = relevantPasses.filter(p => p.success).length;
+        const accuracy = total > 0 ? Math.round((successful / total) * 100) : 0;
+        const keyPasses = relevantPasses.filter(p => p.success && p.targetX > 75).length;
+
+        return { total, successful, accuracy, keyPasses };
+    }, [filteredPasses, selectedPlayerIds]);
+
+    // SVG layout — compact
+    const SVG_SIZE = 380;
+    const CENTER = SVG_SIZE / 2;
+    const RADIUS = 140;
+    const NODE_RADIUS = 18;
+
+    // Calculate player positions in a circle
+    const playerPositions = useMemo(() => {
+        const positions = new Map<string, { x: number; y: number }>();
+        const count = activePlayers.length;
+        activePlayers.forEach((player, index) => {
+            const angle = (2 * Math.PI * index) / count - Math.PI / 2; // Start from top
+            positions.set(player.id, {
+                x: CENTER + RADIUS * Math.cos(angle),
+                y: CENTER + RADIUS * Math.sin(angle),
+            });
+        });
+        return positions;
+    }, [activePlayers]);
+
+    // Toggle player selection
+    const togglePlayer = useCallback((playerId: string) => {
+        setSelectedPlayerIds(prev => {
+            const next = new Set(prev);
+            if (next.has(playerId)) {
+                next.delete(playerId);
+            } else {
+                next.add(playerId);
+            }
+            return next;
+        });
+    }, []);
+
+    const clearSelection = useCallback(() => {
+        setSelectedPlayerIds(new Set());
+    }, []);
+
+    // Check if a node should be dimmed
+    const isNodeDimmed = useCallback((playerId: string) => {
+        if (selectedPlayerIds.size === 0) return false;
+        if (selectedPlayerIds.has(playerId)) return false;
+        // Check if this player is connected to any selected player
+        return !visibleConnections.some(c => c.fromId === playerId || c.toId === playerId);
+    }, [selectedPlayerIds, visibleConnections]);
+
+    // Handle mouse move on connections
+    const handleConnectionHover = useCallback((conn: PassConnection, e: React.MouseEvent<SVGLineElement>) => {
+        const svg = e.currentTarget.closest('svg');
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        setTooltipPos({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top - 10,
+        });
+        setHoveredConnection(conn);
+    }, []);
 
     return (
         <div className="space-y-4">
-            {/* Time Interval Selector */}
+            {/* Network Graph — shown first */}
+            <div className="relative flex justify-center">
+                <svg
+                    viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
+                    className="w-full max-w-xl"
+                    style={{ minHeight: 300 }}
+                >
+                    <defs>
+                        {/* Subtle glow for hovered connections */}
+                        <filter id="conn-glow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="3" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                        {/* Radial gradient for background */}
+                        <radialGradient id="net-bg" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.03" />
+                            <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+                        </radialGradient>
+                    </defs>
+
+                    {/* Background circle */}
+                    <circle cx={CENTER} cy={CENTER} r={RADIUS + 30} fill="url(#net-bg)" />
+                    <circle
+                        cx={CENTER} cy={CENTER} r={RADIUS + 30}
+                        fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" strokeDasharray="4,4" opacity={0.4}
+                    />
+
+                    {/* Connection lines */}
+                    {visibleConnections.map((conn, i) => {
+                        const from = playerPositions.get(conn.fromId);
+                        const to = playerPositions.get(conn.toId);
+                        if (!from || !to) return null;
+
+                        const thickness = 1 + (conn.total / maxPasses) * 4;
+                        const isHovered = hoveredConnection?.fromId === conn.fromId && hoveredConnection?.toId === conn.toId;
+                        const baseOpacity = selectedPlayerIds.size > 0
+                            ? ((selectedPlayerIds.has(conn.fromId) || selectedPlayerIds.has(conn.toId)) ? 0.7 : 0.1)
+                            : 0.5;
+
+                        return (
+                            <line
+                                key={`conn-${i}`}
+                                x1={from.x} y1={from.y}
+                                x2={to.x} y2={to.y}
+                                stroke={isHovered
+                                    ? getConnectionColor(conn.accuracy)
+                                    : getConnectionColorWithOpacity(conn.accuracy, isHovered ? 1 : baseOpacity)
+                                }
+                                strokeWidth={isHovered ? thickness + 1.5 : thickness}
+                                strokeLinecap="round"
+                                filter={isHovered ? "url(#conn-glow)" : undefined}
+                                style={{
+                                    cursor: 'pointer',
+                                    transition: 'stroke-width 0.2s, stroke-opacity 0.2s',
+                                }}
+                                onMouseMove={(e) => handleConnectionHover(conn, e)}
+                                onMouseLeave={() => setHoveredConnection(null)}
+                            />
+                        );
+                    })}
+
+                    {/* Player nodes */}
+                    {activePlayers.map(player => {
+                        const pos = playerPositions.get(player.id);
+                        if (!pos) return null;
+
+                        const isDimmed = isNodeDimmed(player.id);
+                        const isSelected = selectedPlayerIds.has(player.id);
+                        const lastName = player.name.split(' ').slice(-1)[0];
+
+                        return (
+                            <g
+                                key={player.id}
+                                style={{ cursor: 'pointer', transition: 'opacity 0.3s' }}
+                                opacity={isDimmed ? 0.2 : 1}
+                                onClick={() => togglePlayer(player.id)}
+                            >
+                                {/* Glow ring for selected players */}
+                                {isSelected && (
+                                    <circle
+                                        cx={pos.x} cy={pos.y} r={NODE_RADIUS + 3}
+                                        fill="none"
+                                        stroke="hsl(var(--primary))"
+                                        strokeWidth="2"
+                                        opacity={0.6}
+                                    />
+                                )}
+                                {/* Node circle */}
+                                <circle
+                                    cx={pos.x} cy={pos.y} r={NODE_RADIUS}
+                                    fill={isSelected ? "hsl(var(--primary))" : "hsl(var(--card))"}
+                                    stroke={isSelected ? "hsl(var(--primary))" : "hsl(var(--border))"}
+                                    strokeWidth="1.5"
+                                />
+                                {/* Jersey number */}
+                                <text
+                                    x={pos.x} y={pos.y + 1}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    fontSize="11"
+                                    fontWeight="700"
+                                    fill={isSelected ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))"}
+                                >
+                                    {player.jerseyNumber}
+                                </text>
+                                {/* Player name label */}
+                                <text
+                                    x={pos.x}
+                                    y={pos.y + NODE_RADIUS + 11}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    fontSize="8"
+                                    fontWeight="600"
+                                    fill="hsl(var(--muted-foreground))"
+                                    className="select-none"
+                                >
+                                    {lastName}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </svg>
+
+                {/* Hover tooltip */}
+                {hoveredConnection && (
+                    <div
+                        className="absolute pointer-events-none z-50 px-3 py-2 rounded-lg bg-popover border border-border shadow-xl text-sm"
+                        style={{
+                            left: tooltipPos.x,
+                            top: tooltipPos.y,
+                            transform: 'translate(-50%, -100%)',
+                        }}
+                    >
+                        <p className="font-semibold text-foreground text-xs mb-1">
+                            {hoveredConnection.fromName.split(' ').slice(-1)[0]} ↔ {hoveredConnection.toName.split(' ').slice(-1)[0]}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs">
+                            <span className="text-muted-foreground">
+                                Passes: <strong className="text-foreground">{hoveredConnection.total}</strong>
+                            </span>
+                            <span className="text-muted-foreground">
+                                Accuracy: <strong style={{ color: getConnectionColor(hoveredConnection.accuracy) }}>{hoveredConnection.accuracy}%</strong>
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-4 text-xs flex-wrap">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-1 rounded" style={{ backgroundColor: "hsl(142, 76%, 42%)" }} />
+                    <span className="text-muted-foreground">High accuracy (≥85%)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-1 rounded" style={{ backgroundColor: "hsl(38, 92%, 50%)" }} />
+                    <span className="text-muted-foreground">Medium (70-84%)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-1 rounded" style={{ backgroundColor: "hsl(0, 72%, 50%)" }} />
+                    <span className="text-muted-foreground">Low (&lt;70%)</span>
+                </div>
+                <span className="text-muted-foreground/60 ml-2 border-l border-border pl-2">
+                    Line thickness = pass volume
+                </span>
+            </div>
+
+            {/* Connection count info */}
+            {visibleConnections.length > 0 && (
+                <p className="text-xs text-center text-muted-foreground">
+                    Showing {visibleConnections.length} connection{visibleConnections.length !== 1 ? 's' : ''} between {activePlayers.length} players
+                    {selectedPlayerIds.size > 0 && (
+                        <> • <button onClick={clearSelection} className="text-primary hover:underline">Clear filter</button></>
+                    )}
+                </p>
+            )}
+
+            {/* Time Interval Selector — below the graph */}
             <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Time:</span>
@@ -210,18 +477,6 @@ const TeamPassingMap = ({ playerPasses, matchId }: TeamPassingMapProps) => {
                             Halves
                         </Button>
                     </div>
-
-                    <div className="flex items-center gap-1 ml-auto">
-                        <Button
-                            variant={showConnections ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setShowConnections(!showConnections)}
-                            className="h-7 gap-1 text-xs"
-                        >
-                            <Layers className="w-3 h-3" />
-                            Lines
-                        </Button>
-                    </div>
                 </div>
 
                 {/* Time Interval Buttons */}
@@ -243,57 +498,54 @@ const TeamPassingMap = ({ playerPasses, matchId }: TeamPassingMapProps) => {
                 </div>
             </div>
 
-            {/* Player Filter - Only show players with passes */}
-            {playersWithPasses.length > 0 && (
+            {/* Player Filter — Multi-select */}
+            {activePlayers.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                         <Users className="w-4 h-4" />
                         Filter:
                     </span>
                     <Button
-                        variant={selectedPlayerId === null ? "default" : "outline"}
+                        variant={selectedPlayerIds.size === 0 ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setSelectedPlayerId(null)}
+                        onClick={clearSelection}
                         className="h-7 px-3 text-xs"
                     >
-                        All ({playersWithPasses.length})
+                        All ({activePlayers.length})
                     </Button>
-                    {playersWithPasses.slice(0, 10).map(pp => {
-                        const playerPassCount = filteredPasses.filter(p => p.playerId === pp.player.id).length;
+                    {activePlayers.map(player => {
+                        const isSelected = selectedPlayerIds.has(player.id);
+                        const playerPassCount = filteredPasses.filter(p => p.playerId === player.id).length;
                         return (
-                            <Tooltip key={pp.player.id}>
+                            <Tooltip key={player.id}>
                                 <TooltipTrigger asChild>
                                     <Button
-                                        variant={selectedPlayerId === pp.player.id ? "default" : "outline"}
+                                        variant={isSelected ? "default" : "outline"}
                                         size="sm"
-                                        onClick={() => setSelectedPlayerId(selectedPlayerId === pp.player.id ? null : pp.player.id)}
+                                        onClick={() => togglePlayer(player.id)}
                                         className="h-7 px-2 text-xs gap-1"
                                     >
-                                        <span className="font-medium">{pp.player.name.split(' ').slice(-1)[0]}</span>
+                                        <span className="font-medium">{player.name.split(' ').slice(-1)[0]}</span>
                                         <Badge variant="secondary" className="h-4 px-1 text-[10px]">{playerPassCount}</Badge>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
-                                    <p className="font-medium">{pp.player.name}</p>
-                                    <p className="text-xs text-muted-foreground">#{pp.player.jerseyNumber} • {pp.player.position}</p>
-                                    <p className="text-xs text-primary mt-1">Click to view individual passing map →</p>
+                                    <p className="font-medium">{player.name}</p>
+                                    <p className="text-xs text-muted-foreground">#{player.jerseyNumber} • {player.position}</p>
+                                    <p className="text-xs text-primary mt-1">Click to toggle filter</p>
                                 </TooltipContent>
                             </Tooltip>
                         );
                     })}
-                    {playersWithPasses.length > 10 && (
-                        <span className="text-xs text-muted-foreground">+{playersWithPasses.length - 10} more</span>
-                    )}
                 </div>
             )}
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
                     { label: "Total", value: stats.total, color: "text-primary", statId: "total_passes" },
                     { label: "Successful", value: stats.successful, color: "text-success", statId: "total_passes" },
                     { label: "Accuracy", value: `${stats.accuracy}%`, color: "text-warning", statId: "pass_accuracy" },
-                    { label: "Avg Distance", value: `${stats.avgDistance}m`, color: "text-chart-4", statId: "long_passes" },
                     { label: "Key Passes", value: stats.keyPasses, color: "text-destructive", statId: "key_passes" },
                 ].map((stat) => (
                     <div key={stat.label} className="text-center p-2.5 rounded-lg bg-secondary/50 border border-border">
@@ -305,166 +557,6 @@ const TeamPassingMap = ({ playerPasses, matchId }: TeamPassingMapProps) => {
                         </p>
                     </div>
                 ))}
-            </div>
-
-            {/* Pass Type Breakdown */}
-            <div className="flex justify-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(199, 89%, 48%)" }} />
-                    <span className="text-muted-foreground">Short (&lt;10m): <strong className="text-foreground">{stats.shortPasses}</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 76%, 36%)" }} />
-                    <span className="text-muted-foreground">Medium (10-25m): <strong className="text-foreground">{stats.mediumPasses}</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(38, 92%, 50%)" }} />
-                    <span className="text-muted-foreground">Long (&gt;25m): <strong className="text-foreground">{stats.longPasses}</strong></span>
-                </div>
-            </div>
-
-            {/* Field with Team Passing Network */}
-            <TacticalField viewMode="full" className="w-full max-w-3xl mx-auto rounded-xl shadow-xl overflow-visible" showGrid={false}>
-                <defs>
-                    {/* Arrow markers for pass types */}
-                    <marker id={`arrow-short-${uniqueId}`} markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto" markerUnits="userSpaceOnUse">
-                        <path d="M0,0.5 L3.5,2 L0,3.5 L1,2 Z" fill="hsl(199, 89%, 48%)" />
-                    </marker>
-                    <marker id={`arrow-medium-${uniqueId}`} markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto" markerUnits="userSpaceOnUse">
-                        <path d="M0,0.5 L3.5,2 L0,3.5 L1,2 Z" fill="hsl(142, 76%, 36%)" />
-                    </marker>
-                    <marker id={`arrow-long-${uniqueId}`} markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto" markerUnits="userSpaceOnUse">
-                        <path d="M0,0.5 L3.5,2 L0,3.5 L1,2 Z" fill="hsl(38, 92%, 50%)" />
-                    </marker>
-                    <marker id={`arrow-fail-${uniqueId}`} markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto" markerUnits="userSpaceOnUse">
-                        <path d="M0,0.5 L3.5,2 L0,3.5 L1,2 Z" fill="hsl(0, 72%, 50%)" />
-                    </marker>
-                </defs>
-
-                {/* Heatmap Overlay */}
-                <g style={{ opacity: 0.35 }}>
-                    {positionHeatmap.zones.map((row, rowIndex) =>
-                        row.map((intensity, colIndex) => (
-                            <rect
-                                key={`hm-${rowIndex}-${colIndex}`}
-                                x={(colIndex / positionHeatmap.gridCols) * 105}
-                                y={(rowIndex / positionHeatmap.gridRows) * 68}
-                                width={105 / positionHeatmap.gridCols}
-                                height={68 / positionHeatmap.gridRows}
-                                fill={getHeatmapColor(intensity, positionHeatmap.maxIntensity)}
-                                rx={0.5}
-                            />
-                        ))
-                    )}
-                </g>
-
-                {/* Pass Connection Lines */}
-                {showConnections && displayPasses.map((pass, index) => {
-                    const x1 = pass.x / 100 * 105;
-                    const y1 = pass.y / 100 * 68;
-                    const x2 = pass.targetX / 100 * 105;
-                    const y2 = pass.targetY / 100 * 68;
-                    const dist = calculateDistance(pass.x, pass.y, pass.targetX, pass.targetY);
-                    const passType = getPassType(dist);
-
-                    if (dist < 1) return null;
-
-                    // Shorten line for arrow
-                    const angle = Math.atan2(y2 - y1, x2 - x1);
-                    const endOffset = 1.5;
-                    const adjustedX2 = x2 - Math.cos(angle) * endOffset;
-                    const adjustedY2 = y2 - Math.sin(angle) * endOffset;
-
-                    const isHighlighted = selectedPlayerId === pass.playerId;
-                    const lineOpacity = selectedPlayerId ? (isHighlighted ? 0.85 : 0.1) : 0.6;
-
-                    const arrowId = pass.success
-                        ? `arrow-${passType.type.toLowerCase()}-${uniqueId}`
-                        : `arrow-fail-${uniqueId}`;
-
-                    return (
-                        <g key={`pass-line-${index}`}>
-                            <line
-                                x1={x1} y1={y1} x2={adjustedX2} y2={adjustedY2}
-                                stroke={pass.success ? passType.color : "hsl(0, 72%, 50%)"}
-                                strokeWidth={isHighlighted ? 0.5 : 0.3}
-                                strokeOpacity={lineOpacity}
-                                strokeDasharray={pass.success ? "none" : "1.5,0.8"}
-                                markerEnd={`url(#${arrowId})`}
-                            />
-                            {/* Origin dot */}
-                            <circle
-                                cx={x1}
-                                cy={y1}
-                                r={isHighlighted ? 0.8 : 0.5}
-                                fill={pass.success ? passType.color : "hsl(0, 72%, 50%)"}
-                                fillOpacity={lineOpacity}
-                            />
-                        </g>
-                    );
-                })}
-            </TacticalField>
-
-            {/* Player Legend with click to navigate */}
-            <div className="bg-secondary/30 rounded-lg p-4">
-                <p className="text-xs text-center text-muted-foreground mb-3">
-                    Click a player below to view their detailed passing analysis
-                </p>
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {playersWithPasses.slice(0, 8).map(pp => {
-                        const playerPassCount = filteredPasses.filter(p => p.playerId === pp.player.id).length;
-                        return (
-                            <Tooltip key={pp.player.id}>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        onClick={() => handlePlayerClick(pp.player.id)}
-                                        className={cn(
-                                            "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all",
-                                            "bg-background/80 border border-border hover:border-primary hover:bg-primary/10",
-                                            "group cursor-pointer"
-                                        )}
-                                    >
-                                        <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                                            {pp.player.name.split(' ').slice(-1)[0]}
-                                        </span>
-                                        <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{playerPassCount}</Badge>
-                                        <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <p className="font-medium">{pp.player.name}</p>
-                                    <p className="text-xs text-muted-foreground">#{pp.player.jerseyNumber} • {pp.player.position}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        );
-                    })}
-                    {playersWithPasses.length > 8 && (
-                        <span className="text-xs text-muted-foreground">+{playersWithPasses.length - 8} more</span>
-                    )}
-                </div>
-            </div>
-
-            {/* Legend for pass types */}
-            <div className="flex items-center justify-center gap-4 text-xs flex-wrap">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-0.5 rounded" style={{ backgroundColor: "hsl(199, 89%, 48%)" }} />
-                    <span className="text-muted-foreground">Short</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 76%, 36%)" }} />
-                    <span className="text-muted-foreground">Medium</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-0.5 rounded" style={{ backgroundColor: "hsl(38, 92%, 50%)" }} />
-                    <span className="text-muted-foreground">Long</span>
-                </div>
-                <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-border">
-                    <div className="w-6 h-0.5" style={{ backgroundImage: "repeating-linear-gradient(90deg, hsl(0, 72%, 50%) 0px, hsl(0, 72%, 50%) 3px, transparent 3px, transparent 5px)" }} />
-                    <span className="text-muted-foreground">Failed</span>
-                </div>
-                {filteredPasses.length > MAX_VISIBLE_PASSES && (
-                    <span className="text-muted-foreground/60 italic ml-2">Showing {MAX_VISIBLE_PASSES} of {filteredPasses.length} passes</span>
-                )}
             </div>
         </div>
     );

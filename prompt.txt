@@ -1,0 +1,3 @@
+in the project, all the stats are being calculated for both team and the opponent players, currently in frntend only team player stats are visible, but can we integrate a universal toggle switch, for three options, full (both teams), team, opponent, and accordingly, all stats are changed/added.
+
+in maps/charts like the passing breakdown, and match actions charts, use some unique and good-UI elements, so that in full both team stats are properly visible as "vs" or something, make sure the edit is properly fetching data from backend, nothing should be hardcoded, only proper data fetching from backend

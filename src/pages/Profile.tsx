@@ -22,7 +22,9 @@ import {
     Check,
     Settings,
     Lock,
-    Palette
+    Palette,
+    Crown,
+    Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
@@ -129,6 +131,22 @@ const Profile = () => {
                                             <Shield className="w-3 h-3" />
                                             {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1) || 'Coach'}
                                         </span>
+
+                                        {/* Subscription Badge - Coach only */}
+                                        {user?.role === 'coach' && (
+                                            <span className={cn(
+                                                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mt-2",
+                                                user?.subscriptionType === 'premium'
+                                                    ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-400 border border-amber-500/30'
+                                                    : 'bg-secondary text-muted-foreground border border-border'
+                                            )}>
+                                                {user?.subscriptionType === 'premium' ? (
+                                                    <><Crown className="w-3.5 h-3.5" /> Premium</>
+                                                ) : (
+                                                    <><Sparkles className="w-3 h-3" /> Normal</>
+                                                )}
+                                            </span>
+                                        )}
 
                                         <Separator className="my-6" />
 

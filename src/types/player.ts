@@ -49,10 +49,15 @@ export interface MatchEvent {
   minute: number;
   // Advanced analytics properties
   passTarget?: string; // Target player ID for passing network
+  passTargetName?: string; // Target player display name
   isBigChance?: boolean; // Analyst-marked big chance
   isGoal?: boolean; // Whether shot resulted in goal
   xG?: number; // Expected goals value for shots
   shotOutcome?: 'missed' | 'saved' | 'blocked' | 'goal'; // Detailed shot outcome
+  // New metrics for synergy
+  isProgressive?: boolean;
+  isAssist?: boolean;
+  outplays?: number;
 }
 
 export interface PlayerMatch {

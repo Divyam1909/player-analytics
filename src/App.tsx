@@ -22,6 +22,7 @@ import Profile from "./pages/Profile";
 import UpcomingMatches from "./pages/UpcomingMatches";
 import MatchSchedule from "./pages/MatchSchedule";
 import StatsGlossary from "./pages/StatsGlossary";
+import PlayerOverview from "./pages/PlayerOverview";
 
 // Auth Pages
 import LoginSelection from "./pages/auth/LoginSelection";
@@ -195,6 +196,16 @@ function AnimatedRoutes() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'coach']}>
                 <Overview />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Player Overview - Coach and Admin */}
+          <Route
+            path="/players"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'coach']}>
+                <PlayerOverview />
               </ProtectedRoute>
             }
           />

@@ -189,11 +189,11 @@ const PlayerCard = ({ player, onCompare, statFilter = "none", matchId }: PlayerC
                       <div className="text-lg font-bold text-primary">
                         {stat.value}
                       </div>
-                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                      <span className="text-[9px] uppercase tracking-wide text-muted-foreground block">
                         <StatHint statId={stat.statId} iconSize="sm">
                           <span>{stat.label}</span>
                         </StatHint>
-                      </div>
+                      </span>
                     </div>
                   ))}
                 </div>

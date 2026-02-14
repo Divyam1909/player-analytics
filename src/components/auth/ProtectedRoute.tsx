@@ -15,7 +15,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     useEffect(() => {
         if (!isLoading) {
             if (!isAuthenticated) {
-                navigate('/login', { state: { from: location }, replace: true });
+                navigate('/login', { state: { from: location.pathname }, replace: true });
                 return;
             }
 
@@ -35,7 +35,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
                 }
             }
         }
-    }, [isLoading, isAuthenticated, user, allowedRoles, navigate, location]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading, isAuthenticated, user?.role]);
 
     if (isLoading) {
         return (

@@ -70,7 +70,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
     const [showConnections, setShowConnections] = useState(true);
     const [showLabels, setShowLabels] = useState(true);
     const [selectedPass, setSelectedPass] = useState<HoveredPass | null>(null);
-    
+
     // Handle navigation to match video
     // Uses state to preserve the #passing hash for back navigation
     const handleGoToVideo = () => {
@@ -83,12 +83,12 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
     const passEvents = useMemo(() => {
         return events.filter(e => e.type === "pass");
     }, [events]);
-    
+
     // Check if there's overtime data
     const hasOvertime = useMemo(() => {
         return events.some(e => e.minute > 90);
     }, [events]);
-    
+
     // Get available intervals based on mode
     const availableIntervals = useMemo(() => {
         if (intervalMode === 'half') {
@@ -115,7 +115,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
         // Calculate average pass distance
         const distances = filteredPasses.map(p => calculateDistance(p.x, p.y, p.targetX, p.targetY));
         const avgDistance = distances.length > 0 ? Math.round(distances.reduce((a, b) => a + b, 0) / distances.length) : 0;
-        
+
         // Pass type breakdown
         const shortPasses = filteredPasses.filter(p => calculateDistance(p.x, p.y, p.targetX, p.targetY) < 10).length;
         const mediumPasses = filteredPasses.filter(p => {
@@ -165,7 +165,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
             <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Time:</span>
-                    
+
                     {/* Full Match Button */}
                     <Button
                         variant={selectedInterval.category === 'all' ? "default" : "outline"}
@@ -175,7 +175,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                     >
                         Full Match
                     </Button>
-                    
+
                     {/* Interval Mode Toggle */}
                     <div className="flex items-center border border-border rounded-md overflow-hidden">
                         <Button
@@ -202,7 +202,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                             Halves
                         </Button>
                     </div>
-                    
+
                     <div className="flex items-center gap-1 ml-auto">
                         <Button
                             variant={showLabels ? "secondary" : "ghost"}
@@ -224,7 +224,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                         </Button>
                     </div>
                 </div>
-                
+
                 {/* Time Interval Buttons */}
                 <div className="flex flex-wrap gap-1">
                     {availableIntervals.map((interval) => (
@@ -290,8 +290,8 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                                 <div className="flex items-center gap-2">
                                     <div className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2",
-                                        activePass.pass.success 
-                                            ? "bg-success/20 border-success text-success" 
+                                        activePass.pass.success
+                                            ? "bg-success/20 border-success text-success"
                                             : "bg-destructive/20 border-destructive text-destructive"
                                     )}>
                                         {playerName?.split(' ').map(n => n[0]).join('') || 'P'}
@@ -301,7 +301,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                                         <p className="text-sm font-semibold">{playerName || 'Player'}</p>
                                     </div>
                                 </div>
-                                
+
                                 {/* Arrow with distance */}
                                 <div className="flex flex-col items-center px-4">
                                     <div className="flex items-center gap-1">
@@ -314,36 +314,36 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                                             activePass.pass.success ? "text-success" : "text-destructive"
                                         )} />
                                     </div>
-                                    <span className="text-xs font-bold mt-0.5" style={{ 
+                                    <span className="text-xs font-bold mt-0.5" style={{
                                         color: getPassType(calculateDistance(
-                                            activePass.pass.x, activePass.pass.y, 
+                                            activePass.pass.x, activePass.pass.y,
                                             activePass.pass.targetX, activePass.pass.targetY
-                                        )).color 
+                                        )).color
                                     }}>
                                         {Math.round(calculateDistance(
-                                            activePass.pass.x, activePass.pass.y, 
+                                            activePass.pass.x, activePass.pass.y,
                                             activePass.pass.targetX, activePass.pass.targetY
                                         ))}m
                                     </span>
                                 </div>
-                                
+
                                 {/* Receiver */}
                                 <div className="flex items-center gap-2">
                                     <div className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2",
-                                        activePass.pass.success 
-                                            ? "bg-primary/20 border-primary text-primary" 
+                                        activePass.pass.success
+                                            ? "bg-primary/20 border-primary text-primary"
                                             : "bg-muted border-muted-foreground text-muted-foreground"
                                     )}>
-                                        {activePass.pass.passTarget?.split(' ').map(n => n[0]).join('') || 'R'}
+                                        {activePass.pass.passTargetName?.split(' ').map(n => n[0]).join('') || 'R'}
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Receiver</p>
-                                        <p className="text-sm font-semibold">{activePass.pass.passTarget || 'Unknown'}</p>
+                                        <p className="text-sm font-semibold">{activePass.pass.passTargetName || 'Unknown'}</p>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Go to Video Button */}
                             {matchId && (
                                 <Button
@@ -356,7 +356,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                                     <span className="hidden sm:inline">Go to Video</span>
                                 </Button>
                             )}
-                            
+
                             {/* Pass Details */}
                             <div className="flex items-center gap-4 text-sm">
                                 <div className="text-center">
@@ -365,14 +365,14 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                                 </div>
                                 <div className="text-center">
                                     <p className="text-muted-foreground text-xs">Type</p>
-                                    <p className="font-bold" style={{ 
+                                    <p className="font-bold" style={{
                                         color: getPassType(calculateDistance(
-                                            activePass.pass.x, activePass.pass.y, 
+                                            activePass.pass.x, activePass.pass.y,
                                             activePass.pass.targetX, activePass.pass.targetY
-                                        )).color 
+                                        )).color
                                     }}>
                                         {getPassType(calculateDistance(
-                                            activePass.pass.x, activePass.pass.y, 
+                                            activePass.pass.x, activePass.pass.y,
                                             activePass.pass.targetX, activePass.pass.targetY
                                         )).type}
                                     </p>
@@ -406,7 +406,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                     <marker id={`arrow-highlight-${uniqueId}`} markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto" markerUnits="userSpaceOnUse">
                         <path d="M0,0.5 L4.5,2.5 L0,4.5 L1.2,2.5 Z" fill="hsl(217, 91%, 60%)" />
                     </marker>
-                    
+
                     {/* Glow filters for highlighted elements */}
                     <filter id={`glow-success-${uniqueId}`} x="-50%" y="-50%" width="200%" height="200%">
                         <feGaussianBlur stdDeviation="1" result="blur" />
@@ -435,7 +435,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                             <feMergeNode in="SourceGraphic" />
                         </feMerge>
                     </filter>
-                    
+
                     {/* Drop shadow for labels */}
                     <filter id={`shadow-${uniqueId}`} x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="0.3" stdDeviation="0.3" floodColor="black" floodOpacity="0.8" />
@@ -619,7 +619,7 @@ const PassingMap = ({ events, playerName, matchId }: PassingMapProps) => {
                     <span className="text-muted-foreground">Failed</span>
                 </div>
             </div>
-            
+
         </div>
     );
 };

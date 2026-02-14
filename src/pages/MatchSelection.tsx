@@ -126,7 +126,7 @@ const MatchSelection = () => {
                         </p>
                     </motion.div>
 
-                    {/* Past Matches Card */}
+                    {/* All Matches Card */}
                     <Card className="bg-card border-border">
                         <CardHeader className="flex flex-row items-center justify-between pb-4">
                             <div className="flex items-center gap-3">
@@ -134,8 +134,8 @@ const MatchSelection = () => {
                                     <Trophy className="w-5 h-5 text-primary" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-xl">Past Matches</CardTitle>
-                                    <p className="text-sm text-muted-foreground">Your completed match history</p>
+                                    <CardTitle className="text-xl">All Matches</CardTitle>
+                                    <p className="text-sm text-muted-foreground">Your complete match history</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">

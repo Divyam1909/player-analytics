@@ -35,11 +35,14 @@ const HexagonRadar = ({
     const radius = (size / 2) - 45; // Reduced padding for closer labels
     const levels = 5;
 
-    // Calculate points on the hexagon
-    const getHexagonPoints = (radiusMultiplier: number) => {
+    const sides = data.length;
+    const angleStep = (2 * Math.PI) / sides;
+
+    // Calculate points on the polygon
+    const getPolygonPoints = (radiusMultiplier: number) => {
         const points: { x: number; y: number }[] = [];
-        for (let i = 0; i < 6; i++) {
-            const angle = (Math.PI / 3) * i - Math.PI / 2;
+        for (let i = 0; i < sides; i++) {
+            const angle = angleStep * i - Math.PI / 2;
             points.push({
                 x: center + radiusMultiplier * Math.cos(angle),
                 y: center + radiusMultiplier * Math.sin(angle),
@@ -48,9 +51,9 @@ const HexagonRadar = ({
         return points;
     };
 
-    // Generate hexagon path
-    const getHexagonPath = (radiusMultiplier: number) => {
-        const points = getHexagonPoints(radiusMultiplier);
+    // Generate polygon path
+    const getPolygonPath = (radiusMultiplier: number) => {
+        const points = getPolygonPoints(radiusMultiplier);
         return points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
     };
 
@@ -61,7 +64,7 @@ const HexagonRadar = ({
         const labels: { x: number; y: number; label: string; fullLabel: string; angle: number; value: { team: number; opp: number } }[] = [];
 
         data.forEach((item, i) => {
-            const angle = (Math.PI / 3) * i - Math.PI / 2;
+            const angle = angleStep * i - Math.PI / 2;
             const teamNormalized = item.maxValue > 0 ? Math.min(1, item.teamValue / item.maxValue) : 0;
             const oppNormalized = item.maxValue > 0 ? Math.min(1, item.opponentValue / item.maxValue) : 0;
 
@@ -136,11 +139,11 @@ const HexagonRadar = ({
                     </filter>
                 </defs>
 
-                {/* Background hexagon levels with gradient fill */}
+                {/* Background polygon levels with gradient fill */}
                 {Array.from({ length: levels }, (_, i) => (
                     <path
                         key={i}
-                        d={getHexagonPath(radius * ((i + 1) / levels))}
+                        d={getPolygonPath(radius * ((i + 1) / levels))}
                         fill={i === levels - 1 ? "hsl(var(--secondary) / 0.3)" : "none"}
                         stroke="hsl(var(--border))"
                         strokeWidth={i === levels - 1 ? 1.5 : 0.7}
@@ -150,7 +153,7 @@ const HexagonRadar = ({
                 ))}
 
                 {/* Axis lines with dots at ends */}
-                {getHexagonPoints(radius).map((point, i) => (
+                {getPolygonPoints(radius).map((point, i) => (
                     <g key={i}>
                         <line
                             x1={center}
@@ -276,15 +279,17 @@ const HexagonRadar = ({
                 {/* Labels with values */}
                 {labelPositions.map((label, i) => {
                     // Better text anchor based on angle position
+                    // Dynamic text anchor based on angle position relative to sides
+                    const angleRad = angleStep * label.angle - Math.PI / 2;
+                    const angleDeg = ((angleRad * 180 / Math.PI) + 360) % 360;
                     const textAnchor =
-                        label.angle === 0 ? 'middle' :
-                            label.angle === 1 || label.angle === 2 ? 'start' :
-                                label.angle === 3 ? 'middle' : 'end';
+                        (angleDeg > 45 && angleDeg < 135) ? 'start' :
+                            (angleDeg > 225 && angleDeg < 315) ? 'end' : 'middle';
 
                     // Better dy offset - reduced spacing
                     const dy =
-                        label.angle === 0 ? -8 :
-                            label.angle === 3 ? 14 : 3;
+                        (angleDeg > 350 || angleDeg < 10) ? -8 :
+                            (angleDeg > 170 && angleDeg < 190) ? 14 : 3;
 
                     return (
                         <g key={i}>

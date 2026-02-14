@@ -303,6 +303,7 @@ export function passEventToMatchEvent(passEvent: DbPassEvent): MatchEvent {
         targetY: passEvent.end_y ?? 0,
         success: passEvent.is_successful,
         minute: passEvent.minute ?? 0,
+        passTarget: passEvent.receiver_player_id ?? undefined,
     };
 }
 

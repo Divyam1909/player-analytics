@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthHeader from '@/components/layout/AuthHeader';
 import Sidebar from '@/components/layout/Sidebar';
@@ -11,6 +12,7 @@ import {
     Target,
     TrendingUp,
     Video,
+    Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebarContext } from '@/contexts/SidebarContext';
@@ -258,6 +260,115 @@ const CoachDashboard = () => {
                             </Card>
                         </motion.div>
                     </motion.div>
+
+                    {/* Recent Matches */}
+                    {matches.length > 0 && (
+                        <motion.div
+                            className="mb-8"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.3 }}
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-primary/10">
+                                        <Calendar className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-foreground">Recent Matches</h2>
+                                        <p className="text-xs text-muted-foreground">Your latest 5 matches at a glance</p>
+                                    </div>
+                                </div>
+                                <Link
+                                    to="/matches"
+                                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                                >
+                                    View all →
+                                </Link>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                                {matches.slice(0, 5).map((match, index) => {
+                                    const isWin = match.homeScore > match.awayScore;
+                                    const isLoss = match.homeScore < match.awayScore;
+                                    const resultGradient = isWin
+                                        ? 'from-emerald-500/15 via-emerald-500/5 to-transparent'
+                                        : isLoss
+                                            ? 'from-red-500/15 via-red-500/5 to-transparent'
+                                            : 'from-orange-500/15 via-orange-500/5 to-transparent';
+                                    const resultBorder = isWin
+                                        ? 'border-emerald-500/30 hover:border-emerald-500/60'
+                                        : isLoss
+                                            ? 'border-red-500/30 hover:border-red-500/60'
+                                            : 'border-orange-500/30 hover:border-orange-500/60';
+                                    const resultText = isWin ? 'W' : isLoss ? 'L' : 'D';
+                                    const resultColor = isWin ? 'text-emerald-400' : isLoss ? 'text-red-400' : 'text-orange-400';
+
+                                    return (
+                                        <motion.div
+                                            key={match.matchId}
+                                            initial={{ opacity: 0, y: 15 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.4 + index * 0.08 }}
+                                        >
+                                            <Link to={`/match/${match.matchId}`}>
+                                                <motion.div
+                                                    className={cn(
+                                                        "relative overflow-hidden rounded-xl border p-4 backdrop-blur-sm",
+                                                        "bg-card/80 transition-all duration-300 cursor-pointer group",
+                                                        resultBorder
+                                                    )}
+                                                    whileHover={{ y: -4, scale: 1.02 }}
+                                                    whileTap={{ scale: 0.98 }}
+                                                >
+                                                    {/* Gradient overlay */}
+                                                    <div className={cn(
+                                                        "absolute inset-0 bg-gradient-to-br opacity-60 group-hover:opacity-100 transition-opacity",
+                                                        resultGradient
+                                                    )} />
+
+                                                    <div className="relative z-10">
+                                                        {/* Result badge */}
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <span className={cn(
+                                                                "text-xs font-bold px-2 py-0.5 rounded-md bg-background/60 backdrop-blur-sm",
+                                                                resultColor
+                                                            )}>
+                                                                {resultText}
+                                                            </span>
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                {new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Teams */}
+                                                        <p className="text-xs font-semibold text-foreground truncate mb-1" title={match.teamName}>
+                                                            {match.teamName}
+                                                        </p>
+                                                        <p className="text-[11px] text-muted-foreground truncate mb-3" title={match.opponent}>
+                                                            vs {match.opponent}
+                                                        </p>
+
+                                                        {/* Score */}
+                                                        <div className="flex items-center justify-center gap-2 py-2 rounded-lg bg-background/40 backdrop-blur-sm">
+                                                            <span className="text-xl font-black text-foreground">{match.homeScore}</span>
+                                                            <span className="text-xs text-muted-foreground font-medium">-</span>
+                                                            <span className="text-xl font-black text-foreground">{match.awayScore}</span>
+                                                        </div>
+
+                                                        {/* Tournament */}
+                                                        <p className="text-[10px] text-primary/80 font-medium mt-2 truncate text-center" title={match.tournament}>
+                                                            {match.tournament}
+                                                        </p>
+                                                    </div>
+                                                </motion.div>
+                                            </Link>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
 
                 </div>
             </main>

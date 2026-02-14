@@ -41,6 +41,7 @@ interface DbPassEvent {
     end_x: number;
     end_y: number;
     minute: number;
+    outplays_players_count: number;
     receiver_player_id: string | null; // Who received the pass (for synergy analysis)
 }
 
@@ -181,11 +182,10 @@ export const usePlayers = () => {
                         });
                     });
                     pPasses.forEach(p => {
-                        // Look up receiver name for synergy analysis
-                        const receiverName = p.receiver_player_id 
-                            ? playerNameMap.get(p.receiver_player_id) 
+                        const receiverName = p.receiver_player_id
+                            ? playerNameMap.get(p.receiver_player_id)
                             : undefined;
-                        
+
                         events.push({
                             type: 'pass',
                             minute: p.minute,
@@ -194,7 +194,11 @@ export const usePlayers = () => {
                             y: p.start_y,
                             targetX: p.end_x,
                             targetY: p.end_y,
-                            passTarget: receiverName // For synergy analysis
+                            isProgressive: p.is_progressive_pass,
+                            isAssist: p.is_assist,
+                            outplays: p.outplays_players_count || 0,
+                            passTarget: p.receiver_player_id || undefined, // Player ID for network graph
+                            passTargetName: receiverName // Display name for UI components
                         });
                     });
 

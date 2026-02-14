@@ -254,11 +254,11 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
 
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">
                       <StatHint statId={stat.statId} iconSize="sm">
                         <span>{stat.label}</span>
                       </StatHint>
-                    </p>
+                    </span>
                     <p className={`text-2xl font-bold ${stat.color}`}>
                       {stat.value}
                     </p>

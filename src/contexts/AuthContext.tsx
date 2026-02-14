@@ -12,6 +12,7 @@ interface User {
     team?: string;
     teamName?: string; // Support both just in case
     playerId?: string;
+    subscriptionType: 'normal' | 'premium';
 }
 
 interface AuthContextType {
@@ -33,7 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedUser = localStorage.getItem('auth_user');
         if (storedUser) {
             try {
-                setUser(JSON.parse(storedUser));
+                const parsed = JSON.parse(storedUser);
+                // Ensure subscriptionType has a default for cached data from before the field existed
+                if (!parsed.subscriptionType && parsed.role === 'coach') {
+                    parsed.subscriptionType = 'normal';
+                }
+                setUser(parsed);
             } catch {
                 localStorage.removeItem('auth_user');
             }
@@ -79,7 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     role: dbUser.role as UserRole,
                     name: `${dbUser.first_name} ${dbUser.last_name}`,
                     team: dbUser.team_name, // Using team_name from RPC join
-                    playerId: dbUser.player_id
+                    playerId: dbUser.player_id,
+                    subscriptionType: dbUser.subscription_type === 'premium' ? 'premium' : 'normal',
                 };
 
                 setUser(newUser);
