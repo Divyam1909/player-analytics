@@ -1,0 +1,40 @@
+DATABASE MATERIALIZATION & AUTOMATION EXPLAINED
+==============================================
+
+Yes, you are absolutely correct! The tables for match statistics (`match_statistics_summary` and `player_match_statistics`) are designed as **Materialized Views**.
+
+Here is a simple explanation of how it works and why you don't need to manually export cumulative stats:
+
+1. WHAT IS A MATERIALIZED VIEW?
+-------------------------------
+A normal "View" is just a saved SQL query that runs every time you access it. It's always up-to-date but can be slow if the calculation is complex.
+
+A "Materialized View" is like a View, but the result is **saved (cached) as a physical table** on the disk.
+- **Pros:** Reading from it is extremely fast (instant cumulative stats).
+- **Cons:** It needs to be "refreshed" when the underlying data changes.
+
+2. THE AUTOMATION FLOW
+----------------------
+You don't need to do anything manually because the system handles the "refreshing" automatically:
+
+   A. **Trigger:** Whenever a new event is added (e.g., a pass in `pass_events`, a goal in `shots_on_target`), a database Trigger fires.
+   
+   B. **Queue:** This trigger marks a flag in a special `refresh_queue` table, saying "Hey, data has changed!".
+   
+   C. **Refresh:** A function (`do_refresh_statistics_views`) checks this flag. If it's set, it runs `REFRESH MATERIALIZED VIEW` to update the stats.
+
+3. YOUR WORKFLOW
+----------------
+- **You:** Log a match event (Pass, Shot, Duel, etc.).
+- **Database:** Automatically detects the change and recalculates the totals in the background.
+- **Result:** When you query `match_statistics_summary` or `player_match_statistics`, you get the pre-calculated, up-to-date cumulative stats instantly.
+
+4. KEY FILES INVOLVED
+---------------------
+- `new_database/database_updates_stats_structure.sql`: Defines the Materialized Views.
+- `new_database/auto_refresh_triggers.sql`: Sets up the triggers and the refresh logic.
+- `new_database/database-player-attributes-calculation.sql`: Automatically calculates 0-100 player ratings from these stats.
+
+SUMMARY
+-------
+You DO NOT need to write manual scripts to aggregate stats. The database does it for you. You just need to ensure the automation scripts (Triggers and Refresh Functions) are running.

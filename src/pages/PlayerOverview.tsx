@@ -178,21 +178,21 @@ const PlayerOverview = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* Left Panel — Player List */}
-                        <div className="lg:col-span-4 xl:col-span-3">
-                            <Card className="bg-card border-border sticky top-24">
-                                <CardHeader className="pb-3">
+                    <div className="flex flex-col gap-6">
+                        {/* Player Selection Panel — Full Width Horizontal */}
+                        <Card className="bg-card border-border">
+                            <CardHeader className="pb-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <Filter className="w-4 h-4 text-primary" />
                                         Players
-                                        <span className="ml-auto text-xs text-muted-foreground font-normal">
+                                        <span className="ml-2 text-xs text-muted-foreground font-normal">
                                             {filteredPlayers.length} found
                                         </span>
                                     </CardTitle>
 
                                     {/* Search */}
-                                    <div className="relative mt-3">
+                                    <div className="relative flex-1 max-w-xs">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                         <input
                                             type="text"
@@ -204,7 +204,7 @@ const PlayerOverview = () => {
                                     </div>
 
                                     {/* Position Filters */}
-                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                    <div className="flex flex-wrap gap-1.5">
                                         {POSITION_FILTERS.map((pf) => (
                                             <Button
                                                 key={pf.value}
@@ -219,24 +219,26 @@ const PlayerOverview = () => {
                                             </Button>
                                         ))}
                                     </div>
-                                </CardHeader>
+                                </div>
+                            </CardHeader>
 
-                                <CardContent className="pt-0">
-                                    <div className="max-h-[calc(100vh-320px)] overflow-y-auto space-y-1 pr-1">
+                            <CardContent className="pt-0">
+                                <div className="overflow-x-auto pb-2">
+                                    <div className="flex gap-2 min-w-max">
                                         {filteredPlayers.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-8">
+                                            <p className="text-sm text-muted-foreground text-center py-4 w-full">
                                                 No players found
                                             </p>
                                         ) : (
                                             filteredPlayers.map((player, index) => (
                                                 <motion.div
                                                     key={player.id}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    transition={{ delay: index * 0.03 }}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: index * 0.02 }}
                                                     onClick={() => setSelectedPlayerId(player.id)}
                                                     className={cn(
-                                                        "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group",
+                                                        "flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 min-w-[80px]",
                                                         selectedPlayerId === player.id
                                                             ? "bg-primary/15 border border-primary/30"
                                                             : "hover:bg-secondary/80 border border-transparent"
@@ -245,7 +247,7 @@ const PlayerOverview = () => {
                                                     {/* Avatar */}
                                                     <div
                                                         className={cn(
-                                                            "w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
+                                                            "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
                                                             selectedPlayerId === player.id
                                                                 ? "bg-primary text-primary-foreground"
                                                                 : "bg-secondary text-muted-foreground"
@@ -255,58 +257,48 @@ const PlayerOverview = () => {
                                                     </div>
 
                                                     {/* Info */}
-                                                    <div className="flex-1 min-w-0">
+                                                    <div className="text-center min-w-0">
                                                         <p
                                                             className={cn(
-                                                                "text-sm font-medium truncate",
+                                                                "text-xs font-medium truncate max-w-[70px]",
                                                                 selectedPlayerId === player.id
                                                                     ? "text-primary"
                                                                     : "text-foreground"
                                                             )}
+                                                            title={player.name}
                                                         >
-                                                            {player.name}
+                                                            {player.name.split(' ')[0]}...
                                                         </p>
-                                                        <p className="text-[11px] text-muted-foreground">
-                                                            {player.position} · {player.matchStats.length}{" "}
-                                                            matches
+                                                        <p className="text-[10px] text-muted-foreground">
+                                                            {player.position.substring(0, 2).toUpperCase()} · {player.matchStats.length}
                                                         </p>
                                                     </div>
 
                                                     {/* Quick stats */}
-                                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                                        <span className="text-[11px] text-muted-foreground">
+                                                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                                        <span>
                                                             {player.matchStats.reduce(
                                                                 (a, m) => a + m.stats.goals,
                                                                 0
-                                                            )}
-                                                            G
+                                                            )}G
                                                         </span>
-                                                        <span className="text-[11px] text-muted-foreground">
+                                                        <span>
                                                             {player.matchStats.reduce(
                                                                 (a, m) => a + m.stats.assists,
                                                                 0
-                                                            )}
-                                                            A
+                                                            )}A
                                                         </span>
-                                                        <ChevronRight
-                                                            className={cn(
-                                                                "w-3.5 h-3.5 transition-opacity",
-                                                                selectedPlayerId === player.id
-                                                                    ? "text-primary opacity-100"
-                                                                    : "text-muted-foreground opacity-0 group-hover:opacity-100"
-                                                            )}
-                                                        />
                                                     </div>
                                                 </motion.div>
                                             ))
                                         )}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                        {/* Right Panel — Stats Detail */}
-                        <div className="lg:col-span-8 xl:col-span-9">
+                        {/* Stats Panel — Full Width Below */}
+                        <div className="w-full">
                             <AnimatePresence mode="wait">
                                 {selectedPlayer ? (
                                     <motion.div

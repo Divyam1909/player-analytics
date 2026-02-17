@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StatHint } from "@/components/ui/stat-hint";
 import TacticalField from "@/components/field/TacticalField";
+import { FormationName, getFormationByName } from "@/lib/formationPositions";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -15,6 +16,8 @@ interface PlayerPassData {
 interface TeamPassingMapProps {
     playerPasses: PlayerPassData[];
     matchId?: string;
+    preferredHomeTeamId?: string;
+    selectedFormation?: FormationName;
 }
 
 interface TimeInterval {
@@ -219,7 +222,11 @@ const TEAM_PALETTES = [
 
 // ── Component ──────────────────────────────────────────────────
 
-const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
+const TeamPassingMap = ({
+    playerPasses,
+    preferredHomeTeamId,
+    selectedFormation = "4-3-3",
+}: TeamPassingMapProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [selectedInterval, setSelectedInterval] =
         useState<TimeInterval>(ALL_INTERVAL);
@@ -255,8 +262,13 @@ const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
         );
     }, [playerPasses]);
 
-    // Determine home/away by index
-    const homeTeamId = teamGroups[0]?.[0] || "";
+    // Determine home/away. Prefer explicit match-aware home team when available.
+    const homeTeamId = useMemo(() => {
+        if (preferredHomeTeamId && teamGroups.some(([tid]) => tid === preferredHomeTeamId)) {
+            return preferredHomeTeamId;
+        }
+        return teamGroups[0]?.[0] || "";
+    }, [preferredHomeTeamId, teamGroups]);
     const teamColorMap = useMemo(() => {
         const m = new Map<string, (typeof TEAM_PALETTES)[0] & { teamName: string; isHome: boolean }>();
         teamGroups.forEach(([teamId, info], i) => {
@@ -289,6 +301,17 @@ const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
         [allPassEvents],
     );
 
+    const formation = useMemo(
+        () => getFormationByName(selectedFormation),
+        [selectedFormation],
+    );
+    const formationDepthBounds = useMemo(() => {
+        const ys = formation.slots.map((s) => s.y);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        return { minY, rangeY: Math.max(1, maxY - minY) };
+    }, [formation]);
+
     const availableIntervals = useMemo(() => {
         if (intervalMode === "half")
             return hasOvertime
@@ -316,38 +339,56 @@ const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
         return counts;
     }, [filteredPasses]);
 
-    // ── Player nodes with formation-based positions ───────────
+    // ── Player nodes aligned to Team Formation map ───────────
 
     const playerNodes = useMemo(() => {
         const nodes: PlayerNode[] = [];
+        const assignPlayersToSlots = (players: Player[]) => {
+            const assigned: (Player | null)[] = [];
+            const usedPlayerIds = new Set<string>();
 
-        // Count players per position per team for collision offset
-        const positionCounts = new Map<string, number>();
-        const positionIndices = new Map<string, number>();
-
-        // First pass: count positions per team
-        teamGroups.forEach(([teamId, { players }]) => {
-            players.forEach((player) => {
-                const key = `${teamId}:${player.position}`;
-                positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
+            formation.slots.forEach((slot) => {
+                const candidates = players.filter(
+                    (p) =>
+                        !usedPlayerIds.has(p.id) &&
+                        slot.preferredPositions.some(
+                            (pref) =>
+                                p.position.toLowerCase().includes(pref.toLowerCase()) ||
+                                pref.toLowerCase().includes(p.position.toLowerCase()),
+                        ),
+                );
+                const bestCandidate = candidates.sort(
+                    (a, b) => (b.overallRating || 0) - (a.overallRating || 0),
+                )[0];
+                if (bestCandidate) {
+                    assigned.push(bestCandidate);
+                    usedPlayerIds.add(bestCandidate.id);
+                } else {
+                    const fallback = players.find((p) => !usedPlayerIds.has(p.id));
+                    if (fallback) {
+                        assigned.push(fallback);
+                        usedPlayerIds.add(fallback.id);
+                    } else {
+                        assigned.push(null);
+                    }
+                }
             });
-        });
 
-        // Second pass: assign positions
+            return { assigned, usedPlayerIds };
+        };
+
+        // Place each team using the same formation-slot map as Team Formation
         teamGroups.forEach(([teamId, { players }]) => {
             const isHome = teamId === homeTeamId;
-            players.forEach((player) => {
-                const key = `${teamId}:${player.position}`;
-                const idx = positionIndices.get(key) || 0;
-                positionIndices.set(key, idx + 1);
-                const totalSamePos = positionCounts.get(key) || 1;
+            const { assigned, usedPlayerIds } = assignPlayersToSlots(players);
 
-                const { x, y } = getPositionCoords(
-                    player.position,
-                    isHome,
-                    idx,
-                    totalSamePos,
-                );
+            formation.slots.forEach((slot, index) => {
+                const player = assigned[index];
+                if (!player) return;
+
+                const homeX = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
+                const x = isHome ? homeX : PITCH_W - homeX;
+                const y = (slot.x / 100) * PITCH_H;
 
                 nodes.push({
                     player,
@@ -357,10 +398,33 @@ const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
                     passCount: playerPassCounts.get(player.id) || 0,
                 });
             });
+
+            // Fallback for any extra players beyond formation slots
+            const extras = players.filter((p) => !usedPlayerIds.has(p.id));
+            if (extras.length > 0) {
+                const positionCounts = new Map<string, number>();
+                const positionIndices = new Map<string, number>();
+                extras.forEach((p) => {
+                    positionCounts.set(p.position, (positionCounts.get(p.position) || 0) + 1);
+                });
+                extras.forEach((player) => {
+                    const idx = positionIndices.get(player.position) || 0;
+                    positionIndices.set(player.position, idx + 1);
+                    const totalSamePos = positionCounts.get(player.position) || 1;
+                    const { x, y } = getPositionCoords(player.position, isHome, idx, totalSamePos);
+                    nodes.push({
+                        player,
+                        x,
+                        y,
+                        teamId,
+                        passCount: playerPassCounts.get(player.id) || 0,
+                    });
+                });
+            }
         });
 
         return nodes;
-    }, [teamGroups, homeTeamId, playerPassCounts]);
+    }, [teamGroups, homeTeamId, playerPassCounts, formation, formationDepthBounds]);
 
     // ── Bidirectional connections (same team only) ────────────
 
@@ -616,29 +680,23 @@ const TeamPassingMap = ({ playerPasses }: TeamPassingMapProps) => {
 
                 {/* Team labels */}
                 {teamColorMap.size > 0 && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-3 pointer-events-none select-none">
+                    <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
                         {[...teamColorMap.entries()].map(([, palette]) => (
                             <div
                                 key={palette.teamName}
-                                className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-full"
+                                className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full"
                             >
                                 <span
-                                    className="w-2 h-2 rounded-full"
+                                    className="w-2.5 h-2.5 rounded-full"
                                     style={{ backgroundColor: palette.node }}
                                 />
-                                <span className="text-[10px] font-semibold text-white/80">
+                                <span className="text-xs font-semibold text-white/90">
                                     {palette.teamName}
                                 </span>
                             </div>
                         ))}
                     </div>
                 )}
-
-                {/* Time badge */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-white/70 font-medium bg-black/40 px-3 py-1 rounded-full pointer-events-none select-none">
-                    Passes from minutes {selectedInterval.start} to{" "}
-                    {selectedInterval.end > 90 ? "90+" : selectedInterval.end}
-                </div>
 
                 {/* Empty state */}
                 {playerNodes.length === 0 && (

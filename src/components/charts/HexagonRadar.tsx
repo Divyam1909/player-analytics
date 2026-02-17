@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Team colors for comparison view - consistent with TeamAnalytics
+const TEAM_COLORS = {
+    home: "hsl(217, 91%, 60%)", // Blue
+    homeLight: "hsl(217, 91%, 70%)",
+    away: "hsl(0, 72%, 51%)",   // Red
+    awayLight: "hsl(0, 72%, 65%)",
+};
+
 interface HexagonRadarProps {
     data: {
         label: string;
@@ -12,6 +20,7 @@ interface HexagonRadarProps {
     teamName?: string;
     opponentName?: string;
     size?: number;
+    useComparisonColors?: boolean; // Use blue/red instead of primary/muted
 }
 
 interface HoverInfo {
@@ -29,6 +38,7 @@ const HexagonRadar = ({
     teamName = "Team",
     opponentName = "Opponent",
     size = 320,
+    useComparisonColors = true,
 }: HexagonRadarProps) => {
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
     const center = size / 2;
@@ -126,12 +136,12 @@ const HexagonRadar = ({
                 {/* Defs for gradients and filters */}
                 <defs>
                     <linearGradient id="teamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.15} />
+                        <stop offset="0%" stopColor={useComparisonColors ? TEAM_COLORS.home : "hsl(var(--primary))"} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={useComparisonColors ? TEAM_COLORS.home : "hsl(var(--primary))"} stopOpacity={0.15} />
                     </linearGradient>
                     <linearGradient id="oppGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.08} />
+                        <stop offset="0%" stopColor={useComparisonColors ? TEAM_COLORS.away : "hsl(var(--muted-foreground))"} stopOpacity={0.35} />
+                        <stop offset="100%" stopColor={useComparisonColors ? TEAM_COLORS.away : "hsl(var(--muted-foreground))"} stopOpacity={0.12} />
                     </linearGradient>
                     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                         <feGaussianBlur stdDeviation="2" result="blur" />
@@ -187,7 +197,7 @@ const HexagonRadar = ({
                 <motion.path
                     d={opponentPath}
                     fill="url(#oppGradient)"
-                    stroke="hsl(var(--muted-foreground))"
+                    stroke={useComparisonColors ? TEAM_COLORS.away : "hsl(var(--muted-foreground))"}
                     strokeWidth={2}
                     strokeLinejoin="round"
                     initial={{ opacity: 0, scale: 0.5 }}
@@ -199,7 +209,7 @@ const HexagonRadar = ({
                 <motion.path
                     d={teamPath}
                     fill="url(#teamGradient)"
-                    stroke="hsl(var(--primary))"
+                    stroke={useComparisonColors ? TEAM_COLORS.home : "hsl(var(--primary))"}
                     strokeWidth={2.5}
                     strokeLinejoin="round"
                     filter="url(#glow)"
@@ -228,7 +238,7 @@ const HexagonRadar = ({
                             cy={point.y}
                             r={hoverInfo?.type === 'opponent' && hoverInfo?.index === i ? 7 : 5}
                             fill="hsl(var(--background))"
-                            stroke="hsl(var(--muted-foreground))"
+                            stroke={useComparisonColors ? TEAM_COLORS.away : "hsl(var(--muted-foreground))"}
                             strokeWidth={2}
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
@@ -256,7 +266,7 @@ const HexagonRadar = ({
                             cx={point.x}
                             cy={point.y}
                             r={hoverInfo?.type === 'team' && hoverInfo?.index === i ? 10 : 8}
-                            fill="hsl(var(--primary))"
+                            fill={useComparisonColors ? TEAM_COLORS.home : "hsl(var(--primary))"}
                             opacity={0.3}
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
@@ -266,7 +276,7 @@ const HexagonRadar = ({
                             cx={point.x}
                             cy={point.y}
                             r={hoverInfo?.type === 'team' && hoverInfo?.index === i ? 7 : 5}
-                            fill="hsl(var(--primary))"
+                            fill={useComparisonColors ? TEAM_COLORS.home : "hsl(var(--primary))"}
                             stroke="hsl(var(--background))"
                             strokeWidth={2}
                             initial={{ scale: 0 }}
@@ -301,13 +311,25 @@ const HexagonRadar = ({
                             >
                                 {label.label}
                             </text>
+                            {/* Team value */}
                             <text
                                 x={label.x}
                                 y={label.y + dy + 14}
                                 textAnchor={textAnchor}
-                                className="fill-primary text-sm font-bold"
+                                fill={useComparisonColors ? TEAM_COLORS.home : undefined}
+                                className={useComparisonColors ? "text-sm font-bold" : "fill-primary text-sm font-bold"}
                             >
                                 {label.value.team}%
+                            </text>
+                            {/* Opponent value - show in comparison mode */}
+                            <text
+                                x={label.x}
+                                y={label.y + dy + 26}
+                                textAnchor={textAnchor}
+                                fill={useComparisonColors ? TEAM_COLORS.away : undefined}
+                                className={useComparisonColors ? "text-[10px] font-medium" : "fill-muted-foreground text-[10px] font-medium"}
+                            >
+                                {label.value.opp}%
                             </text>
                         </g>
                     );
@@ -328,14 +350,14 @@ const HexagonRadar = ({
                             top: hoverInfo.y - 50,
                             transform: 'translateX(-50%)',
                             backgroundColor: hoverInfo.type === 'team'
-                                ? 'hsl(var(--primary) / 0.95)'
-                                : 'hsl(var(--secondary))',
+                                ? (useComparisonColors ? `${TEAM_COLORS.home}F0` : 'hsl(var(--primary) / 0.95)')
+                                : (useComparisonColors ? `${TEAM_COLORS.away}F0` : 'hsl(var(--secondary))'),
                         }}
                     >
-                        <p className={`text-[10px] font-medium ${hoverInfo.type === 'team' ? 'text-primary-foreground' : 'text-foreground'}`}>
+                        <p className="text-[10px] font-medium text-white">
                             {hoverInfo.teamName}
                         </p>
-                        <p className={`text-sm font-bold ${hoverInfo.type === 'team' ? 'text-primary-foreground' : 'text-foreground'}`}>
+                        <p className="text-sm font-bold text-white">
                             {hoverInfo.label}: {hoverInfo.value}%
                         </p>
                     </motion.div>
@@ -345,11 +367,20 @@ const HexagonRadar = ({
             {/* Legend - Improved styling */}
             <div className="flex items-center justify-center gap-8 mt-2 px-4 py-2 rounded-lg bg-secondary/30">
                 <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 rounded-full bg-primary shadow-md shadow-primary/30" />
+                    <div 
+                        className="w-3.5 h-3.5 rounded-full shadow-md" 
+                        style={{ 
+                            backgroundColor: useComparisonColors ? TEAM_COLORS.home : 'hsl(var(--primary))',
+                            boxShadow: useComparisonColors ? `0 4px 6px ${TEAM_COLORS.home}40` : undefined
+                        }} 
+                    />
                     <span className="text-xs text-foreground font-medium">{teamName}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 rounded-full bg-muted-foreground/60" />
+                    <div 
+                        className="w-3.5 h-3.5 rounded-full" 
+                        style={{ backgroundColor: useComparisonColors ? TEAM_COLORS.away : 'hsl(var(--muted-foreground) / 0.6)' }} 
+                    />
                     <span className="text-xs text-muted-foreground">{opponentName}</span>
                 </div>
             </div>

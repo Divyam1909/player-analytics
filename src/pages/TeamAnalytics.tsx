@@ -30,6 +30,11 @@ import {
     LayoutGrid,
     Video,
     Activity,
+    GitCompare,
+    User,
+    ArrowUpRight,
+    ArrowDownRight,
+    Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -41,6 +46,108 @@ import { FORMATIONS, FormationName, getFormationByName, getSlotColor, FormationS
 import TacticalField from "@/components/field/TacticalField";
 import TeamPassingMap from "@/components/analytics/TeamPassingMap";
 import { StatHint } from "@/components/ui/stat-hint";
+
+// ── Position-based field coordinates for full pitch formation view ──
+// Coordinates are in pitch units: x=0-105, y=0-68
+// Home team defends left goal (x=0), attacks toward right goal (x=105)
+const POSITION_COORDS: Record<string, { x: number; y: number }> = {
+    // Goalkeepers
+    GK: { x: 5.5, y: 34 },
+    Goalkeeper: { x: 5.5, y: 34 },
+    // Defenders
+    CB: { x: 18, y: 34 },
+    Defender: { x: 18, y: 34 },
+    LCB: { x: 18, y: 24 },
+    RCB: { x: 18, y: 44 },
+    LB: { x: 17, y: 12 },
+    RB: { x: 17, y: 56 },
+    LWB: { x: 22, y: 10 },
+    RWB: { x: 22, y: 58 },
+    // Defensive Midfielders
+    CDM: { x: 30, y: 34 },
+    LCDM: { x: 30, y: 25 },
+    RCDM: { x: 30, y: 43 },
+    // Central Midfielders
+    CM: { x: 38, y: 34 },
+    Midfielder: { x: 38, y: 34 },
+    LCM: { x: 37, y: 24 },
+    RCM: { x: 37, y: 44 },
+    LM: { x: 36, y: 13 },
+    RM: { x: 36, y: 55 },
+    // Attacking Midfielders
+    CAM: { x: 44, y: 34 },
+    LCAM: { x: 44, y: 25 },
+    RCAM: { x: 44, y: 43 },
+    // Wingers
+    LW: { x: 46, y: 14 },
+    RW: { x: 46, y: 54 },
+    Winger: { x: 46, y: 34 },
+    // Forwards
+    CF: { x: 50, y: 34 },
+    ST: { x: 51, y: 34 },
+    Forward: { x: 51, y: 34 },
+    LST: { x: 50, y: 26 },
+    RST: { x: 50, y: 42 },
+};
+const DEFAULT_COORDS = { x: 38, y: 34 };
+const PITCH_W = 105;
+const PITCH_H = 68;
+
+// Team colors for formation view
+const FORMATION_TEAM_COLORS = {
+    home: { node: "rgba(59, 140, 255, 0.95)", border: "rgba(30, 80, 180, 0.9)" },
+    away: { node: "rgba(240, 75, 75, 0.95)", border: "rgba(165, 40, 40, 0.9)" },
+};
+
+/**
+ * Get pitch coordinates for a player based on their position.
+ */
+function getPositionCoords(
+    position: string,
+    isHomeTeam: boolean,
+    index: number,
+    totalSamePos: number,
+): { x: number; y: number } {
+    let coords = POSITION_COORDS[position];
+    if (!coords) {
+        const posKey = position.trim();
+        coords = POSITION_COORDS[posKey];
+    }
+    if (!coords) {
+        const posUpper = position.toUpperCase().trim();
+        if (posUpper.includes('GOALKEEPER') || posUpper.includes('KEEPER')) {
+            coords = POSITION_COORDS['GK'];
+        } else if (posUpper.includes('DEFENDER') || posUpper.includes('BACK')) {
+            coords = POSITION_COORDS['CB'];
+        } else if (posUpper.includes('MIDFIELDER') || posUpper.includes('MID')) {
+            coords = POSITION_COORDS['CM'];
+        } else if (posUpper.includes('WINGER') || posUpper.includes('WING')) {
+            coords = POSITION_COORDS['Winger'];
+        } else if (posUpper.includes('FORWARD') || posUpper.includes('STRIKER') || posUpper.includes('ATTACKER')) {
+            coords = POSITION_COORDS['ST'];
+        } else {
+            for (const [key, val] of Object.entries(POSITION_COORDS)) {
+                if (posUpper.includes(key.toUpperCase())) {
+                    coords = val;
+                    break;
+                }
+            }
+        }
+    }
+    if (!coords) coords = DEFAULT_COORDS;
+
+    let { x, y } = coords;
+    if (totalSamePos > 1) {
+        const offsetY = (index - (totalSamePos - 1) / 2) * 4.5;
+        y = Math.max(6, Math.min(PITCH_H - 6, y + offsetY));
+    }
+    if (!isHomeTeam) {
+        x = PITCH_W - x;
+    }
+    x = Math.max(5, Math.min(PITCH_W - 5, x));
+    y = Math.max(6, Math.min(PITCH_H - 6, y));
+    return { x, y };
+}
 
 // Animation variants
 const containerVariants = {
@@ -236,6 +343,176 @@ const POSITION_COLORS: Record<string, string> = {
     Winger: "hsl(var(--chart-4))",
 };
 
+// Team colors for comparison view
+const TEAM_COLORS = {
+    home: "hsl(217, 91%, 60%)", // Blue
+    away: "hsl(0, 72%, 51%)",   // Red
+};
+
+// Comparison bar component - shows both teams' values side by side
+interface ComparisonBarProps {
+    label: string;
+    teamValue: number | null;
+    opponentValue: number | null;
+    teamName: string;
+    opponentName: string;
+    icon?: React.ReactNode;
+    suffix?: string;
+    reverseColors?: boolean; // For stats like fouls where lower is better
+}
+
+const ComparisonBar = ({
+    label,
+    teamValue,
+    opponentValue,
+    teamName,
+    opponentName,
+    icon,
+    suffix = '',
+    reverseColors = false,
+}: ComparisonBarProps) => {
+    const tVal = teamValue ?? 0;
+    const oVal = opponentValue ?? 0;
+    const total = tVal + oVal;
+    const teamPct = total > 0 ? (tVal / total) * 100 : 50;
+    const oppPct = total > 0 ? (oVal / total) * 100 : 50;
+    
+    // Determine advantage
+    const teamAhead = reverseColors ? tVal < oVal : tVal > oVal;
+    const oppAhead = reverseColors ? oVal < tVal : oVal > tVal;
+    const isTied = tVal === oVal;
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    {icon && <span className="text-muted-foreground">{icon}</span>}
+                    {label}
+                </div>
+            </div>
+            <div className="flex items-center gap-3">
+                {/* Team value */}
+                <div className={cn(
+                    "w-16 text-right text-sm font-bold",
+                    teamAhead && "text-success",
+                    oppAhead && "text-muted-foreground",
+                    isTied && "text-foreground"
+                )}>
+                    {teamValue !== null ? `${teamValue}${suffix}` : '--'}
+                    {teamAhead && !isTied && <ArrowUpRight className="inline w-3 h-3 ml-0.5" />}
+                </div>
+                
+                {/* Bar visualization */}
+                <div className="flex-1 h-3 flex rounded-full overflow-hidden bg-secondary/30">
+                    <motion.div
+                        className="h-full rounded-l-full"
+                        style={{ backgroundColor: TEAM_COLORS.home }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${teamPct}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                    <motion.div
+                        className="h-full rounded-r-full"
+                        style={{ backgroundColor: TEAM_COLORS.away }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${oppPct}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+                    />
+                </div>
+                
+                {/* Opponent value */}
+                <div className={cn(
+                    "w-16 text-left text-sm font-bold",
+                    oppAhead && "text-success",
+                    teamAhead && "text-muted-foreground",
+                    isTied && "text-foreground"
+                )}>
+                    {opponentValue !== null ? `${opponentValue}${suffix}` : '--'}
+                    {oppAhead && !isTied && <ArrowUpRight className="inline w-3 h-3 ml-0.5" />}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Compact stat card for comparison view
+interface ComparisonStatCardProps {
+    label: string;
+    teamValue: number | string | null;
+    opponentValue: number | string | null;
+    teamName: string;
+    opponentName: string;
+    icon?: React.ReactNode;
+    reverseColors?: boolean;
+}
+
+const ComparisonStatCard = ({
+    label,
+    teamValue,
+    opponentValue,
+    teamName,
+    opponentName,
+    icon,
+    reverseColors = false,
+}: ComparisonStatCardProps) => {
+    const tVal = typeof teamValue === 'string' ? parseFloat(teamValue) || 0 : teamValue ?? 0;
+    const oVal = typeof opponentValue === 'string' ? parseFloat(opponentValue) || 0 : opponentValue ?? 0;
+    
+    const teamAhead = reverseColors ? tVal < oVal : tVal > oVal;
+    const oppAhead = reverseColors ? oVal < tVal : oVal > tVal;
+    const isTied = tVal === oVal;
+    
+    const diff = tVal - oVal;
+    const diffPct = oVal > 0 ? Math.round(((tVal - oVal) / oVal) * 100) : 0;
+
+    return (
+        <div className="p-3 rounded-lg bg-secondary/30 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+                {icon && <span className="text-muted-foreground">{icon}</span>}
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+                {/* Team value */}
+                <div className="flex flex-col items-start">
+                    <span className={cn(
+                        "text-lg font-bold",
+                        teamAhead && "text-primary",
+                        !teamAhead && !isTied && "text-muted-foreground"
+                    )}>
+                        {teamValue ?? '--'}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[60px]">{teamName}</span>
+                </div>
+                
+                {/* VS / Difference indicator */}
+                <div className="flex flex-col items-center">
+                    {!isTied && (
+                        <span className={cn(
+                            "text-xs font-bold",
+                            (reverseColors ? diff < 0 : diff > 0) ? "text-success" : "text-destructive"
+                        )}>
+                            {(reverseColors ? diff < 0 : diff > 0) ? '+' : ''}{diff}
+                        </span>
+                    )}
+                    {isTied && <Minus className="w-3 h-3 text-muted-foreground" />}
+                </div>
+                
+                {/* Opponent value */}
+                <div className="flex flex-col items-end">
+                    <span className={cn(
+                        "text-lg font-bold",
+                        oppAhead && "text-destructive",
+                        !oppAhead && !isTied && "text-muted-foreground"
+                    )}>
+                        {opponentValue ?? '--'}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[60px]">{opponentName}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Get all goal events from all matches
 interface GoalMoment {
     matchId: string;
@@ -256,6 +533,9 @@ interface MatchListItem {
     opponent: string;
     date: string;
     homeTeam: string;
+    homeTeamId: string;
+    awayTeamId: string;
+    ourTeamId: string;
 }
 
 interface MatchStatistics {
@@ -323,6 +603,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     // Section navigation state
     const [activeSection, setActiveSection] = useState<string>('overview');
     const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    // View mode: 'single' for single team view, 'comparison' for both teams side-by-side
+    const [viewMode, setViewMode] = useState<'single' | 'comparison'>('single');
 
     // Handle section click - smooth scroll to section
     const handleSectionClick = useCallback((sectionId: string) => {
@@ -392,7 +675,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('matches')
-                .select('id, competition_name, match_date, home_team:home_team_id(team_name), away_team:away_team_id(team_name)')
+                .select('id, competition_name, match_date, home_team_id, away_team_id, our_team_id, home_team:home_team_id(team_name), away_team:away_team_id(team_name)')
                 .order('match_date', { ascending: false });
 
             if (error) throw error;
@@ -400,7 +683,10 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                 id: m.id,
                 opponent: (m.away_team as any)?.team_name || 'Opponent',
                 date: m.match_date,
-                homeTeam: (m.home_team as any)?.team_name || 'Team'
+                homeTeam: (m.home_team as any)?.team_name || 'Team',
+                homeTeamId: m.home_team_id,
+                awayTeamId: m.away_team_id,
+                ourTeamId: m.our_team_id,
             })) as MatchListItem[];
         }
     });
@@ -461,32 +747,53 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     home_assists: isHome ? m.home_assists : m.away_assists,
                     home_crosses: isHome ? m.home_crosses : m.away_crosses,
 
+                    // Opponent Passing stats (for comparison mode)
+                    away_successful_passes: isHome ? m.away_successful_passes : m.home_successful_passes,
+                    away_unsuccessful_passes: isHome ? m.away_unsuccessful_passes : m.home_unsuccessful_passes,
+                    away_total_passes: isHome ? m.away_total_passes : m.home_total_passes,
+                    away_progressive_passes: isHome ? m.away_progressive_passes : m.home_progressive_passes,
+                    away_key_passes: isHome ? m.away_key_passes : m.home_key_passes,
+                    away_assists: isHome ? m.away_assists : m.home_assists,
+                    away_crosses: isHome ? m.away_crosses : m.home_crosses,
+
                     // Attacking stats
                     home_goals: isHome ? m.home_goals : m.away_goals,
                     home_penalties: isHome ? m.home_penalties : m.away_penalties,
                     home_shots_saved: isHome ? m.home_shots_saved : m.away_shots_saved,
+                    away_goals: isHome ? m.away_goals : m.home_goals,
 
                     // Duels stats
                     home_aerial_duels_total: isHome ? m.home_aerial_duels_total : m.away_aerial_duels_total,
                     home_total_dribbles: isHome ? m.home_total_dribbles : m.away_total_dribbles,
                     home_progressive_carries: isHome ? m.home_progressive_carries : m.away_progressive_carries,
+                    away_aerial_duels_total: isHome ? m.away_aerial_duels_total : m.home_aerial_duels_total,
+                    away_total_dribbles: isHome ? m.away_total_dribbles : m.home_total_dribbles,
+                    away_progressive_carries: isHome ? m.away_progressive_carries : m.home_progressive_carries,
 
                     // Defensive stats
                     home_blocks: isHome ? m.home_blocks : m.away_blocks,
                     home_ball_recoveries: isHome ? m.home_ball_recoveries : m.away_ball_recoveries,
                     home_high_press_recoveries: isHome ? m.home_high_press_recoveries : m.away_high_press_recoveries,
+                    away_blocks: isHome ? m.away_blocks : m.home_blocks,
+                    away_ball_recoveries: isHome ? m.away_ball_recoveries : m.home_ball_recoveries,
 
                     // Set pieces
                     home_corners: isHome ? m.home_corners : m.away_corners,
+                    away_corners: isHome ? m.away_corners : m.home_corners,
 
                     // Goalkeeper stats
                     home_saves_inside_box: isHome ? m.home_saves_inside_box : m.away_saves_inside_box,
                     home_saves_outside_box: isHome ? m.home_saves_outside_box : m.away_saves_outside_box,
                     home_goals_conceded: isHome ? m.home_goals_conceded : m.away_goals_conceded,
+                    away_saves_inside_box: isHome ? m.away_saves_inside_box : m.home_saves_inside_box,
+                    away_saves_outside_box: isHome ? m.away_saves_outside_box : m.home_saves_outside_box,
+                    away_goals_conceded: isHome ? m.away_goals_conceded : m.home_goals_conceded,
 
                     // Fouls and cards
                     home_yellow_cards: isHome ? m.home_yellow_cards : m.away_yellow_cards,
                     home_red_cards: isHome ? m.home_red_cards : m.away_red_cards,
+                    away_yellow_cards: isHome ? m.away_yellow_cards : m.home_yellow_cards,
+                    away_red_cards: isHome ? m.away_red_cards : m.home_red_cards,
 
                     // Indices - swap based on which team is ours
                     home_possession_control_index: isHome ? m.home_possession_control_index : m.away_possession_control_index,
@@ -622,69 +929,243 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
     // Generate dynamic formation positions
     const currentFormation = useMemo(() => getFormationByName(selectedFormation), [selectedFormation]);
+    const formationDepthBounds = useMemo(() => {
+        const ys = currentFormation.slots.map((s) => s.y);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        return { minY, maxY, rangeY: Math.max(1, maxY - minY) };
+    }, [currentFormation]);
 
-    // Get active players for selected match
+    // Tactical visualizations (formation + passing) always use one concrete match.
+    // If UI filter is "all", fall back to the latest match so we never mix multiple teams.
+    const tacticalMatchId = useMemo(
+        () => (selectedMatch !== "all" ? selectedMatch : (matches[0]?.id ?? "all")),
+        [selectedMatch, matches],
+    );
+    const tacticalMatchInfo = useMemo(
+        () => matches.find((m) => m.id === tacticalMatchId),
+        [matches, tacticalMatchId],
+    );
+
+    // Get tactical players for the selected tactical match context.
+    // Prefer full team rosters for that match (home + away) so formation/bench
+    // are not limited to only players who logged an event.
     const activePlayers = useMemo(() => {
-        return selectedMatch === "all"
+        if (tacticalMatchInfo) {
+            const teamIds = new Set([tacticalMatchInfo.homeTeamId, tacticalMatchInfo.awayTeamId]);
+            return players.filter((p) => teamIds.has(p.teamId));
+        }
+        return tacticalMatchId === "all"
             ? players
-            : players.filter(p => p.matchStats.some(m => m.matchId === selectedMatch));
-    }, [players, selectedMatch]);
+            : players.filter(p => p.matchStats.some(m => m.matchId === tacticalMatchId));
+    }, [players, tacticalMatchId, tacticalMatchInfo]);
 
-    // Auto-assign players to formation slots when match or formation changes
-    useEffect(() => {
-        if (activePlayers.length === 0) return;
+    // Group active players by team for formation view
+    const {
+        homeTeamPlayers,
+        homeStartingPlayers,
+        opponentPlayers,
+        opponentStartingPlayers,
+        homeTeamId,
+        homeTeamName,
+        opponentTeamName,
+    } = useMemo(() => {
+        const selectStartingEleven = (teamPlayers: typeof activePlayers) => {
+            const positionPriority: { match: string[]; count: number }[] = [
+                { match: ['GK', 'Goalkeeper', 'keeper'], count: 1 },
+                { match: ['CB', 'LB', 'RB', 'Defender', 'Back', 'LCB', 'RCB', 'LWB', 'RWB'], count: 4 },
+                { match: ['CM', 'CDM', 'CAM', 'LM', 'RM', 'Midfielder', 'Mid'], count: 3 },
+                { match: ['ST', 'CF', 'LW', 'RW', 'Forward', 'Striker', 'Winger', 'Attacker'], count: 3 },
+            ];
+            const selected: typeof activePlayers = [];
+            const usedIds = new Set<string>();
+            for (const { match, count } of positionPriority) {
+                const candidates = teamPlayers
+                    .filter(p => !usedIds.has(p.id) && match.some(m => p.position.toLowerCase().includes(m.toLowerCase())))
+                    .sort((a, b) => (b.overallRating || 0) - (a.overallRating || 0));
+                for (let i = 0; i < Math.min(count, candidates.length); i++) {
+                    selected.push(candidates[i]);
+                    usedIds.add(candidates[i].id);
+                }
+            }
+            const remaining = teamPlayers
+                .filter(p => !usedIds.has(p.id))
+                .sort((a, b) => (b.overallRating || 0) - (a.overallRating || 0));
+            for (let i = 0; selected.length < 11 && i < remaining.length; i++) {
+                selected.push(remaining[i]);
+            }
+            return selected;
+        };
+
+        // Group by teamId
+        const teamGroups = new Map<string, { players: typeof activePlayers; teamName: string }>();
+        activePlayers.forEach(p => {
+            if (!teamGroups.has(p.teamId)) {
+                teamGroups.set(p.teamId, { players: [], teamName: p.team });
+            }
+            teamGroups.get(p.teamId)!.players.push(p);
+        });
+
+        // Sort by player count descending for fallback when no specific match selected
+        const sortedTeams = [...teamGroups.entries()].sort(
+            (a, b) => b[1].players.length - a[1].players.length
+        );
+
+        let derivedHomeTeamId = sortedTeams[0]?.[0] || "";
+        let homePool = sortedTeams[0]?.[1]?.players || [];
+        let homeTeamName = sortedTeams[0]?.[1]?.teamName || "Home Team";
+        let opponentPool: typeof activePlayers = [];
+        let opponentTeamName = "Opponent";
+
+        // Prefer explicit match team IDs when a specific match is selected
+        if (tacticalMatchInfo && tacticalMatchId !== "all") {
+            const explicitHomeTeamId = tacticalMatchInfo.ourTeamId;
+            const explicitOpponentTeamId =
+                explicitHomeTeamId === tacticalMatchInfo.homeTeamId
+                    ? tacticalMatchInfo.awayTeamId
+                    : tacticalMatchInfo.homeTeamId;
+
+            if (explicitHomeTeamId && teamGroups.has(explicitHomeTeamId)) {
+                derivedHomeTeamId = explicitHomeTeamId;
+                homePool = teamGroups.get(explicitHomeTeamId)!.players;
+                homeTeamName = teamGroups.get(explicitHomeTeamId)!.teamName;
+            }
+            if (explicitOpponentTeamId && teamGroups.has(explicitOpponentTeamId)) {
+                opponentPool = teamGroups.get(explicitOpponentTeamId)!.players;
+                opponentTeamName = teamGroups.get(explicitOpponentTeamId)!.teamName;
+            }
+
+            // Fallback when explicit IDs exist in match row but no player rows resolved
+            if (opponentPool.length === 0) {
+                const fallbackOpponent = sortedTeams.find(([tid]) => tid !== derivedHomeTeamId);
+                if (fallbackOpponent) {
+                    opponentPool = fallbackOpponent[1].players;
+                    opponentTeamName = fallbackOpponent[1].teamName;
+                }
+            }
+        } else {
+            // "All matches" fallback: pick the largest non-home team
+            const primaryOpponentTeam = sortedTeams.find(([tid]) => tid !== derivedHomeTeamId);
+            if (primaryOpponentTeam) {
+                opponentPool = primaryOpponentTeam[1].players;
+                opponentTeamName = primaryOpponentTeam[1].teamName;
+            }
+        }
+
+        const homeStartingPlayers = selectStartingEleven(homePool);
+        const opponentStartingPlayers = selectStartingEleven(opponentPool);
+
+        return {
+            homeTeamPlayers: homePool,
+            homeStartingPlayers,
+            opponentPlayers: opponentPool,
+            opponentStartingPlayers,
+            homeTeamId: derivedHomeTeamId,
+            homeTeamName,
+            opponentTeamName,
+        };
+    }, [activePlayers, tacticalMatchInfo, tacticalMatchId]);
+
+    // Compute default formation assignment for current match + formation
+    const getDefaultFieldAssignment = useCallback(() => {
+        if (homeTeamPlayers.length === 0) return [] as string[];
 
         const formation = getFormationByName(selectedFormation);
         const assigned: string[] = [];
         const usedPlayerIds = new Set<string>();
 
-        // For each slot, find the best matching player
         formation.slots.forEach((slot) => {
-            // Find players that match this slot's preferred positions
-            const candidates = activePlayers.filter(p =>
-                !usedPlayerIds.has(p.id) &&
-                slot.preferredPositions.some(pref =>
-                    p.position.toLowerCase().includes(pref.toLowerCase()) ||
-                    pref.toLowerCase().includes(p.position.toLowerCase())
-                )
+            const candidates = homeTeamPlayers.filter(
+                (p) =>
+                    !usedPlayerIds.has(p.id) &&
+                    slot.preferredPositions.some(
+                        (pref) =>
+                            p.position.toLowerCase().includes(pref.toLowerCase()) ||
+                            pref.toLowerCase().includes(p.position.toLowerCase()),
+                    ),
             );
 
-            // Pick the best candidate (highest rating)
-            const bestCandidate = candidates.sort((a, b) => b.overallRating - a.overallRating)[0];
+            const bestCandidate = candidates.sort(
+                (a, b) => (b.overallRating || 0) - (a.overallRating || 0),
+            )[0];
 
             if (bestCandidate) {
                 assigned.push(bestCandidate.id);
                 usedPlayerIds.add(bestCandidate.id);
             } else {
-                // If no matching player, pick any unused player
-                const fallback = activePlayers.find(p => !usedPlayerIds.has(p.id));
+                const fallback = homeTeamPlayers.find((p) => !usedPlayerIds.has(p.id));
                 if (fallback) {
                     assigned.push(fallback.id);
                     usedPlayerIds.add(fallback.id);
                 } else {
-                    assigned.push(''); // Empty slot
+                    assigned.push("");
                 }
             }
         });
 
-        setFieldPlayerIds(assigned);
-    }, [activePlayers, selectedFormation, selectedMatch]);
+        return assigned;
+    }, [homeTeamPlayers, selectedFormation]);
 
-    // Field players with their slot positions
+    // Opponent player nodes with normalized depth on right half (limited to 11 players)
+    const opponentNodes = useMemo(() => {
+        const positionCounts = new Map<string, number>();
+        const positionIndices = new Map<string, number>();
+        
+        // Count positions
+        opponentStartingPlayers.forEach(p => {
+            const key = p.position;
+            positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
+        });
+        
+        // Assign base positions from role map
+        const baseNodes = opponentStartingPlayers.map(player => {
+            const key = player.position;
+            const idx = positionIndices.get(key) || 0;
+            positionIndices.set(key, idx + 1);
+            const totalSamePos = positionCounts.get(key) || 1;
+            
+            const { x, y } = getPositionCoords(player.position, false, idx, totalSamePos);
+            return { player, x, y };
+        });
+
+        // Normalize depth to occupy the full right half (midline -> goal)
+        const xs = baseNodes.map((n) => n.x);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const rangeX = Math.max(1, maxX - minX);
+
+        return baseNodes.map((n) => ({
+            ...n,
+            x: 56.5 + ((n.x - minX) / rangeX) * 43.5,
+        }));
+    }, [opponentStartingPlayers]);
+
+    // Auto-assign home team players to formation slots when match or formation changes
+    useEffect(() => {
+        setFieldPlayerIds(getDefaultFieldAssignment());
+    }, [getDefaultFieldAssignment, tacticalMatchId]);
+
+    const handleResetFormation = useCallback(() => {
+        setFieldPlayerIds(getDefaultFieldAssignment());
+        setDraggedPlayerId(null);
+        setSwapConfirmation(null);
+    }, [getDefaultFieldAssignment]);
+
+    // Field players with their slot positions (home team only)
     const fieldPlayers = useMemo(() => {
         const formation = getFormationByName(selectedFormation);
         return formation.slots.map((slot, index) => {
             const playerId = fieldPlayerIds[index];
-            const player = activePlayers.find(p => p.id === playerId);
+            const player = homeTeamPlayers.find(p => p.id === playerId);
             return { slot, player: player || null };
         });
-    }, [fieldPlayerIds, activePlayers, selectedFormation]);
+    }, [fieldPlayerIds, homeTeamPlayers, selectedFormation]);
 
-    // Bench players (not on field)
+    // Bench players (home team only, not on field)
     const benchPlayers = useMemo(() => {
         const fieldIds = new Set(fieldPlayerIds);
-        return activePlayers.filter(p => !fieldIds.has(p.id));
-    }, [activePlayers, fieldPlayerIds]);
+        return homeTeamPlayers.filter(p => !fieldIds.has(p.id));
+    }, [homeTeamPlayers, fieldPlayerIds]);
 
     // Drag-drop handlers
     const handleDragStart = (playerId: string) => {
@@ -914,6 +1395,38 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 </motion.div>
                             ))}
                         </div>
+
+                        {/* View Mode Toggle */}
+                        <div className="flex items-center justify-end gap-2 mt-4">
+                            <span className="text-xs text-muted-foreground">View:</span>
+                            <div className="flex items-center border border-border rounded-lg overflow-hidden bg-secondary/30">
+                                <Button
+                                    variant={viewMode === 'single' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('single')}
+                                    className={cn(
+                                        "h-8 px-3 text-xs rounded-none gap-1.5",
+                                        viewMode === 'single' && "shadow-md"
+                                    )}
+                                >
+                                    <User className="w-3.5 h-3.5" />
+                                    Single Team
+                                </Button>
+                                <div className="w-px h-5 bg-border" />
+                                <Button
+                                    variant={viewMode === 'comparison' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('comparison')}
+                                    className={cn(
+                                        "h-8 px-3 text-xs rounded-none gap-1.5",
+                                        viewMode === 'comparison' && "shadow-md"
+                                    )}
+                                >
+                                    <GitCompare className="w-3.5 h-3.5" />
+                                    Compare Teams
+                                </Button>
+                            </div>
+                        </div>
                     </motion.div>
 
 
@@ -1056,20 +1569,109 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                     ];
 
 
+                                    // Calculate totals for head-to-head metrics
+                                    const teamTotalPasses = sumWithNull(relevantStats, m => (m as any).home_total_passes);
+                                    const oppTotalPasses = sumWithNull(relevantStats, m => (m as any).away_total_passes);
+                                    const possessionTeam = teamTotalPasses !== null && oppTotalPasses !== null && (teamTotalPasses + oppTotalPasses) > 0
+                                        ? Math.round((teamTotalPasses / (teamTotalPasses + oppTotalPasses)) * 100)
+                                        : null;
+                                    const possessionOpp = possessionTeam !== null ? 100 - possessionTeam : null;
+
+                                    const teamGoals = sumWithNull(relevantStats, m => (m as any).home_goals);
+                                    const oppGoals = sumWithNull(relevantStats, m => (m as any).away_goals);
+
                                     return (
                                         <>
-                                            {/* Team Names Header */}
+                                            {/* Team Names Header with color indicators */}
                                             <div className="flex items-center justify-center gap-4 mb-6">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full bg-primary" />
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TEAM_COLORS.home }} />
                                                     <span className="font-medium text-foreground">{teamName}</span>
                                                 </div>
-                                                <span className="text-muted-foreground">vs</span>
+                                                <span className="text-muted-foreground font-bold">vs</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full bg-muted-foreground" />
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TEAM_COLORS.away }} />
                                                     <span className="text-muted-foreground">{opponentName}</span>
                                                 </div>
                                             </div>
+
+                                            {/* Comparison View - Side-by-side stats */}
+                                            {viewMode === 'comparison' && (
+                                                <>
+                                                    {/* Head-to-Head Summary */}
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                                                        <ComparisonStatCard
+                                                            label="Goals"
+                                                            teamValue={teamGoals}
+                                                            opponentValue={oppGoals}
+                                                            teamName={teamName}
+                                                            opponentName={opponentName}
+                                                            icon={<Target className="w-4 h-4" />}
+                                                        />
+                                                        <ComparisonStatCard
+                                                            label="Possession"
+                                                            teamValue={possessionTeam !== null ? `${possessionTeam}%` : null}
+                                                            opponentValue={possessionOpp !== null ? `${possessionOpp}%` : null}
+                                                            teamName={teamName}
+                                                            opponentName={opponentName}
+                                                            icon={<Footprints className="w-4 h-4" />}
+                                                        />
+                                                        <ComparisonStatCard
+                                                            label="Shots on Target"
+                                                            teamValue={teamShotsOnTarget}
+                                                            opponentValue={oppShotsOnTarget}
+                                                            teamName={teamName}
+                                                            opponentName={opponentName}
+                                                            icon={<Target className="w-4 h-4" />}
+                                                        />
+                                                        <ComparisonStatCard
+                                                            label="Fouls"
+                                                            teamValue={teamFouls}
+                                                            opponentValue={oppFouls}
+                                                            teamName={teamName}
+                                                            opponentName={opponentName}
+                                                            icon={<Shield className="w-4 h-4" />}
+                                                            reverseColors
+                                                        />
+                                                    </div>
+
+                                                    {/* Detailed Comparison Bars */}
+                                                    <div className="p-4 rounded-xl bg-gradient-to-br from-secondary/30 to-background border border-border mb-6">
+                                                        <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                                                            <GitCompare className="w-4 h-4 text-primary" />
+                                                            Detailed Comparison
+                                                        </h4>
+                                                        <div className="grid gap-4">
+                                                            {advancedStats.map((stat, i) => (
+                                                                <ComparisonBar
+                                                                    key={stat.label}
+                                                                    label={stat.label}
+                                                                    teamValue={stat.team}
+                                                                    opponentValue={stat.opponent}
+                                                                    teamName={teamName}
+                                                                    opponentName={opponentName}
+                                                                    icon={stat.icon}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Bottom Stats Grid */}
+                                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                                                        {bottomStats.map((stat) => (
+                                                            <ComparisonStatCard
+                                                                key={stat.label}
+                                                                label={stat.label}
+                                                                teamValue={stat.team}
+                                                                opponentValue={stat.opponent}
+                                                                teamName={teamName}
+                                                                opponentName={opponentName}
+                                                                reverseColors={stat.label === "FOULS"}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
 
                                             {/* Hexagon Radar Chart - Full Width */}
                                             <div className="flex flex-col items-center justify-center p-6 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border mb-6">
@@ -1112,7 +1714,12 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         // Build hierarchical stats data from match statistics
                         const relevantStats = matchStatsList;
 
-                        // Get aggregated values for Passes
+                        // Get match info for team names in comparison view
+                        const currentMatchInfo = dbMatches.find(m => m.id === selectedMatch);
+                        const breakdownTeamName = currentMatchInfo?.homeTeam || "Our Team";
+                        const breakdownOpponentName = selectedMatch === "all" ? "All Opponents" : currentMatchInfo?.opponent || "Opponent";
+
+                        // Get aggregated values for Passes - Team
                         const successfulPasses = sumWithNull(relevantStats, m => (m as any).home_successful_passes) ?? 0;
                         const unsuccessfulPasses = sumWithNull(relevantStats, m => (m as any).home_unsuccessful_passes) ?? 0;
                         const progressivePasses = sumWithNull(relevantStats, m => (m as any).home_progressive_passes) ?? 0;
@@ -1123,6 +1730,14 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const shortPasses = sumWithNull(relevantStats, m => (m as any).home_short_passes) ?? Math.floor(successfulPasses * 0.5);
                         const throughBalls = sumWithNull(relevantStats, m => (m as any).home_through_balls) ?? Math.floor(keyPasses * 0.3);
 
+                        // Get aggregated values for Passes - Opponent
+                        const oppSuccessfulPasses = sumWithNull(relevantStats, m => (m as any).away_successful_passes) ?? 0;
+                        const oppUnsuccessfulPasses = sumWithNull(relevantStats, m => (m as any).away_unsuccessful_passes) ?? 0;
+                        const oppProgressivePasses = sumWithNull(relevantStats, m => (m as any).away_progressive_passes) ?? 0;
+                        const oppKeyPasses = sumWithNull(relevantStats, m => (m as any).away_key_passes) ?? 0;
+                        const oppAssists = sumWithNull(relevantStats, m => (m as any).away_assists) ?? 0;
+                        const oppCrosses = sumWithNull(relevantStats, m => (m as any).away_crosses) ?? 0;
+
                         // Unsuccessful passes breakdown
                         const passesBlocked = sumWithNull(relevantStats, m => (m as any).home_passes_blocked) ?? Math.floor(unsuccessfulPasses * 0.2);
                         const passesClearance = sumWithNull(relevantStats, m => (m as any).home_passes_cleared) ?? Math.floor(unsuccessfulPasses * 0.15);
@@ -1131,7 +1746,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const passesBallRecoveries = sumWithNull(relevantStats, m => (m as any).home_passes_ball_recoveries) ?? Math.floor(unsuccessfulPasses * 0.2);
                         const passesHighPressing = sumWithNull(relevantStats, m => (m as any).home_passes_high_pressing) ?? Math.floor(unsuccessfulPasses * 0.15);
 
-                        // Get aggregated values for Duels
+                        // Get aggregated values for Duels - Team
                         const aerialDuelsWon = sumWithNull(relevantStats, m => m.team_aerial_duels_won) ?? 0;
                         const aerialDuelsTotal = sumWithNull(relevantStats, m => (m as any).home_aerial_duels_total) ?? aerialDuelsWon * 2;
                         const aerialDuelsLost = Math.max(0, aerialDuelsTotal - aerialDuelsWon);
@@ -1143,7 +1758,12 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const tacklesLost = sumWithNull(relevantStats, m => (m as any).home_tackles_lost) ?? Math.floor(tacklesWon * 0.3);
                         const dribbleSuccessRate = totalDribbles > 0 ? Math.round((successfulDribbles / totalDribbles) * 100) : 0;
 
-                        // Get aggregated values for Set Pieces
+                        // Get aggregated values for Duels - Opponent
+                        const oppAerialDuelsWon = sumWithNull(relevantStats, m => m.opponent_aerial_duels_won) ?? 0;
+                        const oppSuccessfulDribbles = sumWithNull(relevantStats, m => m.opponent_successful_dribbles) ?? 0;
+                        const oppProgressiveCarries = sumWithNull(relevantStats, m => (m as any).away_progressive_carries) ?? 0;
+
+                        // Get aggregated values for Set Pieces - Team
                         const corners = sumWithNull(relevantStats, m => (m as any).home_corners) ?? 0;
                         const cornersFirstContact = sumWithNull(relevantStats, m => (m as any).home_corners_first_contact) ?? Math.floor(corners * 0.7);
                         const cornersSecondContact = sumWithNull(relevantStats, m => (m as any).home_corners_second_contact) ?? Math.floor(corners * 0.3);
@@ -1156,6 +1776,10 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         const throwIns = sumWithNull(relevantStats, m => (m as any).home_throw_ins) ?? Math.floor(corners * 3);
                         const throwInsFirstContact = sumWithNull(relevantStats, m => (m as any).home_throw_ins_first_contact) ?? Math.floor(throwIns * 0.75);
                         const throwInsSecondContact = sumWithNull(relevantStats, m => (m as any).home_throw_ins_second_contact) ?? Math.floor(throwIns * 0.25);
+
+                        // Get aggregated values for Set Pieces - Opponent
+                        const oppCorners = sumWithNull(relevantStats, m => (m as any).away_corners) ?? 0;
+                        const oppFreeKicks = sumWithNull(relevantStats, m => m.opponent_freekicks) ?? 0;
 
                         // Get aggregated values for Goalkeeper
                         const saves = sumWithNull(relevantStats, m => m.team_saves) ?? 0;
@@ -1368,59 +1992,166 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             ]
                         };
 
+                        // Passing comparison data for comparison mode
+                        const passingComparisonStats = [
+                            { label: "Successful Passes", team: successfulPasses, opponent: oppSuccessfulPasses, icon: <Footprints className="w-4 h-4" /> },
+                            { label: "Progressive Passes", team: progressivePasses, opponent: oppProgressivePasses, icon: <TrendingUp className="w-4 h-4" /> },
+                            { label: "Key Passes", team: keyPasses, opponent: oppKeyPasses, icon: <Target className="w-4 h-4" /> },
+                            { label: "Assists", team: assists, opponent: oppAssists, icon: <Trophy className="w-4 h-4" /> },
+                            { label: "Crosses", team: crosses, opponent: oppCrosses, icon: <Flame className="w-4 h-4" /> },
+                        ];
+
+                        const actionsComparisonStats = [
+                            { label: "Aerial Duels Won", team: aerialDuelsWon, opponent: oppAerialDuelsWon, icon: <Shield className="w-4 h-4" /> },
+                            { label: "Successful Dribbles", team: successfulDribbles, opponent: oppSuccessfulDribbles, icon: <Flame className="w-4 h-4" /> },
+                            { label: "Progressive Carries", team: progressiveCarries, opponent: oppProgressiveCarries, icon: <TrendingUp className="w-4 h-4" /> },
+                            { label: "Corners", team: corners, opponent: oppCorners, icon: <Target className="w-4 h-4" /> },
+                            { label: "Free Kicks", team: freeKicks, opponent: oppFreeKicks, icon: <Footprints className="w-4 h-4" /> },
+                        ];
+
                         return (
                             <div
                                 id="breakdown"
                                 ref={(el) => { sectionRefs.current['breakdown'] = el; }}
-                                className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-24"
+                                className="mb-8 scroll-mt-24 space-y-6"
                             >
-                                {/* Passing Stats Chart */}
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                >
-                                    <Card className="glass-strong rounded-xl h-full">
-                                        <CardHeader>
-                                            <CardTitle className="text-lg flex items-center gap-2">
-                                                <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <circle cx="12" cy="12" r="6" />
-                                                    <circle cx="12" cy="12" r="2" />
-                                                </svg>
-                                                Passing Breakdown
-                                            </CardTitle>
-                                            <p className="text-sm text-muted-foreground">Detailed passing statistics - click to expand</p>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <ExpandableStatsChart data={passingStatsData} className="py-4" />
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
+                                {/* Comparison Mode: Side-by-side bars */}
+                                {viewMode === 'comparison' && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Passing Comparison */}
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.15 }}
+                                        >
+                                            <Card className="glass-strong rounded-xl">
+                                                <CardHeader>
+                                                    <div className="flex items-center justify-between">
+                                                        <CardTitle className="text-lg flex items-center gap-2">
+                                                            <GitCompare className="w-5 h-5 text-primary" />
+                                                            Passing Comparison
+                                                        </CardTitle>
+                                                        <div className="flex items-center gap-3 text-xs">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAM_COLORS.home }} />
+                                                                <span className="text-muted-foreground">{breakdownTeamName}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAM_COLORS.away }} />
+                                                                <span className="text-muted-foreground">{breakdownOpponentName}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="space-y-4">
+                                                    {passingComparisonStats.map((stat) => (
+                                                        <ComparisonBar
+                                                            key={stat.label}
+                                                            label={stat.label}
+                                                            teamValue={stat.team}
+                                                            opponentValue={stat.opponent}
+                                                            teamName={breakdownTeamName}
+                                                            opponentName={breakdownOpponentName}
+                                                            icon={stat.icon}
+                                                        />
+                                                    ))}
+                                                </CardContent>
+                                            </Card>
+                                        </motion.div>
 
-                                {/* Other Stats Chart (Set Pieces, Duels, Keeper) */}
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.3 }}
-                                >
-                                    <Card className="glass-strong rounded-xl h-full">
-                                        <CardHeader>
-                                            <CardTitle className="text-lg flex items-center gap-2">
-                                                <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <circle cx="12" cy="12" r="6" />
-                                                    <circle cx="12" cy="12" r="2" />
-                                                </svg>
-                                                Match Actions
-                                            </CardTitle>
-                                            <p className="text-sm text-muted-foreground">Set pieces, duels & keeper stats - click to expand</p>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <ExpandableStatsChart data={otherStatsData} className="py-4" variant="pie" />
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
+                                        {/* Actions Comparison */}
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.2 }}
+                                        >
+                                            <Card className="glass-strong rounded-xl">
+                                                <CardHeader>
+                                                    <div className="flex items-center justify-between">
+                                                        <CardTitle className="text-lg flex items-center gap-2">
+                                                            <GitCompare className="w-5 h-5 text-primary" />
+                                                            Actions Comparison
+                                                        </CardTitle>
+                                                        <div className="flex items-center gap-3 text-xs">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAM_COLORS.home }} />
+                                                                <span className="text-muted-foreground">{breakdownTeamName}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAM_COLORS.away }} />
+                                                                <span className="text-muted-foreground">{breakdownOpponentName}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="space-y-4">
+                                                    {actionsComparisonStats.map((stat) => (
+                                                        <ComparisonBar
+                                                            key={stat.label}
+                                                            label={stat.label}
+                                                            teamValue={stat.team}
+                                                            opponentValue={stat.opponent}
+                                                            teamName={breakdownTeamName}
+                                                            opponentName={breakdownOpponentName}
+                                                            icon={stat.icon}
+                                                        />
+                                                    ))}
+                                                </CardContent>
+                                            </Card>
+                                        </motion.div>
+                                    </div>
+                                )}
+
+                                {/* Original Charts Grid */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Passing Stats Chart */}
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.25 }}
+                                    >
+                                        <Card className="glass-strong rounded-xl h-full">
+                                            <CardHeader>
+                                                <CardTitle className="text-lg flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <circle cx="12" cy="12" r="6" />
+                                                        <circle cx="12" cy="12" r="2" />
+                                                    </svg>
+                                                    Passing Breakdown
+                                                </CardTitle>
+                                                <p className="text-sm text-muted-foreground">Detailed passing statistics - click to expand</p>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <ExpandableStatsChart data={passingStatsData} className="py-4" />
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+
+                                    {/* Other Stats Chart (Set Pieces, Duels, Keeper) */}
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.3 }}
+                                    >
+                                        <Card className="glass-strong rounded-xl h-full">
+                                            <CardHeader>
+                                                <CardTitle className="text-lg flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <circle cx="12" cy="12" r="6" />
+                                                        <circle cx="12" cy="12" r="2" />
+                                                    </svg>
+                                                    Match Actions
+                                                </CardTitle>
+                                                <p className="text-sm text-muted-foreground">Set pieces, duels & keeper stats - click to expand</p>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <ExpandableStatsChart data={otherStatsData} className="py-4" variant="pie" />
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                </div>
                             </div>
                         );
                     })()}
@@ -1461,238 +2192,253 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {/* Position Legend */}
-                                        <div className="hidden md:flex items-center gap-2">
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--warning))' }} />
-                                                <span className="text-muted-foreground">GK</span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleResetFormation}
+                                            className="h-8 px-3 text-xs"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                                            Reset
+                                        </Button>
+                                        {/* Team Legend */}
+                                        <div className="hidden md:flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5 text-xs">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: FORMATION_TEAM_COLORS.home.node }} />
+                                                <span className="text-muted-foreground">Home</span>
                                             </div>
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--success))' }} />
-                                                <span className="text-muted-foreground">DEF</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                <span className="text-muted-foreground">MID</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(var(--destructive))' }} />
-                                                <span className="text-muted-foreground">FWD</span>
+                                            <div className="flex items-center gap-1.5 text-xs">
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: FORMATION_TEAM_COLORS.away.node }} />
+                                                <span className="text-muted-foreground">Opponent</span>
                                             </div>
                                         </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {/* Half-field with formation - VERTICAL layout (goal on top) */}
-                                    <TacticalField
-                                        viewMode="top_half"
-                                        className="w-full aspect-[72/80] max-w-3xl mx-auto"
-                                    >
-                                        {/* Field Players - 11 slots */}
-                                        {fieldPlayers.map(({ slot, player }, index) => {
-                                            // For VERTICAL display (goal on top, center on bottom):
-                                            // We're showing the LEFT HALF of the field (x: 0-52.5) and rotating it -90deg
-                                            // 
-                                            // Original slot coordinates (0-100 percentage):
-                                            // slot.x: 0 = left edge, 100 = right edge (becomes vertical after rotation)
-                                            // slot.y: 0 = near goal, 100 = midfield (becomes horizontal after rotation)
-                                            //
-                                            // For vertical display with rotation:
-                                            // - slot.y maps to SVG X (0 at goal/left, 52.5 at midfield/right)
-                                            // - slot.x maps to SVG Y (0 at top, 68 at bottom) -> We need to invert this because
-                                            //   rotation makes 0 (top) become Right and 68 (bottom) become Left.
+                                    {/* Full field with both teams - like passing network */}
+                                    <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]">
+                                        <TacticalField
+                                            viewMode="full"
+                                            className="absolute inset-0 w-full h-full"
+                                        >
+                                            {/* Home Team Field Players - 11 slots (left side) */}
+                                            {fieldPlayers.map(({ slot, player }, index) => {
+                                                // Normalize formation depth to fill left half.
+                                                // This keeps forwards close to the midfield line regardless of
+                                                // each formation's raw Y range in `formationPositions`.
+                                                const svgX = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
+                                                const svgY = (slot.x / 100) * PITCH_H;
 
-                                            const svgX = (slot.y / 100) * 52.5;  // 0-52.5 (goal to midfield)
-                                            // Invert X axis for proper Left/Right placement
-                                            const svgY = 68 - ((slot.x / 100) * 68);    // 0-68 (width of field)
+                                                const circleRadius = 2.2;
 
-                                            const circleRadius = 1.8;
+                                                const handlePlayerClick = (e: React.MouseEvent) => {
+                                                    if (player && !draggedPlayerId) {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        window.history.replaceState(null, '', '/team#formation');
+                                                        navigate(`/player/${player.id}`);
+                                                    }
+                                                };
 
-                                            const handlePlayerClick = (e: React.MouseEvent) => {
-                                                if (player && !draggedPlayerId) {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    window.history.replaceState(null, '', '/team#formation');
-                                                    navigate(`/player/${player.id}`);
-                                                }
-                                            };
-
-                                            return (
-                                                <g key={slot.id}>
-                                                    {/* Drop zone for drag and drop */}
-                                                    <foreignObject
-                                                        x={svgX - 4}
-                                                        y={svgY - 4}
-                                                        width={8}
-                                                        height={8}
-                                                        style={{ pointerEvents: 'all' }}
-                                                    >
-                                                        <div
-                                                            onDragOver={handleDragOver}
-                                                            onDrop={() => handleDropOnField(index)}
-                                                            style={{ width: '100%', height: '100%' }}
-                                                        />
-                                                    </foreignObject>
-
-                                                    {player ? (
-                                                        <g
-                                                            transform={`translate(${svgX}, ${svgY})`}
-                                                            className="cursor-pointer"
-                                                            onClick={handlePlayerClick}
+                                                return (
+                                                    <g key={slot.id}>
+                                                        {/* Drop zone for drag and drop */}
+                                                        <foreignObject
+                                                            x={svgX - 5}
+                                                            y={svgY - 5}
+                                                            width={10}
+                                                            height={10}
                                                             style={{ pointerEvents: 'all' }}
                                                         >
-                                                            {/* Shadow/halo */}
-                                                            <circle
-                                                                cx={0}
-                                                                cy={0}
-                                                                r={circleRadius + 0.3}
-                                                                fill="rgba(0,0,0,0.3)"
+                                                            <div
+                                                                onDragOver={handleDragOver}
+                                                                onDrop={() => handleDropOnField(index)}
+                                                                style={{ width: '100%', height: '100%' }}
                                                             />
+                                                        </foreignObject>
 
-                                                            {/* Main circle */}
-                                                            <motion.circle
-                                                                cx={0}
-                                                                cy={0}
-                                                                r={circleRadius}
-                                                                fill={getSlotColor(slot.role)}
-                                                                stroke="white"
-                                                                strokeWidth={0.2}
-                                                                initial={{ scale: 0, opacity: 0 }}
-                                                                animate={{ scale: 1, opacity: 1 }}
-                                                                transition={{ delay: 0.1 + index * 0.03, type: "spring" }}
-                                                                whileHover={{ scale: 1.3 }}
-                                                                className={cn(
-                                                                    draggedPlayerId === player.id && "stroke-yellow-400 stroke-[0.4]"
-                                                                )}
-                                                            />
+                                                        {player ? (
+                                                            <g
+                                                                transform={`translate(${svgX}, ${svgY})`}
+                                                                className="cursor-pointer"
+                                                                onClick={handlePlayerClick}
+                                                                style={{ pointerEvents: 'all' }}
+                                                            >
+                                                                {/* Shadow/halo */}
+                                                                <circle
+                                                                    cx={0}
+                                                                    cy={0}
+                                                                    r={circleRadius + 0.3}
+                                                                    fill="rgba(0,0,0,0.3)"
+                                                                />
 
-                                                            {/* Jersey number - rotated -90 to counter field rotation */}
-                                                            <text
-                                                                x={0}
-                                                                y={0.5}
-                                                                textAnchor="middle"
-                                                                fill="white"
-                                                                fontSize="1.4"
-                                                                fontWeight="bold"
-                                                                fontFamily="Arial"
-                                                                transform="rotate(-90)"
-                                                                style={{ pointerEvents: 'none' }}
-                                                            >
-                                                                {player.jerseyNumber}
-                                                            </text>
+                                                                {/* Main circle - home team blue */}
+                                                                <motion.circle
+                                                                    cx={0}
+                                                                    cy={0}
+                                                                    r={circleRadius}
+                                                                    fill={FORMATION_TEAM_COLORS.home.node}
+                                                                    stroke={FORMATION_TEAM_COLORS.home.border}
+                                                                    strokeWidth={0.3}
+                                                                    initial={{ scale: 0, opacity: 0 }}
+                                                                    animate={{ scale: 1, opacity: 1 }}
+                                                                    transition={{ delay: 0.1 + index * 0.03, type: "spring" }}
+                                                                    whileHover={{ scale: 1.3 }}
+                                                                    className={cn(
+                                                                        draggedPlayerId === player.id && "stroke-yellow-400 stroke-[0.5]"
+                                                                    )}
+                                                                />
 
-                                                            {/* Player name (below circle) - rotated -90 */}
-                                                            {/* We need to adjust x/y because of rotation. 
-                                                                Before rotation: y was offset. 
-                                                                After rotation (-90): y becomes x, x becomes -y.
-                                                                Wait, rotate(-90) rotates the AXES.
-                                                                So drawing at (0, y) stays at (0, y) in the new system? No.
-                                                                rotate(-90) is a transform. 
-                                                                If I use transform="rotate(-90)", the element is rotated around (0,0).
-                                                                The text anchor is at x=0, so it pivots around x=0.
-                                                                If I just rotate, the 'y' offset will now point to the RIGHT (since Y axis rotates -90 to become X axis).
-                                                                
-                                                                Actually:
-                                                                Origin (0,0) is center of circle.
-                                                                Old pos: (0, r+2).
-                                                                Rotate(-90) moves (0, r+2) to (r+2, 0) relative to screen?
-                                                                No, strict rotation of the vector (0, y) by -90deg is (y, 0).
-                                                                So the text would appear to the RIGHT of the player.
-                                                                We want the text BELOW the player visually.
-                                                                Visually BELOW means positive Screen Y.
-                                                                Since field is rotated 90 (clockwise), Screen Y matches Field X (reversed? or Field -X?).
-                                                                
-                                                                Let's look at `TacticalField`: `isVertical && "rotate-90"`.
-                                                                The SVG itself is rotated 90deg Clockwise.
-                                                                So:
-                                                                Screen X = Field -Y
-                                                                Screen Y = Field X (simplified)
-                                                                
-                                                                We want text to be at Screen (0, offset).
-                                                                This corresponds to Field (offset, 0).
-                                                                So we should place text at x=offset, y=0 in the SVG coordinate space.
-                                                                AND rotate the text -90 deg so it stands up.
-                                                                
-                                                                So:
-                                                                Jersey Number: (0,0) -> rotated -90 -> stays (0,0). Correct.
-                                                                Name: Was (0, r+2). rotated -90 -> ends up at (r+2, 0) relative to rotated axes?
-                                                                If I simply rotate the text element, it rotates around its origin anchor (specified by x,y).
-                                                                NO, SVG transform rotates around (0,0) of the current user coordinate system (the <g> center).
-                                                                
-                                                                So:
-                                                                1. Rotate coordinate system -90. New X points UP (Screen -Y), New Y points RIGHT (Screen X).
-                                                                   Wait, Visual Field: Vertical.
-                                                                   SVG: Horizontal. Rotated 90deg.
-                                                                   Screen Up is SVG Left (-X?). Screen Right is SVG Top (-Y?).
-                                                                   
-                                                                   Let's just use intuition: 
-                                                                   To place text "Below" player (Screen Down):
-                                                                   Screen Down corresponds to...
-                                                                   If SVG is rotated 90deg Clockwise:
-                                                                   SVG X axis -> Screen Down.
-                                                                   SVG Y axis -> Screen Left.
-                                                                   
-                                                                   So placing text at SVG X > 0 means Screen Down.
-                                                                   So I should set `x={circleRadius + 2}` and `y={0}`.
-                                                                   AND rotate text -90deg so letters are upright.
-                                                             */}
-                                                            <text
-                                                                x={circleRadius + 2.5}
-                                                                y={0}
-                                                                textAnchor="middle"
-                                                                fill="white"
-                                                                fontSize="1.1"
-                                                                fontWeight="bold"
-                                                                fontFamily="Arial"
-                                                                transform="rotate(-90)"
-                                                                style={{ pointerEvents: 'none' }}
-                                                                dominantBaseline="middle"
-                                                            >
-                                                                {player.name.split(" ").pop()}
-                                                            </text>
+                                                                {/* Jersey number */}
+                                                                <text
+                                                                    x={0}
+                                                                    y={0.6}
+                                                                    textAnchor="middle"
+                                                                    fill="white"
+                                                                    fontSize="1.6"
+                                                                    fontWeight="bold"
+                                                                    fontFamily="Arial"
+                                                                    style={{ pointerEvents: 'none' }}
+                                                                >
+                                                                    {player.jerseyNumber}
+                                                                </text>
 
-                                                            {/* Position label - rotated -90 */}
-                                                            <text
-                                                                x={circleRadius + 4.2}
-                                                                y={0}
-                                                                textAnchor="middle"
-                                                                fill="rgba(255,255,255,0.6)"
-                                                                fontSize="0.85"
-                                                                fontFamily="Arial"
-                                                                transform="rotate(-90)"
-                                                                style={{ pointerEvents: 'none' }}
-                                                                dominantBaseline="middle"
-                                                            >
-                                                                {slot.role}
-                                                            </text>
-                                                        </g>
-                                                    ) : (
-                                                        <g transform={`translate(${svgX}, ${svgY})`}>
-                                                            <circle
-                                                                cx={0}
-                                                                cy={0}
-                                                                r={circleRadius}
-                                                                fill="rgba(0,0,0,0.2)"
-                                                                stroke="rgba(255,255,255,0.4)"
-                                                                strokeWidth={0.2}
-                                                                strokeDasharray="0.6 0.6"
-                                                            />
-                                                            <text
-                                                                x={0}
-                                                                y={0.5}
-                                                                textAnchor="middle"
-                                                                fill="rgba(255,255,255,0.4)"
-                                                                fontSize="1.2"
-                                                                transform="rotate(90)"
-                                                            >
-                                                                {slot.role}
-                                                            </text>
-                                                        </g>
-                                                    )}
-                                                </g>
-                                            );
-                                        })}
-                                    </TacticalField>
+                                                                {/* Player name (below circle) */}
+                                                                <text
+                                                                    x={0}
+                                                                    y={circleRadius + 2.2}
+                                                                    textAnchor="middle"
+                                                                    fill="white"
+                                                                    fontSize="1.4"
+                                                                    fontWeight="500"
+                                                                    fontFamily="system-ui, -apple-system, sans-serif"
+                                                                    stroke="rgba(0,0,0,0.5)"
+                                                                    strokeWidth="0.3"
+                                                                    paintOrder="stroke"
+                                                                    style={{ pointerEvents: 'none' }}
+                                                                >
+                                                                    {player.name.split(" ").pop()}
+                                                                </text>
+                                                            </g>
+                                                        ) : (
+                                                            <g transform={`translate(${svgX}, ${svgY})`}>
+                                                                <circle
+                                                                    cx={0}
+                                                                    cy={0}
+                                                                    r={circleRadius}
+                                                                    fill="rgba(0,0,0,0.2)"
+                                                                    stroke="rgba(255,255,255,0.4)"
+                                                                    strokeWidth={0.2}
+                                                                    strokeDasharray="0.8 0.8"
+                                                                />
+                                                                <text
+                                                                    x={0}
+                                                                    y={0.5}
+                                                                    textAnchor="middle"
+                                                                    fill="rgba(255,255,255,0.5)"
+                                                                    fontSize="1.3"
+                                                                >
+                                                                    {slot.role}
+                                                                </text>
+                                                            </g>
+                                                        )}
+                                                    </g>
+                                                );
+                                            })}
+
+                                            {/* Opponent Team Players (right side) - position-based */}
+                                            {opponentNodes.map((node, index) => {
+                                                const circleRadius = 2.2;
+                                                const lastName = node.player.name.split(" ").slice(-1)[0];
+
+                                                return (
+                                                    <g
+                                                        key={node.player.id}
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => {
+                                                            window.history.replaceState(null, '', '/team#formation');
+                                                            navigate(`/player/${node.player.id}`);
+                                                        }}
+                                                    >
+                                                        {/* Shadow */}
+                                                        <circle
+                                                            cx={node.x}
+                                                            cy={node.y}
+                                                            r={circleRadius + 0.3}
+                                                            fill="rgba(0,0,0,0.3)"
+                                                        />
+                                                        {/* Main circle - opponent red */}
+                                                        <motion.circle
+                                                            cx={node.x}
+                                                            cy={node.y}
+                                                            r={circleRadius}
+                                                            fill={FORMATION_TEAM_COLORS.away.node}
+                                                            stroke={FORMATION_TEAM_COLORS.away.border}
+                                                            strokeWidth={0.3}
+                                                            initial={{ scale: 0, opacity: 0 }}
+                                                            animate={{ scale: 1, opacity: 1 }}
+                                                            transition={{ delay: 0.2 + index * 0.03, type: "spring" }}
+                                                            whileHover={{ scale: 1.2 }}
+                                                        />
+                                                        {/* Jersey number */}
+                                                        <text
+                                                            x={node.x}
+                                                            y={node.y + 0.6}
+                                                            textAnchor="middle"
+                                                            fill="white"
+                                                            fontSize="1.6"
+                                                            fontWeight="bold"
+                                                            fontFamily="Arial"
+                                                            style={{ pointerEvents: 'none' }}
+                                                        >
+                                                            {node.player.jerseyNumber}
+                                                        </text>
+                                                        {/* Player name */}
+                                                        <text
+                                                            x={node.x}
+                                                            y={node.y - circleRadius - 1.2}
+                                                            textAnchor="middle"
+                                                            dominantBaseline="auto"
+                                                            fontSize="1.4"
+                                                            fontWeight="500"
+                                                            fontFamily="system-ui, -apple-system, sans-serif"
+                                                            fill="white"
+                                                            stroke="rgba(0,0,0,0.5)"
+                                                            strokeWidth="0.3"
+                                                            paintOrder="stroke"
+                                                            style={{ pointerEvents: 'none' }}
+                                                        >
+                                                            {lastName}
+                                                        </text>
+                                                    </g>
+                                                );
+                                            })}
+                                        </TacticalField>
+
+                                        {/* Team labels overlay */}
+                                        <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
+                                            <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
+                                                <span
+                                                    className="w-2.5 h-2.5 rounded-full"
+                                                    style={{ backgroundColor: FORMATION_TEAM_COLORS.home.node }}
+                                                />
+                                                <span className="text-xs font-semibold text-white/90">
+                                                    {homeTeamName}
+                                                </span>
+                                            </div>
+                                            {opponentPlayers.length > 0 && (
+                                                <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
+                                                    <span
+                                                        className="w-2.5 h-2.5 rounded-full"
+                                                        style={{ backgroundColor: FORMATION_TEAM_COLORS.away.node }}
+                                                    />
+                                                    <span className="text-xs font-semibold text-white/90">
+                                                        {opponentTeamName}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     {/* Bench Section */}
                                     {benchPlayers.length > 0 && (
@@ -1734,8 +2480,8 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                                 <div
                                                                     className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 text-white shadow"
                                                                     style={{
-                                                                        backgroundColor: 'hsl(var(--muted-foreground))',
-                                                                        borderColor: 'hsl(var(--muted-foreground))'
+                                                                        backgroundColor: FORMATION_TEAM_COLORS.home.node,
+                                                                        borderColor: FORMATION_TEAM_COLORS.home.border
                                                                     }}
                                                                 >
                                                                     {player.jerseyNumber}
@@ -1890,13 +2636,15 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             </CardHeader>
                             <CardContent>
                                 <TeamPassingMap
-                                    playerPasses={activePlayers.map(player => ({
+                                    playerPasses={[...homeStartingPlayers, ...opponentStartingPlayers].map(player => ({
                                         player,
                                         events: player.matchStats
-                                            .filter(m => selectedMatch === "all" || m.matchId === selectedMatch)
+                                            .filter(m => tacticalMatchId === "all" || m.matchId === tacticalMatchId)
                                             .flatMap(m => m.events)
                                     }))}
-                                    matchId={selectedMatch !== "all" ? selectedMatch : undefined}
+                                    matchId={tacticalMatchId !== "all" ? tacticalMatchId : undefined}
+                                    preferredHomeTeamId={tacticalMatchInfo?.ourTeamId}
+                                    selectedFormation={selectedFormation}
                                 />
                             </CardContent>
                         </Card>
