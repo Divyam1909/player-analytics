@@ -95,7 +95,6 @@ export const usePlayers = () => {
             if (matchesError) throw matchesError;
 
             // 3. Fetch Events
-            // Fetching all for now since dataset is small. In prod, would fetch per player or match.
             const { data: passEvents, error: passError } = await supabase
                 .from('pass_events')
                 .select('*');
@@ -111,16 +110,21 @@ export const usePlayers = () => {
                 .select('*');
             if (duelError) throw duelError;
 
-            const { data: keeperEvents, error: keeperError } = await supabase
-                .from('keeper_actions')
-                .select('*');
-            // Not throwing on keeper (optional or might be empty)
-
             // Fetch player attributes
-            const { data: playerAttributes, error: attributesError } = await supabase
+            const { data: playerAttributes } = await supabase
                 .from('player_attributes')
                 .select('*');
-            // Not throwing - attributes might not be calculated yet
+
+            // 3.5 Fetch player match statistics view for defensive/physical stats
+            const { data: playerMatchViewStats } = await supabase
+                .from('player_match_statistics')
+                .select('*');
+
+            // Build a lookup map: key = `${player_id}__${match_id}`
+            const viewStatsMap = new Map<string, any>();
+            (playerMatchViewStats as any[])?.forEach(stat => {
+                viewStatsMap.set(`${stat.player_id}__${stat.match_id}`, stat);
+            });
 
             // 4. Transform and Combine
             const players: Player[] = (dbPlayers as DbPlayer[]).map(dbPlayer => {
@@ -146,23 +150,22 @@ export const usePlayers = () => {
                     const pShots = (shotEvents as DbShotEvent[])?.filter(e => e.player_id === dbPlayer.id && e.match_id === matchId) || [];
                     const pDuels = (duelEvents as DbDuelEvent[])?.filter(e => e.player_id === dbPlayer.id && e.match_id === matchId) || [];
 
-                    // If no activity, assume didn't play (or filter out empty later? JSON includes all matches usually)
-                    // If 0 events, return null/skip? 
-                    // Let's include if they have at least one event.
+                    // If no activity, assume didn't play
                     if (pPasses.length === 0 && pShots.length === 0 && pDuels.length === 0) return null;
 
-                    // Calculate Stats
+                    // Get materialized view data for this player+match (has defensive/physical stats)
+                    const viewStat = viewStatsMap.get(`${dbPlayer.id}__${matchId}`);
+
+                    // Calculate Stats from raw events
                     const goals = pShots.filter(s => s.is_goal).length;
                     const assists = pPasses.filter(p => p.is_assist).length;
                     const passes = pPasses.length; // Attempted
                     const successfulPasses = pPasses.filter(p => p.is_successful).length;
                     const passAccuracy = passes > 0 ? Math.round((successfulPasses / passes) * 100) : 0;
 
-                    const shots = pShots.length; // On target mostly, since `shots_on_target` table
-                    const shotsOnTarget = pShots.length; // Table name implies. (Though schema might allow misses?)
+                    const shots = pShots.length;
+                    const shotsOnTarget = pShots.length;
 
-                    const interceptions = 0; // Not explicitly in events, maybe duels type?
-                    // Duels has duel_type.
                     const aerialDuelsWon = pDuels.filter(d => d.duel_type === 'aerial' && d.is_successful).length;
                     const dribbles = pDuels.filter(d => d.duel_type === 'dribble').length;
                     const dribblesSuccessful = pDuels.filter(d => d.duel_type === 'dribble' && d.is_successful).length;
@@ -197,12 +200,11 @@ export const usePlayers = () => {
                             isProgressive: p.is_progressive_pass,
                             isAssist: p.is_assist,
                             outplays: p.outplays_players_count || 0,
-                            passTarget: p.receiver_player_id || undefined, // Player ID for network graph
-                            passTargetName: receiverName // Display name for UI components
+                            passTarget: p.receiver_player_id || undefined,
+                            passTargetName: receiverName
                         });
                     });
 
-                    // Note: JSON "MatchStats" structure has `stats` object
                     // Compute opponent based on which team is "ours"
                     const getTeamName = (team: { team_name: string }[] | { team_name: string } | null) => {
                         if (!team) return null;
@@ -211,10 +213,8 @@ export const usePlayers = () => {
 
                     let opponentName = 'Opponent';
                     if (match.our_team_id === match.home_team_id) {
-                        // We are home, opponent is away
                         opponentName = getTeamName(match.away_team) || 'Opponent';
                     } else {
-                        // We are away, opponent is home
                         opponentName = getTeamName(match.home_team) || 'Opponent';
                     }
 
@@ -222,7 +222,7 @@ export const usePlayers = () => {
                         matchId: match.id,
                         opponent: opponentName,
                         date: match.match_date,
-                        minutesPlayed: 90, // Default to 90 if events exist
+                        minutesPlayed: viewStat?.minutes_played || 0,
                         stats: {
                             goals,
                             assists,
@@ -237,18 +237,18 @@ export const usePlayers = () => {
                             keyPasses: pPasses.filter(p => p.is_key_pass).length,
                             crosses: pPasses.filter(p => p.is_cross).length,
                             progressivePassing: pPasses.filter(p => p.is_progressive_pass).length,
-                            ballTouches: passes + dribbles + shots,
-                            // Not available in database - use null
-                            passesInFinalThird: null,
-                            passesInBox: null,
-                            blocks: null,
-                            interceptions: null,
-                            clearances: null,
-                            recoveries: null,
-                            tackles: null,
-                            progressiveRuns: null,
-                            distanceCovered: null,
-                            sprints: null
+                            ballTouches: viewStat?.ball_touches || (passes + dribbles + shots),
+                            // From materialized view (defensive stats)
+                            passesInFinalThird: viewStat?.final_third_touches ?? null,
+                            passesInBox: viewStat?.passes_in_box ?? null,
+                            blocks: viewStat?.blocks ?? null,
+                            interceptions: viewStat?.interceptions ?? null,
+                            clearances: viewStat?.clearances ?? null,
+                            recoveries: viewStat?.ball_recoveries ?? null,
+                            tackles: viewStat?.tackles ?? null,
+                            progressiveRuns: viewStat?.progressive_carries ?? null,
+                            distanceCovered: viewStat?.distance_covered_meters ?? null,
+                            sprints: viewStat?.sprint_count ?? null
                         },
                         events
                     };

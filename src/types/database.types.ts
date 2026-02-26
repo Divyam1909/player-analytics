@@ -60,85 +60,182 @@ export interface Database {
                 Insert: Omit<Database['public']['Tables']['matches']['Row'], 'id' | 'created_at' | 'updated_at'>;
                 Update: Partial<Database['public']['Tables']['matches']['Insert']>;
             };
-            match_statistics_summary: {
+            match_statistics: {
                 Row: {
+                    id: string;
                     match_id: string;
-                    home_team_id: string;
-                    away_team_id: string;
-                    our_team_id: string;
-                    team_id: string;
-                    opponent_id: string;
 
-                    // Home Stats
+                    // Team / Opponent (our-team perspective)
+                    team_possession: number | null;
+                    opponent_possession: number | null;
+                    team_passes: number | null;
+                    opponent_passes: number | null;
+                    team_shots_on_target: number | null;
+                    opponent_shots_on_target: number | null;
+                    team_corners: number | null;
+                    opponent_corners: number | null;
+                    team_offsides: number | null;
+                    opponent_offsides: number | null;
+                    team_aerial_duels_won: number | null;
+                    opponent_aerial_duels_won: number | null;
+                    team_fouls: number | null;
+                    opponent_fouls: number | null;
+                    team_chances_created: number | null;
+                    opponent_chances_created: number | null;
+                    team_saves: number | null;
+                    opponent_saves: number | null;
+                    team_chances_final_third: number | null;
+                    opponent_chances_final_third: number | null;
+                    team_performance: number | null;
+                    opponent_performance: number | null;
+                    team_clearances: number | null;
+                    opponent_clearances: number | null;
+                    team_interceptions: number | null;
+                    opponent_interceptions: number | null;
+                    team_successful_dribbles: number | null;
+                    opponent_successful_dribbles: number | null;
+                    team_conversion_rate: number | null;
+                    opponent_conversion_rate: number | null;
+                    team_freekicks: number | null;
+                    opponent_freekicks: number | null;
+
+                    // Home / Away (absolute perspective) - Possession & Passes
+                    home_possession: number | null;
+                    away_possession: number | null;
+                    home_passes: number | null;
+                    away_passes: number | null;
                     home_successful_passes: number | null;
-                    home_unsuccessful_passes: number | null;
-                    home_total_passes: number | null;
-                    home_progressive_passes: number | null;
-                    home_key_passes: number | null;
-                    home_assists: number | null;
-                    home_crosses: number | null;
-                    home_interceptions: number | null;
-                    home_blocks: number | null;
-                    home_clearances: number | null;
-                    home_ball_recoveries: number | null;
-                    home_high_press_recoveries: number | null;
-                    home_shots_on_target: number | null;
-                    home_goals: number | null;
-                    home_penalties: number | null;
-                    home_shots_saved: number | null;
-                    home_aerial_duels_won: number | null;
-                    home_aerial_duels_total: number | null;
-                    home_successful_dribbles: number | null;
-                    home_total_dribbles: number | null;
-                    home_progressive_carries: number | null;
-                    home_saves: number | null;
-                    home_saves_inside_box: number | null;
-                    home_saves_outside_box: number | null;
-                    home_goals_conceded: number | null;
-                    home_fouls_committed: number | null;
-                    home_yellow_cards: number | null;
-                    home_red_cards: number | null;
-                    home_corners: number | null;
-                    home_freekicks: number | null;
-                    home_final_third_entries: number | null;
-                    home_chances_in_box: number | null;
-
-                    // Away Stats
                     away_successful_passes: number | null;
+                    home_unsuccessful_passes: number | null;
                     away_unsuccessful_passes: number | null;
+                    home_total_passes: number | null;
                     away_total_passes: number | null;
+                    home_progressive_passes: number | null;
                     away_progressive_passes: number | null;
+                    home_key_passes: number | null;
                     away_key_passes: number | null;
+                    home_long_passes: number | null;
+                    away_long_passes: number | null;
+                    home_short_passes: number | null;
+                    away_short_passes: number | null;
+
+                    // Attacking
+                    home_assists: number | null;
                     away_assists: number | null;
+                    home_crosses: number | null;
                     away_crosses: number | null;
-                    away_interceptions: number | null;
-                    away_blocks: number | null;
-                    away_clearances: number | null;
-                    away_ball_recoveries: number | null;
-                    away_high_press_recoveries: number | null;
+                    home_shots_on_target: number | null;
                     away_shots_on_target: number | null;
-                    away_goals: number | null;
-                    away_penalties: number | null;
+                    home_shots_saved: number | null;
                     away_shots_saved: number | null;
-                    away_aerial_duels_won: number | null;
-                    away_aerial_duels_total: number | null;
-                    away_successful_dribbles: number | null;
-                    away_total_dribbles: number | null;
-                    away_progressive_carries: number | null;
-                    away_saves: number | null;
-                    away_saves_inside_box: number | null;
-                    away_saves_outside_box: number | null;
-                    away_goals_conceded: number | null;
-                    away_fouls_committed: number | null;
-                    away_yellow_cards: number | null;
-                    away_red_cards: number | null;
+                    home_shots_off_target: number | null;
+                    away_shots_off_target: number | null;
+                    home_goals: number | null;
+                    away_goals: number | null;
+                    home_penalties: number | null;
+                    away_penalties: number | null;
+
+                    // Set Pieces
+                    home_corners: number | null;
                     away_corners: number | null;
+                    home_offsides: number | null;
+                    away_offsides: number | null;
+                    home_freekicks: number | null;
                     away_freekicks: number | null;
-                    away_final_third_entries: number | null;
-                    away_chances_in_box: number | null;
+
+                    // Chances
+                    home_chances_created: number | null;
+                    away_chances_created: number | null;
+                    home_chances_final_third: number | null;
+                    away_chances_final_third: number | null;
+
+                    // Defensive
+                    home_clearances: number | null;
+                    away_clearances: number | null;
+                    home_interceptions: number | null;
+                    away_interceptions: number | null;
+                    home_blocks: number | null;
+                    away_blocks: number | null;
+                    home_ball_recoveries: number | null;
+                    away_ball_recoveries: number | null;
+                    home_high_press_recoveries: number | null;
+                    away_high_press_recoveries: number | null;
+
+                    // Duels
+                    home_successful_dribbles: number | null;
+                    away_successful_dribbles: number | null;
+                    home_total_dribbles: number | null;
+                    away_total_dribbles: number | null;
+                    home_aerial_duels_won: number | null;
+                    away_aerial_duels_won: number | null;
+                    home_aerial_duels_total: number | null;
+                    away_aerial_duels_total: number | null;
+                    home_progressive_carries: number | null;
+                    away_progressive_carries: number | null;
+
+                    // Fouls & Cards
+                    home_fouls: number | null;
+                    away_fouls: number | null;
+                    home_fouls_committed: number | null;
+                    away_fouls_committed: number | null;
+                    home_yellow_cards: number | null;
+                    away_yellow_cards: number | null;
+                    home_red_cards: number | null;
+                    away_red_cards: number | null;
+
+                    // Goalkeeper
+                    home_saves: number | null;
+                    away_saves: number | null;
+                    home_saves_inside_box: number | null;
+                    away_saves_inside_box: number | null;
+                    home_saves_outside_box: number | null;
+                    away_saves_outside_box: number | null;
+                    home_goals_conceded: number | null;
+                    away_goals_conceded: number | null;
+
+                    // Conversion Rates
+                    home_conversion_rate: number | null;
+                    away_conversion_rate: number | null;
+
+                    // Performance Indices
+                    home_possession_control_index: number | null;
+                    away_possession_control_index: number | null;
+                    home_chance_creation_index: number | null;
+                    away_chance_creation_index: number | null;
+                    home_shooting_efficiency: number | null;
+                    away_shooting_efficiency: number | null;
+                    home_defensive_solidity: number | null;
+                    away_defensive_solidity: number | null;
+                    home_transition_progression: number | null;
+                    away_transition_progression: number | null;
+                    home_recovery_pressing_efficiency: number | null;
+                    away_recovery_pressing_efficiency: number | null;
+
+                    // Overall Performance
+                    home_performance: number | null;
+                    away_performance: number | null;
+
+                    created_at: string | null;
+                    updated_at: string | null;
                 };
-                Insert: never; // Materialized view, generic insert not supported
-                Update: never;
+                Insert: Omit<Database['public']['Tables']['match_statistics']['Row'], 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Database['public']['Tables']['match_statistics']['Insert']>;
+            };
+            match_interval_stats: {
+                Row: {
+                    id: string;
+                    match_id: string;
+                    interval_start: number;
+                    interval_end: number;
+                    home_possession: number | null;
+                    away_possession: number | null;
+                    home_performance_index: number | null;
+                    away_performance_index: number | null;
+                    created_at: string | null;
+                    updated_at: string | null;
+                };
+                Insert: Omit<Database['public']['Tables']['match_interval_stats']['Row'], 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Database['public']['Tables']['match_interval_stats']['Insert']>;
             };
             player_match_statistics: {
                 Row: {
@@ -161,6 +258,7 @@ export interface Database {
                     total_lines_outplayed: number | null;
                     long_passes: number | null;
                     short_passes: number | null;
+                    passes_in_box: number | null;
 
                     // Defensive
                     interceptions: number | null;
@@ -168,12 +266,14 @@ export interface Database {
                     clearances: number | null;
                     ball_recoveries: number | null;
                     high_press_actions: number | null;
+                    tackles: number | null;
 
                     // Shooting
                     shots_on_target: number | null;
                     goals: number | null;
                     penalties_scored: number | null;
                     shots_off_target: number | null;
+                    ball_touches: number | null;
 
                     // Duels
                     aerial_duels_won: number | null;
@@ -203,10 +303,11 @@ export interface Database {
                     // Final Third
                     final_third_touches: number | null;
 
-                    // Physical Stats (new)
+                    // Physical Stats (joined from physical_stats table)
                     distance_covered_meters: number | null;
                     sprint_count: number | null;
                     high_intensity_runs: number | null;
+                    minutes_played: number | null;
                 };
                 Insert: never;
                 Update: never;
@@ -402,6 +503,7 @@ export interface Database {
                     high_intensity_runs: number | null;
                     top_speed_kmh: number | null;
                     average_speed_kmh: number | null;
+                    minutes_played: number | null;
                     created_at: string | null;
                     updated_at: string | null;
                 };
@@ -426,7 +528,10 @@ export type HighlightType =
 export type DbPlayer = Database['public']['Tables']['players']['Row'];
 export type DbTeam = Database['public']['Tables']['teams']['Row'];
 export type DbMatch = Database['public']['Tables']['matches']['Row'];
-export type DbMatchStatisticsSummary = Database['public']['Tables']['match_statistics_summary']['Row'];
+export type DbMatchStatistics = Database['public']['Tables']['match_statistics']['Row'];
+/** @deprecated Use DbMatchStatistics instead */
+export type DbMatchStatisticsSummary = DbMatchStatistics;
+export type DbMatchIntervalStats = Database['public']['Tables']['match_interval_stats']['Row'];
 export type DbPassEvent = Database['public']['Tables']['pass_events']['Row'];
 export type DbShotOnTarget = Database['public']['Tables']['shots_on_target']['Row'];
 export type DbDuel = Database['public']['Tables']['duels']['Row'];

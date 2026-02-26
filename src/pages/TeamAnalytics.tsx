@@ -376,7 +376,7 @@ const ComparisonBar = ({
     const total = tVal + oVal;
     const teamPct = total > 0 ? (tVal / total) * 100 : 50;
     const oppPct = total > 0 ? (oVal / total) * 100 : 50;
-    
+
     // Determine advantage
     const teamAhead = reverseColors ? tVal < oVal : tVal > oVal;
     const oppAhead = reverseColors ? oVal < tVal : oVal > tVal;
@@ -401,7 +401,7 @@ const ComparisonBar = ({
                     {teamValue !== null ? `${teamValue}${suffix}` : '--'}
                     {teamAhead && !isTied && <ArrowUpRight className="inline w-3 h-3 ml-0.5" />}
                 </div>
-                
+
                 {/* Bar visualization */}
                 <div className="flex-1 h-3 flex rounded-full overflow-hidden bg-secondary/30">
                     <motion.div
@@ -419,7 +419,7 @@ const ComparisonBar = ({
                         transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
                     />
                 </div>
-                
+
                 {/* Opponent value */}
                 <div className={cn(
                     "w-16 text-left text-sm font-bold",
@@ -457,11 +457,11 @@ const ComparisonStatCard = ({
 }: ComparisonStatCardProps) => {
     const tVal = typeof teamValue === 'string' ? parseFloat(teamValue) || 0 : teamValue ?? 0;
     const oVal = typeof opponentValue === 'string' ? parseFloat(opponentValue) || 0 : opponentValue ?? 0;
-    
+
     const teamAhead = reverseColors ? tVal < oVal : tVal > oVal;
     const oppAhead = reverseColors ? oVal < tVal : oVal > tVal;
     const isTied = tVal === oVal;
-    
+
     const diff = tVal - oVal;
     const diffPct = oVal > 0 ? Math.round(((tVal - oVal) / oVal) * 100) : 0;
 
@@ -483,7 +483,7 @@ const ComparisonStatCard = ({
                     </span>
                     <span className="text-[10px] text-muted-foreground truncate max-w-[60px]">{teamName}</span>
                 </div>
-                
+
                 {/* VS / Difference indicator */}
                 <div className="flex flex-col items-center">
                     {!isTied && (
@@ -496,7 +496,7 @@ const ComparisonStatCard = ({
                     )}
                     {isTied && <Minus className="w-3 h-3 text-muted-foreground" />}
                 </div>
-                
+
                 {/* Opponent value */}
                 <div className="flex flex-col items-end">
                     <span className={cn(
@@ -607,6 +607,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     // View mode: 'single' for single team view, 'comparison' for both teams side-by-side
     const [viewMode, setViewMode] = useState<'single' | 'comparison'>('single');
 
+    // Trend section toggle: 'performance' (goals/assists) or 'possession' (interval stats)
+    const [trendView, setTrendView] = useState<'performance' | 'possession'>('performance');
+
     // Handle section click - smooth scroll to section
     const handleSectionClick = useCallback((sectionId: string) => {
         const element = sectionRefs.current[sectionId];
@@ -695,48 +698,88 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
         return dbMatches;
     }, [dbMatches]);
 
+    // Fetch match interval stats for possession/performance graphs
+    const { data: matchIntervalStats = [] } = useQuery({
+        queryKey: ['match-interval-stats', selectedMatch],
+        queryFn: async () => {
+            if (selectedMatch === 'all') return [];
+            const { data, error } = await supabase
+                .from('match_interval_stats')
+                .select('*')
+                .eq('match_id', selectedMatch)
+                .order('interval_start', { ascending: true });
+            if (error) throw error;
+            return (data || []) as {
+                id: string;
+                match_id: string;
+                interval_start: number;
+                interval_end: number;
+                home_possession: number | null;
+                away_possession: number | null;
+                home_performance_index: number | null;
+                away_performance_index: number | null;
+            }[];
+        },
+        enabled: selectedMatch !== 'all',
+    });
+
+    // Build interval chart data from match_interval_stats
+    const intervalChartData = useMemo(() => {
+        if (matchIntervalStats.length === 0) return [];
+        return matchIntervalStats.map((row) => ({
+            name: `${row.interval_start}-${row.interval_end}'`,
+            "Home Possession": row.home_possession ?? 0,
+            "Away Possession": row.away_possession ?? 0,
+            "Home Performance": row.home_performance_index ?? 0,
+            "Away Performance": row.away_performance_index ?? 0,
+        }));
+    }, [matchIntervalStats]);
+
     // Fetch match statistics
     const { data: matchStatsList = [] } = useQuery({
         queryKey: ['match-statistics', selectedMatch],
         queryFn: async () => {
-            let query = supabase.from('match_statistics_summary').select('*');
+            let query = supabase.from('match_statistics').select('*');
             if (selectedMatch !== "all") {
                 query = query.eq('match_id', selectedMatch);
             }
             const { data, error } = await query;
             if (error) throw error;
 
-            // Map view columns to UI expected columns - normalize to team/opponent perspective
+            // The new match_statistics table already has team_*/opponent_* columns
+            // (our-team perspective). For home_/away_ detailed stats, we determine
+            // isHome by looking up the match in dbMatches.
             return (data || []).map((m: any) => {
-                const isHome = m.team_id === m.home_team_id;
+                // Determine isHome from the matches table data (not from match_statistics)
+                const matchInfo = dbMatches.find(dm => dm.id === m.match_id);
+                const isHome = matchInfo ? matchInfo.ourTeamId === matchInfo.homeTeamId : true;
 
                 return {
                     match_id: m.match_id,
 
-                    // Generic Team Stats (normalized - always "our team" perspective)
-                    team_clearances: isHome ? m.home_clearances : m.away_clearances,
-                    team_interceptions: isHome ? m.home_interceptions : m.away_interceptions,
-                    team_successful_dribbles: isHome ? m.home_successful_dribbles : m.away_successful_dribbles,
-                    team_chances_created: isHome ? m.home_chances_in_box : m.away_chances_in_box,
-                    team_chances_final_third: isHome ? m.home_final_third_entries : m.away_final_third_entries,
-                    team_aerial_duels_won: isHome ? m.home_aerial_duels_won : m.away_aerial_duels_won,
-                    team_shots_on_target: isHome ? m.home_shots_on_target : m.away_shots_on_target,
-                    team_fouls: isHome ? m.home_fouls_committed : m.away_fouls_committed,
-                    team_saves: isHome ? m.home_saves : m.away_saves,
-                    team_freekicks: isHome ? m.home_freekicks : m.away_freekicks,
+                    // Generic Team/Opponent Stats — read directly from DB team_*/opponent_* columns
+                    team_clearances: m.team_clearances,
+                    team_interceptions: m.team_interceptions,
+                    team_successful_dribbles: m.team_successful_dribbles,
+                    team_chances_created: m.team_chances_created,
+                    team_chances_final_third: m.team_chances_final_third,
+                    team_aerial_duels_won: m.team_aerial_duels_won,
+                    team_shots_on_target: m.team_shots_on_target,
+                    team_fouls: m.team_fouls,
+                    team_saves: m.team_saves,
+                    team_freekicks: m.team_freekicks,
 
-                    // Generic Opponent Stats
-                    opponent_clearances: isHome ? m.away_clearances : m.home_clearances,
-                    opponent_interceptions: isHome ? m.away_interceptions : m.home_interceptions,
-                    opponent_successful_dribbles: isHome ? m.away_successful_dribbles : m.home_successful_dribbles,
-                    opponent_chances_created: isHome ? m.away_chances_in_box : m.home_chances_in_box,
-                    opponent_chances_final_third: isHome ? m.away_final_third_entries : m.home_final_third_entries,
-                    opponent_aerial_duels_won: isHome ? m.away_aerial_duels_won : m.home_aerial_duels_won,
-                    opponent_fouls: isHome ? m.away_fouls_committed : m.home_fouls_committed,
-                    opponent_saves: isHome ? m.away_saves : m.home_saves,
-                    opponent_freekicks: isHome ? m.away_freekicks : m.home_freekicks,
-                    opponent_shots_on_target: isHome ? m.away_shots_on_target : m.home_shots_on_target,
-                    opponent_conversion_rate: null,
+                    opponent_clearances: m.opponent_clearances,
+                    opponent_interceptions: m.opponent_interceptions,
+                    opponent_successful_dribbles: m.opponent_successful_dribbles,
+                    opponent_chances_created: m.opponent_chances_created,
+                    opponent_chances_final_third: m.opponent_chances_final_third,
+                    opponent_aerial_duels_won: m.opponent_aerial_duels_won,
+                    opponent_fouls: m.opponent_fouls,
+                    opponent_saves: m.opponent_saves,
+                    opponent_freekicks: m.opponent_freekicks,
+                    opponent_shots_on_target: m.opponent_shots_on_target,
+                    opponent_conversion_rate: m.opponent_conversion_rate,
 
                     // Passing stats (normalized to team perspective using home_ prefix for compatibility)
                     home_successful_passes: isHome ? m.home_successful_passes : m.away_successful_passes,
@@ -1110,20 +1153,20 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
     const opponentNodes = useMemo(() => {
         const positionCounts = new Map<string, number>();
         const positionIndices = new Map<string, number>();
-        
+
         // Count positions
         opponentStartingPlayers.forEach(p => {
             const key = p.position;
             positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
         });
-        
+
         // Assign base positions from role map
         const baseNodes = opponentStartingPlayers.map(player => {
             const key = player.position;
             const idx = positionIndices.get(key) || 0;
             positionIndices.set(key, idx + 1);
             const totalSamePos = positionCounts.get(key) || 1;
-            
+
             const { x, y } = getPositionCoords(player.position, false, idx, totalSamePos);
             return { player, x, y };
         });
@@ -2354,11 +2397,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 return (
                                                     <g
                                                         key={node.player.id}
-                                                        style={{ cursor: 'pointer' }}
-                                                        onClick={() => {
-                                                            window.history.replaceState(null, '', '/team#formation');
-                                                            navigate(`/player/${node.player.id}`);
-                                                        }}
+                                                        style={{ cursor: 'default' }}
                                                     >
                                                         {/* Shadow */}
                                                         <circle
@@ -2367,7 +2406,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                             r={circleRadius + 0.3}
                                                             fill="rgba(0,0,0,0.3)"
                                                         />
-                                                        {/* Main circle - opponent red */}
+                                                        {/* Main circle - opponent red (non-clickable) */}
                                                         <motion.circle
                                                             cx={node.x}
                                                             cy={node.y}
@@ -2378,7 +2417,6 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                             initial={{ scale: 0, opacity: 0 }}
                                                             animate={{ scale: 1, opacity: 1 }}
                                                             transition={{ delay: 0.2 + index * 0.03, type: "spring" }}
-                                                            whileHover={{ scale: 1.2 }}
                                                         />
                                                         {/* Jersey number */}
                                                         <text
@@ -2636,7 +2674,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             </CardHeader>
                             <CardContent>
                                 <TeamPassingMap
-                                    playerPasses={[...homeStartingPlayers, ...opponentStartingPlayers].map(player => ({
+                                    playerPasses={homeStartingPlayers.map(player => ({
                                         player,
                                         events: player.matchStats
                                             .filter(m => tacticalMatchId === "all" || m.matchId === tacticalMatchId)
@@ -2830,21 +2868,76 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         className="scroll-mt-24"
                     >
                         <Card className="bg-card border-border">
-                            <CardHeader>
+                            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <TrendingUp className="w-5 h-5 text-primary" />
-                                    Team Performance Trend
+                                    {trendView === 'performance' ? 'Team Performance Trend' : 'Match Interval Stats'}
                                 </CardTitle>
+                                {/* Toggle switch */}
+                                <div className="flex items-center border border-border rounded-lg overflow-hidden bg-secondary/30">
+                                    <Button
+                                        variant={trendView === 'performance' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setTrendView('performance')}
+                                        className={cn(
+                                            "h-8 px-3 text-xs rounded-none gap-1.5",
+                                            trendView === 'performance' && "shadow-md"
+                                        )}
+                                    >
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        Performance
+                                    </Button>
+                                    <div className="w-px h-5 bg-border" />
+                                    <Button
+                                        variant={trendView === 'possession' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setTrendView('possession')}
+                                        className={cn(
+                                            "h-8 px-3 text-xs rounded-none gap-1.5",
+                                            trendView === 'possession' && "shadow-md"
+                                        )}
+                                    >
+                                        <Footprints className="w-3.5 h-3.5" />
+                                        Possession
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent>
-                                <LineChart
-                                    data={teamTrendData}
-                                    lines={[
-                                        { dataKey: "Goals", color: "hsl(var(--destructive))", name: "Goals" },
-                                        { dataKey: "Assists", color: "hsl(var(--warning))", name: "Assists" },
-                                    ]}
-                                    height={264}
-                                />
+                                {selectedMatch === 'all' ? (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <TrendingUp className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                                        <p className="text-muted-foreground font-medium text-sm">Select a specific match</p>
+                                        <p className="text-xs text-muted-foreground/60 mt-1">
+                                            Interval stats are available per match — select one above
+                                        </p>
+                                    </div>
+                                ) : intervalChartData.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <TrendingUp className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                                        <p className="text-muted-foreground font-medium text-sm">No interval data available</p>
+                                        <p className="text-xs text-muted-foreground/60 mt-1">
+                                            No data recorded for this match yet
+                                        </p>
+                                    </div>
+                                ) : trendView === 'performance' ? (
+                                    <LineChart
+                                        data={intervalChartData}
+                                        lines={[
+                                            { dataKey: "Home Performance", color: "hsl(217, 91%, 60%)", name: "Home Performance" },
+                                            { dataKey: "Away Performance", color: "hsl(0, 72%, 51%)", name: "Away Performance" },
+                                        ]}
+                                        height={264}
+                                    />
+                                ) : (
+                                    <LineChart
+                                        data={intervalChartData}
+                                        lines={[
+                                            { dataKey: "Home Possession", color: "hsl(217, 91%, 60%)", name: "Home Possession %" },
+                                            { dataKey: "Away Possession", color: "hsl(0, 72%, 51%)", name: "Away Possession %" },
+                                        ]}
+                                        height={264}
+                                    />
+                                )}
                             </CardContent>
                         </Card>
                     </motion.div>

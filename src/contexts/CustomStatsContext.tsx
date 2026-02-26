@@ -41,7 +41,7 @@ export const ALL_STATS: StatItem[] = [
     { id: 'distanceCovered', name: 'Distance Covered', category: 'physical', description: 'Total distance in meters' },
     { id: 'sprints', name: 'Sprints', category: 'physical', description: 'Number of sprint actions' },
 
-    // Team Stats (from match_statistics_summary)
+    // Team Stats (from match_statistics)
     { id: 'team_clearances', name: 'Team Clearances', category: 'team', description: 'Team total clearances' },
     { id: 'team_interceptions', name: 'Team Interceptions', category: 'team', description: 'Team total interceptions' },
     { id: 'team_successful_dribbles', name: 'Team Dribbles', category: 'team', description: 'Team successful dribbles' },
@@ -123,8 +123,8 @@ export const CustomStatsProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const toggleStat = (statId: string) => {
-        setSelectedStatsState(prev => 
-            prev.includes(statId) 
+        setSelectedStatsState(prev =>
+            prev.includes(statId)
                 ? prev.filter(id => id !== statId)
                 : [...prev, statId]
         );

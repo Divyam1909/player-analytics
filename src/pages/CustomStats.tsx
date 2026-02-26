@@ -127,7 +127,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
     // Calculate aggregated player stats
     const aggregatedPlayerStats = useMemo(() => {
         const stats: Record<string, number | null> = {};
-        
+
         const playerStatKeys = [
             'passes', 'passAccuracy', 'keyPasses', 'passesInFinalThird', 'passesInBox',
             'crosses', 'progressivePassing', 'assists', 'goals', 'shots', 'shotsOnTarget',
@@ -159,19 +159,19 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
         return stats;
     }, [matchPlayers, matchId]);
 
-    // Map team stats
+    // Map team stats — use team_*/opponent_* columns directly from match_statistics table
     const teamStatsMap = useMemo(() => {
         if (!currentMatchStats) return {};
-        
+
         return {
-            'team_clearances': currentMatchStats.home_clearances ?? null,
-            'team_interceptions': currentMatchStats.home_interceptions ?? null,
-            'team_successful_dribbles': currentMatchStats.home_successful_dribbles ?? null,
-            'team_chances_created': currentMatchStats.home_chances_in_box ?? null,
-            'team_aerial_duels_won': currentMatchStats.home_aerial_duels_won ?? null,
-            'team_shots_on_target': currentMatchStats.home_shots_on_target ?? null,
-            'team_fouls': currentMatchStats.home_fouls_committed ?? null,
-            'team_saves': currentMatchStats.home_saves ?? null,
+            'team_clearances': currentMatchStats.team_clearances ?? null,
+            'team_interceptions': currentMatchStats.team_interceptions ?? null,
+            'team_successful_dribbles': currentMatchStats.team_successful_dribbles ?? null,
+            'team_chances_created': currentMatchStats.team_chances_created ?? null,
+            'team_aerial_duels_won': currentMatchStats.team_aerial_duels_won ?? null,
+            'team_shots_on_target': currentMatchStats.team_shots_on_target ?? null,
+            'team_fouls': currentMatchStats.team_fouls ?? null,
+            'team_saves': currentMatchStats.team_saves ?? null,
             'possession_control_index': currentMatchStats.home_possession_control_index ?? null,
             'chance_creation_index': currentMatchStats.home_chance_creation_index ?? null,
             'shooting_efficiency': currentMatchStats.home_shooting_efficiency ?? null,
@@ -232,14 +232,14 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
     // Top performers
     const topPerformers = useMemo(() => {
         const performers: { stat: string; player: Player; value: number }[] = [];
-        
+
         selectedStats.slice(0, 5).forEach(statId => {
             const stat = ALL_STATS.find(s => s.id === statId);
             if (!stat || stat.category === 'team' || stat.category === 'advanced') return;
-            
+
             let topPlayer: Player | null = null;
             let topValue = -1;
-            
+
             matchPlayers.forEach(player => {
                 let value = 0;
                 if (matchId) {
@@ -248,18 +248,18 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
                 } else {
                     value = player.matchStats.reduce((acc, m) => acc + ((m.stats as any)[statId] || 0), 0);
                 }
-                
+
                 if (value > topValue) {
                     topValue = value;
                     topPlayer = player;
                 }
             });
-            
+
             if (topPlayer && topValue > 0) {
                 performers.push({ stat: stat.name, player: topPlayer, value: topValue });
             }
         });
-        
+
         return performers;
     }, [selectedStats, matchPlayers, matchId]);
 
@@ -285,7 +285,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
     // Handlers
     const handleModeToggle = (newMode: boolean) => {
         if (newMode && !hasCustomStats) return;
-        
+
         if (newMode && hasCustomStats) {
             setPendingMode(newMode);
             setShowConfirmDialog(true);
@@ -306,7 +306,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
         const categoryStatIds = ALL_STATS.filter(s => s.category === categoryId).map(s => s.id);
         const currentSelected = new Set(selectedStats);
         const allSelected = categoryStatIds.every(id => currentSelected.has(id));
-        
+
         if (allSelected) {
             setSelectedStats(selectedStats.filter(id => !categoryStatIds.includes(id)));
         } else {
@@ -484,9 +484,9 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
                                         Custom Stats Mode
                                     </h3>
                                     <p className="text-sm text-muted-foreground max-w-md">
-                                        {isCustomMode 
+                                        {isCustomMode
                                             ? "Custom mode is ON. When viewing matches, you'll see your custom stats first."
-                                            : hasCustomStats 
+                                            : hasCustomStats
                                                 ? "Toggle to enable custom mode and see only your selected stats."
                                                 : "Select stats below to enable custom mode."
                                         }
@@ -546,7 +546,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
                                     </Button>
                                 </div>
                             </div>
-                            
+
                             {selectedStats.length > 0 && (
                                 <div className="flex flex-wrap gap-2">
                                     {selectedStats.slice(0, 8).map(statId => {
@@ -612,7 +612,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
                 {STAT_CATEGORIES.map((category) => {
                     const categoryStats = groupedStats[category.id] || [];
                     if (categoryStats.length === 0) return null;
-                    
+
                     const Icon = getCategoryIcon(category.id);
                     const isExpanded = expandedCategory === category.id;
                     const selectedCount = getSelectedCountInCategory(category.id);
@@ -788,7 +788,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
                             Custom <span className="text-primary">Stats</span>
                         </h1>
                         <p className="text-muted-foreground">
-                            {embedded 
+                            {embedded
                                 ? "View your selected statistics for this match or configure your preferences."
                                 : "Select the statistics you want to focus on. Your preferences will be saved and used across matches."
                             }

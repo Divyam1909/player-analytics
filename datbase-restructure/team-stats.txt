@@ -1,0 +1,143 @@
+create table public.match_statistics (
+  id uuid not null default gen_random_uuid (),
+  match_id uuid not null,
+  team_possession integer null,
+  opponent_possession integer null,
+  team_passes integer null,
+  opponent_passes integer null,
+  team_shots_on_target integer null,
+  opponent_shots_on_target integer null,
+  team_corners integer null,
+  opponent_corners integer null,
+  team_offsides integer null,
+  opponent_offsides integer null,
+  created_at timestamp with time zone null default now(),
+  team_aerial_duels_won integer null default 0,
+  opponent_aerial_duels_won integer null default 0,
+  team_fouls integer null default 0,
+  opponent_fouls integer null default 0,
+  team_chances_created integer null default 0,
+  opponent_chances_created integer null default 0,
+  team_saves integer null default 0,
+  opponent_saves integer null default 0,
+  team_chances_final_third integer null default 0,
+  opponent_chances_final_third integer null default 0,
+  team_performance integer null default 50,
+  opponent_performance integer null default 50,
+  team_clearances integer null,
+  opponent_clearances integer null,
+  team_interceptions integer null,
+  opponent_interceptions integer null,
+  team_successful_dribbles integer null,
+  opponent_successful_dribbles integer null,
+  team_conversion_rate numeric(5, 2) null default null::numeric,
+  opponent_conversion_rate numeric(5, 2) null default null::numeric,
+  team_freekicks integer null,
+  opponent_freekicks integer null,
+  updated_at timestamp with time zone null default now(),
+  home_possession integer null,
+  away_possession integer null,
+  home_passes integer null,
+  away_passes integer null,
+  home_shots_on_target integer null,
+  away_shots_on_target integer null,
+  home_corners integer null,
+  away_corners integer null,
+  home_offsides integer null,
+  away_offsides integer null,
+  home_chances_created integer null,
+  away_chances_created integer null,
+  home_chances_final_third integer null,
+  away_chances_final_third integer null,
+  home_clearances integer null,
+  away_clearances integer null,
+  home_interceptions integer null,
+  away_interceptions integer null,
+  home_successful_dribbles integer null,
+  away_successful_dribbles integer null,
+  home_conversion_rate numeric(5, 2) null,
+  away_conversion_rate numeric(5, 2) null,
+  home_ball_recoveries integer null,
+  away_ball_recoveries integer null,
+  home_aerial_duels_won integer null,
+  away_aerial_duels_won integer null,
+  home_fouls integer null,
+  away_fouls integer null,
+  home_saves integer null,
+  away_saves integer null,
+  home_freekicks integer null,
+  away_freekicks integer null,
+  home_possession_control_index numeric(5, 2) null,
+  away_possession_control_index numeric(5, 2) null,
+  home_chance_creation_index numeric(5, 2) null,
+  away_chance_creation_index numeric(5, 2) null,
+  home_shooting_efficiency numeric(5, 2) null,
+  away_shooting_efficiency numeric(5, 2) null,
+  home_defensive_solidity numeric(5, 2) null,
+  away_defensive_solidity numeric(5, 2) null,
+  home_transition_progression numeric(5, 2) null,
+  away_transition_progression numeric(5, 2) null,
+  home_recovery_pressing_efficiency numeric(5, 2) null,
+  away_recovery_pressing_efficiency numeric(5, 2) null,
+  home_performance integer null,
+  away_performance integer null,
+  constraint match_statistics_pkey primary key (id),
+  constraint match_statistics_match_id_key unique (match_id),
+  constraint match_statistics_match_id_fkey foreign KEY (match_id) references matches (id) on delete CASCADE,
+  constraint check_saves_positive check (
+    (
+      (team_saves >= 0)
+      and (opponent_saves >= 0)
+    )
+  ),
+  constraint match_statistics_opponent_corners_check check ((opponent_corners >= 0)),
+  constraint match_statistics_opponent_offsides_check check ((opponent_offsides >= 0)),
+  constraint match_statistics_opponent_passes_check check ((opponent_passes >= 0)),
+  constraint match_statistics_opponent_possession_check check (
+    (
+      (opponent_possession >= 0)
+      and (opponent_possession <= 100)
+    )
+  ),
+  constraint match_statistics_opponent_shots_on_target_check check ((opponent_shots_on_target >= 0)),
+  constraint match_statistics_team_corners_check check ((team_corners >= 0)),
+  constraint match_statistics_team_offsides_check check ((team_offsides >= 0)),
+  constraint match_statistics_team_passes_check check ((team_passes >= 0)),
+  constraint match_statistics_team_possession_check check (
+    (
+      (team_possession >= 0)
+      and (team_possession <= 100)
+    )
+  ),
+  constraint check_aerial_duels_positive check (
+    (
+      (team_aerial_duels_won >= 0)
+      and (opponent_aerial_duels_won >= 0)
+    )
+  ),
+  constraint match_statistics_team_shots_on_target_check check ((team_shots_on_target >= 0)),
+  constraint check_chances_positive check (
+    (
+      (team_chances_created >= 0)
+      and (opponent_chances_created >= 0)
+    )
+  ),
+  constraint check_fouls_positive check (
+    (
+      (team_fouls >= 0)
+      and (opponent_fouls >= 0)
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_match_statistics_match_id on public.match_statistics using btree (match_id) TABLESPACE pg_default;
+
+create index IF not exists idx_match_stats_possession on public.match_statistics using btree (home_possession, away_possession) TABLESPACE pg_default;
+
+create index IF not exists idx_match_stats_created_at on public.match_statistics using btree (created_at desc) TABLESPACE pg_default;
+
+create index IF not exists idx_match_stats_match_id on public.match_statistics using btree (match_id) TABLESPACE pg_default;
+
+create trigger trigger_update_match_statistics_updated_at BEFORE
+update on match_statistics for EACH row
+execute FUNCTION update_match_statistics_updated_at ();

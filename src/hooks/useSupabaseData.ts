@@ -14,7 +14,7 @@ import {
     fetchMatchStatisticsFromDB,
 } from '@/services/dataService';
 import type { Player } from '@/types/player';
-import type { DbMatch, DbMatchStatisticsSummary } from '@/types/database.types';
+import type { DbMatch, DbMatchStatistics } from '@/types/database.types';
 
 // Query keys for cache management
 export const queryKeys = {
@@ -77,7 +77,7 @@ export function useMatches() {
  * Fetch match statistics
  */
 export function useMatchStatistics() {
-    return useQuery<DbMatchStatisticsSummary[] | null, Error>({
+    return useQuery<DbMatchStatistics[] | null, Error>({
         queryKey: queryKeys.matchStatistics,
         queryFn: fetchMatchStatisticsFromDB,
         staleTime: 5 * 60 * 1000,

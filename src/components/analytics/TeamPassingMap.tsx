@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatHint } from "@/components/ui/stat-hint";
 import TacticalField from "@/components/field/TacticalField";
 import { FormationName, getFormationByName } from "@/lib/formationPositions";
+import { computeHeatmapPosition } from "@/utils/computeHeatmapPosition";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ function getPositionCoords(
     // Try matching partial (e.g., "Left Winger" contains "LW", "Defender" contains "CB")
     if (!coords) {
         const posUpper = position.toUpperCase().trim();
-        
+
         // Check for common text patterns
         if (posUpper.includes('GOALKEEPER') || posUpper.includes('KEEPER')) {
             coords = POSITION_COORDS['GK'];
@@ -339,56 +340,92 @@ const TeamPassingMap = ({
         return counts;
     }, [filteredPasses]);
 
-    // ── Player nodes aligned to Team Formation map ───────────
+    // ── Build a map of player id → events for heatmap positioning ──
+    const playerEventsMap = useMemo(() => {
+        const m = new Map<string, MatchEvent[]>();
+        playerPasses.forEach((pp) => {
+            m.set(pp.player.id, pp.events);
+        });
+        return m;
+    }, [playerPasses]);
+
+    // ── Player nodes positioned by heatmap (home team only) ───────────
 
     const playerNodes = useMemo(() => {
         const nodes: PlayerNode[] = [];
-        const assignPlayersToSlots = (players: Player[]) => {
-            const assigned: (Player | null)[] = [];
-            const usedPlayerIds = new Set<string>();
 
-            formation.slots.forEach((slot) => {
-                const candidates = players.filter(
-                    (p) =>
-                        !usedPlayerIds.has(p.id) &&
-                        slot.preferredPositions.some(
-                            (pref) =>
-                                p.position.toLowerCase().includes(pref.toLowerCase()) ||
-                                pref.toLowerCase().includes(p.position.toLowerCase()),
-                        ),
-                );
-                const bestCandidate = candidates.sort(
-                    (a, b) => (b.overallRating || 0) - (a.overallRating || 0),
-                )[0];
-                if (bestCandidate) {
-                    assigned.push(bestCandidate);
-                    usedPlayerIds.add(bestCandidate.id);
-                } else {
-                    const fallback = players.find((p) => !usedPlayerIds.has(p.id));
-                    if (fallback) {
-                        assigned.push(fallback);
-                        usedPlayerIds.add(fallback.id);
+        // Only home team players
+        teamGroups.forEach(([teamId, { players }]) => {
+            const isHome = teamId === homeTeamId;
+            if (!isHome) return; // skip opponent team
+
+            // Formation-slot fallback helper
+            const assignPlayersToSlots = (playerList: Player[]) => {
+                const assigned: (Player | null)[] = [];
+                const usedPlayerIds = new Set<string>();
+
+                formation.slots.forEach((slot) => {
+                    const candidates = playerList.filter(
+                        (p) =>
+                            !usedPlayerIds.has(p.id) &&
+                            slot.preferredPositions.some(
+                                (pref) =>
+                                    p.position.toLowerCase().includes(pref.toLowerCase()) ||
+                                    pref.toLowerCase().includes(p.position.toLowerCase()),
+                            ),
+                    );
+                    const bestCandidate = candidates.sort(
+                        (a, b) => (b.overallRating || 0) - (a.overallRating || 0),
+                    )[0];
+                    if (bestCandidate) {
+                        assigned.push(bestCandidate);
+                        usedPlayerIds.add(bestCandidate.id);
                     } else {
-                        assigned.push(null);
+                        const fallback = playerList.find((p) => !usedPlayerIds.has(p.id));
+                        if (fallback) {
+                            assigned.push(fallback);
+                            usedPlayerIds.add(fallback.id);
+                        } else {
+                            assigned.push(null);
+                        }
                     }
+                });
+                return assigned;
+            };
+
+            // Build formation fallback positions for players without events
+            const assigned = assignPlayersToSlots(players);
+            const formationFallback = new Map<string, { x: number; y: number }>();
+            formation.slots.forEach((slot, index) => {
+                const player = assigned[index];
+                if (player) {
+                    const fx = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
+                    formationFallback.set(player.id, { x: fx, y: (slot.x / 100) * PITCH_H });
                 }
             });
 
-            return { assigned, usedPlayerIds };
-        };
+            players.forEach((player) => {
+                const events = playerEventsMap.get(player.id) || [];
+                const heatmapPos = computeHeatmapPosition(events, true);
 
-        // Place each team using the same formation-slot map as Team Formation
-        teamGroups.forEach(([teamId, { players }]) => {
-            const isHome = teamId === homeTeamId;
-            const { assigned, usedPlayerIds } = assignPlayersToSlots(players);
+                let x: number;
+                let y: number;
 
-            formation.slots.forEach((slot, index) => {
-                const player = assigned[index];
-                if (!player) return;
-
-                const homeX = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
-                const x = isHome ? homeX : PITCH_W - homeX;
-                const y = (slot.x / 100) * PITCH_H;
+                if (heatmapPos) {
+                    x = heatmapPos.x;
+                    y = heatmapPos.y;
+                } else if (formationFallback.has(player.id)) {
+                    const fb = formationFallback.get(player.id)!;
+                    x = fb.x;
+                    y = fb.y;
+                } else {
+                    // Last resort: position-based coords
+                    const positionCounts = new Map<string, number>();
+                    players.forEach((p) => positionCounts.set(p.position, (positionCounts.get(p.position) || 0) + 1));
+                    const fallbackCoords = getPositionCoords(player.position, true, 0, positionCounts.get(player.position) || 1);
+                    x = fallbackCoords.x;
+                    y = fallbackCoords.y;
+                }
 
                 nodes.push({
                     player,
@@ -398,33 +435,10 @@ const TeamPassingMap = ({
                     passCount: playerPassCounts.get(player.id) || 0,
                 });
             });
-
-            // Fallback for any extra players beyond formation slots
-            const extras = players.filter((p) => !usedPlayerIds.has(p.id));
-            if (extras.length > 0) {
-                const positionCounts = new Map<string, number>();
-                const positionIndices = new Map<string, number>();
-                extras.forEach((p) => {
-                    positionCounts.set(p.position, (positionCounts.get(p.position) || 0) + 1);
-                });
-                extras.forEach((player) => {
-                    const idx = positionIndices.get(player.position) || 0;
-                    positionIndices.set(player.position, idx + 1);
-                    const totalSamePos = positionCounts.get(player.position) || 1;
-                    const { x, y } = getPositionCoords(player.position, isHome, idx, totalSamePos);
-                    nodes.push({
-                        player,
-                        x,
-                        y,
-                        teamId,
-                        passCount: playerPassCounts.get(player.id) || 0,
-                    });
-                });
-            }
         });
 
         return nodes;
-    }, [teamGroups, homeTeamId, playerPassCounts, formation, formationDepthBounds]);
+    }, [teamGroups, homeTeamId, playerPassCounts, formation, formationDepthBounds, playerEventsMap]);
 
     // ── Bidirectional connections (same team only) ────────────
 
@@ -491,10 +505,10 @@ const TeamPassingMap = ({
         const relevant =
             selectedPlayerIds.size > 0
                 ? filteredPasses.filter(
-                      (p) =>
-                          selectedPlayerIds.has(p.playerId) ||
-                          (p.passTarget && selectedPlayerIds.has(p.passTarget)),
-                  )
+                    (p) =>
+                        selectedPlayerIds.has(p.playerId) ||
+                        (p.passTarget && selectedPlayerIds.has(p.passTarget)),
+                )
                 : filteredPasses;
         const total = relevant.length;
         const successful = relevant.filter((p) => p.success).length;
@@ -563,7 +577,7 @@ const TeamPassingMap = ({
             {/* Pitch */}
             <div
                 ref={containerRef}
-                className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]"
+                className="relative w-full mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]"
             >
                 <TacticalField viewMode="full" className="absolute inset-0 w-full h-full">
                     {/* Pass lines */}
@@ -592,10 +606,10 @@ const TeamPassingMap = ({
                         const stroke = isHovered
                             ? palette.lineHover
                             : isNodeHov
-                              ? palette.lineHover
-                              : isDimmed
-                                ? "rgba(255,255,255,0.05)"
-                                : palette.line;
+                                ? palette.lineHover
+                                : isDimmed
+                                    ? "rgba(255,255,255,0.05)"
+                                    : palette.line;
 
                         return (
                             <line
@@ -678,25 +692,24 @@ const TeamPassingMap = ({
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black/[0.04] pointer-events-none" />
 
-                {/* Team labels */}
-                {teamColorMap.size > 0 && (
-                    <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
-                        {[...teamColorMap.entries()].map(([, palette]) => (
-                            <div
-                                key={palette.teamName}
-                                className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full"
-                            >
+                {/* Team label (home team only) */}
+                {teamColorMap.size > 0 && (() => {
+                    const homePalette = [...teamColorMap.entries()].find(([, p]) => p.isHome)?.[1];
+                    if (!homePalette) return null;
+                    return (
+                        <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
+                            <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
                                 <span
                                     className="w-2.5 h-2.5 rounded-full"
-                                    style={{ backgroundColor: palette.node }}
+                                    style={{ backgroundColor: homePalette.node }}
                                 />
                                 <span className="text-xs font-semibold text-white/90">
-                                    {palette.teamName}
+                                    {homePalette.teamName}
                                 </span>
                             </div>
-                        ))}
-                    </div>
-                )}
+                        </div>
+                    );
+                })()}
 
                 {/* Empty state */}
                 {playerNodes.length === 0 && (
@@ -813,7 +826,7 @@ const TeamPassingMap = ({
                             className={cn(
                                 "h-7 px-2 text-xs",
                                 interval.category === "overtime" &&
-                                    "border-warning/50 text-warning hover:bg-warning/10",
+                                "border-warning/50 text-warning hover:bg-warning/10",
                             )}
                         >
                             {interval.label}

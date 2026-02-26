@@ -13,7 +13,7 @@ import type {
     DbPlayer,
     DbTeam,
     DbMatch,
-    DbMatchStatisticsSummary,
+    DbMatchStatistics,
     DbPlayerMatchStatistics,
     DbPlayerAttributes,
     DbPassEvent,
@@ -96,11 +96,11 @@ export async function fetchMatchesFromDB(): Promise<DbMatch[] | null> {
 /**
  * Fetch match statistics from Supabase
  */
-export async function fetchMatchStatisticsFromDB(): Promise<DbMatchStatisticsSummary[] | null> {
+export async function fetchMatchStatisticsFromDB(): Promise<DbMatchStatistics[] | null> {
     if (!isSupabaseConfigured() || !supabase) return null;
 
     const { data, error } = await supabase
-        .from('match_statistics_summary')
+        .from('match_statistics')
         .select('*');
 
     if (error) {
@@ -382,15 +382,15 @@ export async function getPlayersWithStats(): Promise<Player[]> {
                     matchId: stat.match_id,
                     opponent: opponentName,
                     date: match?.match_date || new Date().toISOString().split('T')[0],
-                    minutesPlayed: 90, // TODO: Fetch from physical_stats table when available
+                    minutesPlayed: stat.minutes_played || 0,
                     stats: {
                         goals: stat.goals || 0,
                         assists: stat.assists || 0,
                         passes: stat.total_passes || 0,
                         passAccuracy: calculatePassCompletionRate(stat.successful_passes || 0, stat.total_passes || 0),
                         keyPasses: stat.key_passes || 0,
-                        passesInFinalThird: stat.final_third_touches || 0, // Using touches as proxy for now
-                        passesInBox: 0, // Not directly in view yet, would need update
+                        passesInFinalThird: stat.final_third_touches || 0,
+                        passesInBox: stat.passes_in_box || 0,
                         crosses: stat.crosses || 0,
                         progressivePassing: stat.progressive_passes || 0,
                         shots: (stat.shots_on_target || 0) + (stat.shots_off_target || 0),
@@ -398,13 +398,13 @@ export async function getPlayersWithStats(): Promise<Player[]> {
                         dribbles: stat.total_dribbles || 0,
                         dribblesSuccessful: stat.successful_dribbles || 0,
                         aerialDuelsWon: stat.aerial_duels_won || 0,
-                        ballTouches: (stat.total_passes || 0) + (stat.total_dribbles || 0), // Approx
+                        ballTouches: stat.ball_touches || 0,
 
                         blocks: stat.blocks,
                         interceptions: stat.interceptions,
                         clearances: stat.clearances,
                         recoveries: stat.ball_recoveries,
-                        tackles: null, // Not in view
+                        tackles: stat.tackles,
                         progressiveRuns: stat.progressive_carries,
                         distanceCovered: stat.distance_covered_meters,
                         sprints: stat.sprint_count,
