@@ -35,6 +35,8 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Minus,
+    Maximize2,
+    X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -185,6 +187,8 @@ interface SectionNavProps {
 }
 
 const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: SectionNavProps) => {
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -194,14 +198,33 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                 "fixed z-50 transition-all duration-300",
                 embedded
                     ? "right-3 top-[55%] -translate-y-1/2"
-                    : "md:right-3 max-md:left-1/2 max-md:-translate-x-1/2 max-md:bottom-4 max-md:top-auto top-[55%] max-md:w-[90vw] max-md:max-w-md max-md:translate-y-0 md:-translate-y-1/2"
+                    : "md:right-3 md:top-[55%] md:-translate-y-1/2 max-md:bottom-4 max-md:right-3"
             )}
         >
+            {/* Mobile toggle button */}
+            {!embedded && (
+                <button
+                    onClick={() => setMobileNavOpen(!mobileNavOpen)}
+                    className={cn(
+                        "md:hidden w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center",
+                        mobileNavOpen && "mb-2"
+                    )}
+                >
+                    {mobileNavOpen ? (
+                        <X className="w-5 h-5" />
+                    ) : (
+                        <LayoutGrid className="w-5 h-5" />
+                    )}
+                </button>
+            )}
+
+            {/* Desktop: always visible. Mobile: toggled. */}
+            <div className={cn(embedded ? "" : "hidden md:block")}>
             <div className={cn(
                 "flex rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl no-scrollbar overflow-hidden",
                 embedded
                     ? "flex-row items-stretch p-1.5 gap-0"
-                    : "md:flex-row max-md:flex-col overflow-x-auto max-md:py-1.5 max-md:px-2 md:items-stretch md:p-2 md:gap-0"
+                    : "flex-row items-stretch p-2 gap-0"
             )}>
                 {/* Desktop indicator */}
                 <div className={cn("relative justify-start mr-1.5", embedded ? "flex flex-col" : "hidden md:flex md:flex-col")}>
@@ -217,7 +240,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                 {/* Buttons container */}
                 <div className={cn(
                     "flex",
-                    embedded ? "flex-col gap-1" : "md:flex-col max-md:flex-row md:gap-1.5 max-md:justify-between max-md:w-full"
+                    embedded ? "flex-col gap-1" : "flex-col gap-1.5"
                 )}>
                     {SECTIONS.map((section, index) => {
                         const Icon = section.icon;
@@ -229,9 +252,9 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                                 onClick={() => onSectionClick(section.id)}
                                 className={cn(
                                     "group relative flex items-center justify-center rounded-lg transition-all duration-200 shrink-0",
-                                    embedded ? "w-7 h-7" : "md:w-9 md:h-9 max-md:px-3 max-md:py-2 max-md:flex-col max-md:gap-1 max-md:min-w-[60px]",
+                                    embedded ? "w-7 h-7" : "w-9 h-9",
                                     isActive
-                                        ? "max-md:text-primary max-md:bg-primary/10 md:bg-primary/20 md:text-primary"
+                                        ? "bg-primary/20 text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
                                 )}
                                 whileHover={{ scale: 1.05 }}
@@ -240,22 +263,14 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.6 + index * 0.05 }}
                             >
-                                <Icon className={cn(embedded ? "w-3.5 h-3.5" : "w-4 h-4 max-md:w-5 max-md:h-5")} />
-                                <span className={cn(
-                                    "text-[10px] font-medium hidden",
-                                    !embedded && "max-md:block",
-                                    isActive ? "text-primary" : "text-muted-foreground"
-                                )}>
-                                    {section.shortLabel}
-                                </span>
+                                <Icon className={cn(embedded ? "w-3.5 h-3.5" : "w-4 h-4")} />
 
-                                {/* Tooltip on hover (desktop only) */}
+                                {/* Tooltip on hover */}
                                 <div className={cn(
                                     "absolute right-full mr-3 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap",
                                     "bg-popover text-popover-foreground border border-border shadow-lg",
                                     "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
-                                    "transition-all duration-200 pointer-events-none",
-                                    embedded ? "block" : "hidden md:block" // keep tooltips hidden on mobile
+                                    "transition-all duration-200 pointer-events-none"
                                 )}>
                                     {section.label}
                                     <div className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-2.5 rotate-45 bg-popover border-r border-t border-border" />
@@ -265,9 +280,103 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                     })}
                 </div>
             </div>
+            </div>
+
+            {/* Mobile: animated panel */}
+            {!embedded && (
+            <AnimatePresence>
+            {mobileNavOpen && (
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                className="md:hidden flex flex-col rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl p-1.5 gap-0.5"
+            >
+                {SECTIONS.map((section, index) => {
+                    const Icon = section.icon;
+                    const isActive = activeSection === section.id;
+                    return (
+                        <motion.button
+                            key={section.id}
+                            onClick={() => {
+                                onSectionClick(section.id);
+                                setMobileNavOpen(false);
+                            }}
+                            className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200",
+                                isActive
+                                    ? "bg-primary/20 text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                            )}
+                            initial={{ opacity: 0, x: 10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.03 }}
+                        >
+                            <Icon className="w-4 h-4" />
+                            <span className="text-xs font-medium">{section.shortLabel}</span>
+                        </motion.button>
+                    );
+                })}
+            </motion.div>
+            )}
+            </AnimatePresence>
+            )}
         </motion.div>
     );
 };
+
+// Fullscreen landscape field modal for mobile
+interface FieldFullscreenModalProps {
+    open: boolean;
+    onClose: () => void;
+    children: React.ReactNode;
+    title?: string;
+}
+
+const FieldFullscreenModal = ({ open, onClose, children, title }: FieldFullscreenModalProps) => {
+    useEffect(() => {
+        if (open) {
+            document.body.style.overflow = 'hidden';
+            const meta = document.querySelector('meta[name="viewport"]');
+            if (meta) meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1');
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [open]);
+
+    if (!open) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+            <div className="flex items-center justify-between px-3 py-2 bg-card/90 border-b border-border shrink-0">
+                {title && <span className="text-sm font-semibold text-foreground truncate">{title}</span>}
+                <button
+                    onClick={onClose}
+                    className="ml-auto p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+            <div className="flex-1 flex items-center justify-center p-2 overflow-auto">
+                <div className="w-full h-full max-h-full" style={{ aspectRatio: '105/68' }}>
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Expand button for fields on mobile
+const FieldExpandButton = ({ onClick }: { onClick: () => void }) => (
+    <button
+        onClick={onClick}
+        className="md:hidden absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
+        title="View fullscreen"
+    >
+        <Maximize2 className="w-4 h-4" />
+    </button>
+);
 
 // Helper to check if a value exists in database (not null/undefined)
 const hasData = (value: number | null | undefined): value is number => {
@@ -618,6 +727,10 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
     // Trend section toggle: 'performance' (goals/assists) or 'possession' (interval stats)
     const [trendView, setTrendView] = useState<'performance' | 'possession'>('performance');
+
+    // Fullscreen field modals for mobile
+    const [formationFieldFullscreen, setFormationFieldFullscreen] = useState(false);
+    const [goalFieldFullscreen, setGoalFieldFullscreen] = useState(false);
 
     // Handle section click - smooth scroll to section
     const handleSectionClick = useCallback((sectionId: string) => {
@@ -1745,16 +1858,18 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                             )}
 
                                             {/* Hexagon Radar Chart - Full Width */}
-                                            <div className="flex flex-col items-center justify-center p-6 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border mb-6">
-                                                <h4 className="text-sm font-semibold text-foreground mb-4">Performance Indices Overview</h4>
+                                            <div className="flex flex-col items-center justify-center p-3 sm:p-6 rounded-xl bg-gradient-to-br from-secondary/50 to-background border border-border mb-6">
+                                                <h4 className="text-sm font-semibold text-foreground mb-3 sm:mb-4">Performance Indices Overview</h4>
+                                                <div className="w-full max-w-[420px]">
                                                 <HexagonRadar
                                                     data={hexagonData}
                                                     teamName={teamName}
                                                     opponentName={opponentName}
-                                                    size={380}
+                                                    size={420}
                                                 />
+                                                </div>
                                                 {/* Legend for indices */}
-                                                <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mt-6 w-full">
+                                                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4 mt-4 sm:mt-6 w-full">
                                                     {[
                                                         { label: "PI", full: "Performance Index", statId: "overall_rating" },
                                                         { label: "SOT", full: "Shots on Target", statId: "shots_on_target" },
@@ -2290,6 +2405,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                     {/* Full field with both teams - like passing network */}
                                     <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
                                         <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl min-w-[600px] md:min-w-0 aspect-[105/68]">
+                                            <FieldExpandButton onClick={() => setFormationFieldFullscreen(true)} />
                                             <TacticalField
                                                 viewMode="full"
                                                 className="absolute inset-0 w-full h-full"
@@ -2753,6 +2869,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 {/* Goal Pitch Visualization - full field */}
                                 <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
                                     <div className="relative w-full max-w-3xl mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 min-w-[600px] md:min-w-0 aspect-[16/10]">
+                                        <FieldExpandButton onClick={() => setGoalFieldFullscreen(true)} />
                                         <TacticalField
                                             viewMode="full"
                                             className="w-full h-full"
@@ -3003,6 +3120,87 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                     </div>
                 )
             }
+            {/* Fullscreen Formation Field Modal */}
+            <FieldFullscreenModal
+                open={formationFieldFullscreen}
+                onClose={() => setFormationFieldFullscreen(false)}
+                title="Team Formation"
+            >
+                <div className="relative w-full h-full rounded-xl overflow-hidden border border-border shadow-xl">
+                    <TacticalField
+                        viewMode="full"
+                        className="absolute inset-0 w-full h-full"
+                    >
+                        {fieldPlayers.map(({ slot, player }, index) => {
+                            const svgX = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
+                            const svgY = (slot.x / 100) * PITCH_H;
+                            const jersey = player?.jersey_number ?? (index + 1);
+                            const lastName = player ? player.name.split(" ").slice(-1)[0] : `P${index + 1}`;
+                            return (
+                                <g key={`fs-home-${index}`} transform={`translate(${svgX}, ${svgY})`}>
+                                    <circle r="3.2" fill={getSlotColor(slot.zone)} stroke="white" strokeWidth="0.4" opacity={0.95} />
+                                    <text y="0.2" textAnchor="middle" dominantBaseline="central" fill="white" fontSize="2.2" fontWeight="bold">{jersey}</text>
+                                    <text y="5.5" textAnchor="middle" fill="white" fontSize="2" fontWeight="500" opacity={0.9}>{lastName}</text>
+                                </g>
+                            );
+                        })}
+                        {opponentNodes.map((node, index) => {
+                            const lastName = node.player.name.split(" ").slice(-1)[0];
+                            return (
+                                <g key={`fs-away-${index}`} transform={`translate(${node.x}, ${node.y})`}>
+                                    <circle r="3.2" fill="hsl(0, 72%, 51%)" stroke="white" strokeWidth="0.4" opacity={0.8} />
+                                    <text y="0.2" textAnchor="middle" dominantBaseline="central" fill="white" fontSize="2.2" fontWeight="bold">{node.player.jersey_number}</text>
+                                    <text y="5.5" textAnchor="middle" fill="white" fontSize="2" fontWeight="500" opacity={0.75}>{lastName}</text>
+                                </g>
+                            );
+                        })}
+                    </TacticalField>
+                    <div className="absolute top-2 left-0 right-0 flex items-center justify-center gap-3 pointer-events-none select-none px-3">
+                        <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1 rounded-full">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getSlotColor('DEF') }} />
+                            <span className="text-[11px] font-medium text-white">{homeTeamName}</span>
+                        </div>
+                        <span className="text-[10px] text-white/60">vs</span>
+                        <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1 rounded-full">
+                            <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
+                            <span className="text-[11px] font-medium text-white">{opponentTeamName}</span>
+                        </div>
+                    </div>
+                </div>
+            </FieldFullscreenModal>
+
+            {/* Fullscreen Goal Map Modal */}
+            <FieldFullscreenModal
+                open={goalFieldFullscreen}
+                onClose={() => setGoalFieldFullscreen(false)}
+                title="Goal Map"
+            >
+                <div className="relative w-full h-full rounded-xl border border-border overflow-hidden bg-muted/20">
+                    <TacticalField
+                        viewMode="full"
+                        className="w-full h-full"
+                    >
+                        {goalHalfFilter === '1st' && (
+                            <rect x={52.5} y={-6} width={56} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
+                        )}
+                        {goalHalfFilter === '2nd' && (
+                            <rect x={-8} y={-6} width={60.5} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
+                        )}
+                        {filteredGoals.map((goal, idx) => {
+                            const pitchX = (goal.event.x / 100) * 105;
+                            const pitchY = (goal.event.y / 100) * 68;
+                            const isCurrent = idx === currentGoalIndex;
+                            return (
+                                <g key={`fs-goal-${idx}`} transform={`translate(${pitchX}, ${pitchY})`}>
+                                    <circle r={isCurrent ? 3.5 : 2.8} fill="hsl(0, 72%, 51%)" stroke="white" strokeWidth="0.5" opacity={isCurrent ? 1 : 0.7} />
+                                    <text y="0.3" textAnchor="middle" dominantBaseline="central" fill="white" fontSize="2" fontWeight="bold">{goal.scorer.name.split(' ').pop()?.[0]}</text>
+                                    <text y="-4.5" textAnchor="middle" fill="white" fontSize="1.8" fontWeight="bold" opacity={0.85}>{goal.minute}'</text>
+                                </g>
+                            );
+                        })}
+                    </TacticalField>
+                </div>
+            </FieldFullscreenModal>
         </div >
     );
 };

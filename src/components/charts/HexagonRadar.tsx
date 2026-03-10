@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Team colors for comparison view - consistent with TeamAnalytics
 const TEAM_COLORS = {
-    home: "hsl(217, 91%, 60%)", // Blue
+    home: "hsl(217, 91%, 60%)",
     homeLight: "hsl(217, 91%, 70%)",
-    away: "hsl(0, 72%, 51%)",   // Red
+    away: "hsl(0, 72%, 51%)",
     awayLight: "hsl(0, 72%, 65%)",
 };
 
@@ -20,7 +19,7 @@ interface HexagonRadarProps {
     teamName?: string;
     opponentName?: string;
     size?: number;
-    useComparisonColors?: boolean; // Use blue/red instead of primary/muted
+    useComparisonColors?: boolean;
 }
 
 interface HoverInfo {
@@ -37,18 +36,40 @@ const HexagonRadar = ({
     data,
     teamName = "Team",
     opponentName = "Opponent",
-    size = 320,
+    size: propSize = 320,
     useComparisonColors = true,
 }: HexagonRadarProps) => {
     const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState(0);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    // Use the smaller of prop size and container width, with a reasonable minimum
+    const effectiveSize = containerWidth > 0 ? Math.min(propSize, containerWidth) : propSize;
+    const isMobile = effectiveSize < 340;
+
+    const labelPadding = isMobile ? 50 : 55;
+    const labelOffset = isMobile ? 22 : 32;
+
+    const size = effectiveSize;
     const center = size / 2;
-    const radius = (size / 2) - 45; // Reduced padding for closer labels
+    const radius = (size / 2) - labelPadding;
     const levels = 5;
 
     const sides = data.length;
     const angleStep = (2 * Math.PI) / sides;
 
-    // Calculate points on the polygon
     const getPolygonPoints = (radiusMultiplier: number) => {
         const points: { x: number; y: number }[] = [];
         for (let i = 0; i < sides; i++) {
@@ -61,13 +82,11 @@ const HexagonRadar = ({
         return points;
     };
 
-    // Generate polygon path
     const getPolygonPath = (radiusMultiplier: number) => {
         const points = getPolygonPoints(radiusMultiplier);
         return points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
     };
 
-    // Calculate data points for team and opponent
     const { teamPoints, opponentPoints, labelPositions } = useMemo(() => {
         const teamPts: { x: number; y: number }[] = [];
         const oppPts: { x: number; y: number }[] = [];
@@ -88,11 +107,10 @@ const HexagonRadar = ({
                 y: center + radius * oppNormalized * Math.sin(angle),
             });
 
-            // Position labels closer to the graph
-            const labelRadius = radius + 32; // Increased for larger text
+            const lr = radius + labelOffset;
             labels.push({
-                x: center + labelRadius * Math.cos(angle),
-                y: center + labelRadius * Math.sin(angle),
+                x: center + lr * Math.cos(angle),
+                y: center + lr * Math.sin(angle),
                 label: item.label,
                 fullLabel: item.fullLabel || item.label,
                 angle: i,
@@ -101,7 +119,7 @@ const HexagonRadar = ({
         });
 
         return { teamPoints: teamPts, opponentPoints: oppPts, labelPositions: labels };
-    }, [data, center, radius]);
+    }, [data, center, radius, labelOffset]);
 
     const teamPath = teamPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
     const opponentPath = opponentPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
@@ -131,10 +149,10 @@ const HexagonRadar = ({
     };
 
     return (
-        <div className="relative flex flex-col items-center">
+        <div ref={containerRef} className="relative flex flex-col items-center w-full">
             <svg
                 viewBox={`0 0 ${size} ${size}`}
-                className="mx-auto overflow-visible w-full h-auto"
+                className="mx-auto w-full h-auto"
                 style={{ maxWidth: size, maxHeight: size }}
             >
                 {/* Defs for gradients and filters */}
@@ -292,18 +310,21 @@ const HexagonRadar = ({
 
                 {/* Labels with values */}
                 {labelPositions.map((label, i) => {
-                    // Better text anchor based on angle position
-                    // Dynamic text anchor based on angle position relative to sides
                     const angleRad = angleStep * label.angle - Math.PI / 2;
                     const angleDeg = ((angleRad * 180 / Math.PI) + 360) % 360;
                     const textAnchor =
                         (angleDeg > 45 && angleDeg < 135) ? 'start' :
                             (angleDeg > 225 && angleDeg < 315) ? 'end' : 'middle';
 
-                    // Better dy offset - reduced spacing
                     const dy =
-                        (angleDeg > 350 || angleDeg < 10) ? -8 :
-                            (angleDeg > 170 && angleDeg < 190) ? 14 : 3;
+                        (angleDeg > 350 || angleDeg < 10) ? (isMobile ? -6 : -8) :
+                            (angleDeg > 170 && angleDeg < 190) ? (isMobile ? 10 : 14) : (isMobile ? 2 : 3);
+
+                    const labelFontSize = isMobile ? 9 : 12;
+                    const valueFontSize = isMobile ? 9 : 14;
+                    const oppFontSize = isMobile ? 8 : 10;
+                    const valueGap = isMobile ? 10 : 14;
+                    const oppGap = isMobile ? 18 : 26;
 
                     return (
                         <g key={i}>
@@ -311,27 +332,29 @@ const HexagonRadar = ({
                                 x={label.x}
                                 y={label.y + dy}
                                 textAnchor={textAnchor}
-                                className="fill-foreground text-xs font-bold"
+                                fill="currentColor"
+                                className="fill-foreground"
+                                style={{ fontSize: labelFontSize, fontWeight: 700 }}
                             >
                                 {label.label}
                             </text>
-                            {/* Team value */}
                             <text
                                 x={label.x}
-                                y={label.y + dy + 14}
+                                y={label.y + dy + valueGap}
                                 textAnchor={textAnchor}
                                 fill={useComparisonColors ? TEAM_COLORS.home : undefined}
-                                className={useComparisonColors ? "text-sm font-bold" : "fill-primary text-sm font-bold"}
+                                className={useComparisonColors ? "" : "fill-primary"}
+                                style={{ fontSize: valueFontSize, fontWeight: 700 }}
                             >
                                 {label.value.team}%
                             </text>
-                            {/* Opponent value - show in comparison mode */}
                             <text
                                 x={label.x}
-                                y={label.y + dy + 26}
+                                y={label.y + dy + oppGap}
                                 textAnchor={textAnchor}
                                 fill={useComparisonColors ? TEAM_COLORS.away : undefined}
-                                className={useComparisonColors ? "text-[10px] font-medium" : "fill-muted-foreground text-[10px] font-medium"}
+                                className={useComparisonColors ? "" : "fill-muted-foreground"}
+                                style={{ fontSize: oppFontSize, fontWeight: 500 }}
                             >
                                 {label.value.opp}%
                             </text>
@@ -368,24 +391,24 @@ const HexagonRadar = ({
                 )}
             </AnimatePresence>
 
-            {/* Legend - Improved styling */}
-            <div className="flex items-center justify-center gap-8 mt-2 px-4 py-2 rounded-lg bg-secondary/30">
-                <div className="flex items-center gap-2">
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-4 sm:gap-8 mt-2 px-3 sm:px-4 py-2 rounded-lg bg-secondary/30">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                     <div
-                        className="w-3.5 h-3.5 rounded-full shadow-md"
+                        className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shadow-md shrink-0"
                         style={{
                             backgroundColor: useComparisonColors ? TEAM_COLORS.home : 'hsl(var(--primary))',
                             boxShadow: useComparisonColors ? `0 4px 6px ${TEAM_COLORS.home}40` : undefined
                         }}
                     />
-                    <span className="text-xs text-foreground font-medium">{teamName}</span>
+                    <span className="text-[11px] sm:text-xs text-foreground font-medium truncate max-w-[80px] sm:max-w-none">{teamName}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                     <div
-                        className="w-3.5 h-3.5 rounded-full"
+                        className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shrink-0"
                         style={{ backgroundColor: useComparisonColors ? TEAM_COLORS.away : 'hsl(var(--muted-foreground) / 0.6)' }}
                     />
-                    <span className="text-xs text-muted-foreground">{opponentName}</span>
+                    <span className="text-[11px] sm:text-xs text-muted-foreground truncate max-w-[80px] sm:max-w-none">{opponentName}</span>
                 </div>
             </div>
         </div>

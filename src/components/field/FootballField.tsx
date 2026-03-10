@@ -1,8 +1,8 @@
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo, useId, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MatchEvent } from "@/types/player";
 import { cn } from "@/lib/utils";
-import { Play, Filter, Layers } from "lucide-react";
+import { Play, Filter, Layers, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -54,6 +54,14 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
   const [activeFilters, setActiveFilters] = useState<string[]>(["pass", "shot", "dribble", "interception", "tackle"]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationIndex, setAnimationIndex] = useState(-1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFullscreen]);
 
   const eventColors: Record<string, { bg: string; glow: string; text: string; hsl: string }> = {
     pass: { bg: "bg-primary", glow: "shadow-primary/50", text: "text-primary", hsl: "199, 89%, 48%" },
@@ -223,6 +231,15 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
 
       {/* Main Field Container */}
       <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]">
+        {/* Expand button for mobile */}
+        <button
+          onClick={() => setIsFullscreen(true)}
+          className="md:hidden absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
+          title="View fullscreen"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+
         {/* Tactical Field Background */}
         <TacticalField viewMode="full" className="absolute inset-0 w-full h-full" interactive={false} />
 
@@ -543,6 +560,89 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Fullscreen field overlay for mobile */}
+      {isFullscreen && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+          <div className="flex items-center justify-between px-3 py-2 bg-card/90 border-b border-border shrink-0">
+            <span className="text-sm font-semibold text-foreground">Heatmap</span>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-2 overflow-auto">
+            <div className="w-full h-full max-h-full" style={{ aspectRatio: '105/68' }}>
+              <div className="relative w-full h-full rounded-xl overflow-hidden border border-border shadow-xl">
+                <TacticalField viewMode="full" className="absolute inset-0 w-full h-full" interactive={false} />
+                <div className="absolute inset-0 bg-black/10" />
+                {viewMode === "heatmap" && heatmapData && (() => {
+                  const pitchLeft = ((-VIEWBOX_X_START) / VIEWBOX_WIDTH) * 100;
+                  const pitchTop = ((-VIEWBOX_Y_START) / VIEWBOX_HEIGHT) * 100;
+                  const pitchWidthPercent = (PITCH_WIDTH / VIEWBOX_WIDTH) * 100;
+                  const pitchHeightPercent = (PITCH_HEIGHT / VIEWBOX_HEIGHT) * 100;
+                  return (
+                    <div
+                      className="absolute"
+                      style={{
+                        left: `${pitchLeft}%`,
+                        top: `${pitchTop}%`,
+                        width: `${pitchWidthPercent}%`,
+                        height: `${pitchHeightPercent}%`,
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${heatmapData.gridCols}, 1fr)`,
+                        gridTemplateRows: `repeat(${heatmapData.gridRows}, 1fr)`,
+                      }}
+                    >
+                      {heatmapData.zones.map((row, rowIndex) =>
+                        row.map((intensity, colIndex) => (
+                          <div
+                            key={`fs-${rowIndex}-${colIndex}`}
+                            style={{
+                              backgroundColor: getHeatmapColor(intensity, heatmapData.maxIntensity),
+                              filter: intensity > 0 ? "blur(4px)" : "none",
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                  );
+                })()}
+                {filteredEvents.map((event, index) => {
+                  const pos = toContainerPercent(event.x, event.y);
+                  const isShot = event.type === "shot";
+                  return (
+                    <div
+                      key={`fs-ev-${index}`}
+                      className={cn("absolute z-10 rounded-full", !isShot && eventColors[event.type]?.bg)}
+                      style={{
+                        left: `${pos.x}%`,
+                        top: `${pos.y}%`,
+                        transform: "translate(-50%, -50%)",
+                        width: "10px",
+                        height: "10px",
+                        boxShadow: `0 2px 4px rgba(0,0,0,0.3)`,
+                        ...(isShot ? { background: "hsl(var(--destructive))" } : {}),
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 py-2 px-3 bg-card/90 border-t border-border shrink-0">
+            <span className="text-[10px] font-semibold text-foreground flex items-center gap-1.5">
+              <Layers className="w-3 h-3" />
+              {filteredEvents.length} touches
+            </span>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              Def {zoneStats.defensive}% · Mid {zoneStats.middle}% · Att {zoneStats.attacking}%
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
