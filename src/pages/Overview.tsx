@@ -218,7 +218,7 @@ const Overview = ({ embedded = false, matchId }: OverviewProps) => {
 
       <main className={cn(
         embedded ? "pb-12 px-2 sm:px-6" : "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
-        !embedded && (isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0")
+        !embedded && (isCollapsed ? "lg:ml-16 ml-0" : "lg:ml-64 ml-0")
       )}>
         <div className="container mx-auto">
           {/* Page Header */}

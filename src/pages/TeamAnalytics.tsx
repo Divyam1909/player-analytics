@@ -198,7 +198,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                 "fixed z-50 transition-all duration-300",
                 embedded
                     ? "right-3 top-[55%] -translate-y-1/2"
-                    : "md:right-3 md:top-[55%] md:-translate-y-1/2 max-md:bottom-4 max-md:right-3"
+                    : "lg:right-3 lg:top-[55%] lg:-translate-y-1/2 max-lg:bottom-4 max-lg:right-3"
             )}
         >
             {/* Mobile toggle button */}
@@ -206,7 +206,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                 <button
                     onClick={() => setMobileNavOpen(!mobileNavOpen)}
                     className={cn(
-                        "md:hidden w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center",
+                        "lg:hidden w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center",
                         mobileNavOpen && "mb-2"
                     )}
                 >
@@ -219,7 +219,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
             )}
 
             {/* Desktop: always visible. Mobile: toggled. */}
-            <div className={cn(embedded ? "" : "hidden md:block")}>
+            <div className={cn(embedded ? "" : "hidden lg:block")}>
             <div className={cn(
                 "flex rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl no-scrollbar overflow-hidden",
                 embedded
@@ -227,7 +227,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                     : "flex-row items-stretch p-2 gap-0"
             )}>
                 {/* Desktop indicator */}
-                <div className={cn("relative justify-start mr-1.5", embedded ? "flex flex-col" : "hidden md:flex md:flex-col")}>
+                <div className={cn("relative justify-start mr-1.5", embedded ? "flex flex-col" : "hidden lg:flex lg:flex-col")}>
                     <motion.div
                         className={cn("rounded-full bg-primary", embedded ? "w-1 h-6" : "w-1.5 h-8")}
                         animate={{
@@ -290,7 +290,7 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                 initial={{ opacity: 0, scale: 0.9, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                className="md:hidden flex flex-col rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl p-1.5 gap-0.5"
+                className="lg:hidden flex flex-col rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl p-1.5 gap-0.5"
             >
                 {SECTIONS.map((section, index) => {
                     const Icon = section.icon;
@@ -371,7 +371,7 @@ const FieldFullscreenModal = ({ open, onClose, children, title }: FieldFullscree
 const FieldExpandButton = ({ onClick }: { onClick: () => void }) => (
     <button
         onClick={onClick}
-        className="md:hidden absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
+        className="lg:hidden absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
         title="View fullscreen"
     >
         <Maximize2 className="w-4 h-4" />
@@ -1479,9 +1479,9 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
             <main className={cn(
                 embedded ? "pb-12 px-2 sm:px-6" : "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
-                !embedded && (isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0")
+                !embedded && (isCollapsed ? "lg:ml-16 ml-0" : "lg:ml-64 ml-0")
             )}>
-                <div className="container mx-auto">
+                <div className="mx-auto w-full max-w-screen-2xl">
                     {/* Page Header */}
                     <motion.div
                         className="mb-6 sm:mb-8"
@@ -1506,7 +1506,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
                     >
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             {/* All Matches Option */}
                             <motion.div
                                 onClick={() => setSelectedMatch("all")}
@@ -1562,15 +1562,15 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                         </div>
 
                         {/* View Mode Toggle */}
-                        <div className="flex items-center justify-end gap-2 mt-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mt-4">
                             <span className="text-xs text-muted-foreground">View:</span>
-                            <div className="flex items-center border border-border rounded-lg overflow-hidden bg-secondary/30">
+                            <div className="flex items-center border border-border rounded-lg overflow-hidden bg-secondary/30 w-full sm:w-auto">
                                 <Button
                                     variant={viewMode === 'single' ? 'default' : 'ghost'}
                                     size="sm"
                                     onClick={() => setViewMode('single')}
                                     className={cn(
-                                        "h-8 px-3 text-xs rounded-none gap-1.5",
+                                        "h-8 px-3 text-xs rounded-none gap-1.5 flex-1 sm:flex-none",
                                         viewMode === 'single' && "shadow-md"
                                     )}
                                 >
@@ -1583,7 +1583,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                     size="sm"
                                     onClick={() => setViewMode('comparison')}
                                     className={cn(
-                                        "h-8 px-3 text-xs rounded-none gap-1.5",
+                                        "h-8 px-3 text-xs rounded-none gap-1.5 flex-1 sm:flex-none",
                                         viewMode === 'comparison' && "shadow-md"
                                     )}
                                 >
@@ -2389,7 +2389,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                             Reset
                                         </Button>
                                         {/* Team Legend */}
-                                        <div className="hidden md:flex items-center gap-3">
+                                        <div className="hidden lg:flex items-center gap-3">
                                             <div className="flex items-center gap-1.5 text-xs">
                                                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: FORMATION_TEAM_COLORS.home.node }} />
                                                 <span className="text-muted-foreground">Home</span>
@@ -2403,8 +2403,8 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {/* Full field with both teams - like passing network */}
-                                    <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
-                                        <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl min-w-[600px] md:min-w-0 aspect-[105/68]">
+                                    <div className="w-full pb-4">
+                                        <div className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]">
                                             <FieldExpandButton onClick={() => setFormationFieldFullscreen(true)} />
                                             <TacticalField
                                                 viewMode="full"
@@ -2867,8 +2867,8 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {/* Goal Pitch Visualization - full field */}
-                                <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
-                                    <div className="relative w-full max-w-3xl mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 min-w-[600px] md:min-w-0 aspect-[16/10]">
+                                <div className="w-full pb-4">
+                                    <div className="relative w-full max-w-4xl mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 aspect-[16/10]">
                                         <FieldExpandButton onClick={() => setGoalFieldFullscreen(true)} />
                                         <TacticalField
                                             viewMode="full"
@@ -2991,14 +2991,14 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                 key={`${goal.matchId}-${goal.minute}-${i}`}
                                                 onClick={() => setCurrentGoalIndex(i)}
                                                 className={cn(
-                                                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors",
+                                                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors max-w-[150px]",
                                                     i === currentGoalIndex
                                                         ? "bg-destructive/20 border border-destructive/40 text-destructive font-semibold"
                                                         : "bg-secondary/40 hover:bg-secondary/60 text-muted-foreground"
                                                 )}
                                             >
                                                 <span className="font-bold">{goal.scorer.jerseyNumber}</span>
-                                                <span>{goal.scorer.name.split(' ').pop()}</span>
+                                                <span className="truncate">{goal.scorer.name.split(' ').pop()}</span>
                                                 <span className="opacity-60">{goal.minute}'</span>
                                             </button>
                                         ))}

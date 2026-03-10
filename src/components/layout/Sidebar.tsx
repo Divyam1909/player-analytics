@@ -58,16 +58,21 @@ const Sidebar = ({ className }: SidebarProps) => {
     const location = useLocation();
     const [expandedItems, setExpandedItems] = useState<string[]>(['Matches']);
     const { isCollapsed, toggleSidebar, setCollapsed } = useSidebarContext();
-    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
     useEffect(() => {
         const handleResize = () => {
-            setIsMobile(window.innerWidth < 768);
+            const mobile = window.innerWidth < 1024;
+            setIsMobile(mobile);
+            // Always start collapsed when entering mobile layout.
+            if (mobile) {
+                setCollapsed(true);
+            }
         };
         window.addEventListener('resize', handleResize);
         handleResize();
         return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [setCollapsed]);
 
     // Close sidebar on mobile when navigating
     useEffect(() => {
@@ -104,24 +109,25 @@ const Sidebar = ({ className }: SidebarProps) => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setCollapsed(true)}
-                        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+                        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
                     />
                 )}
             </AnimatePresence>
             <motion.aside
                 className={cn(
                     "fixed left-0 top-0 bottom-0 bg-card border-r border-border z-50 overflow-y-auto overflow-x-hidden transition-transform duration-300",
-                    isCollapsed ? "max-md:-translate-x-full" : "max-md:translate-x-0",
+                    isCollapsed ? "max-lg:-translate-x-full" : "max-lg:translate-x-0",
+                    "max-lg:w-[82vw] max-lg:max-w-[320px]",
                     className
                 )}
-                animate={{ width: isMobile ? 256 : (isCollapsed ? 64 : 256) }}
+                animate={isMobile ? {} : { width: isCollapsed ? 64 : 256 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
             >
-                <div className="p-3 h-full flex flex-col min-w-[256px] md:min-w-0">
+                <div className="p-3 h-full flex flex-col min-w-0">
                     {/* Collapse Toggle at top */}
                     <div className={cn(
                         "flex mb-4",
-                        isMobile ? "justify-end hidden md:flex" : (isCollapsed ? "justify-center" : "justify-end")
+                        isMobile ? "justify-end hidden lg:flex" : (isCollapsed ? "justify-center" : "justify-end")
                     )}>
                         <button
                             onClick={toggleSidebar}

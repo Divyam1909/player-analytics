@@ -10,7 +10,7 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const SidebarProvider = ({ children }: { children: ReactNode }) => {
     const [isCollapsed, setIsCollapsed] = useState(
-        typeof window !== 'undefined' ? window.innerWidth < 768 : true
+        typeof window !== 'undefined' ? window.innerWidth < 1024 : true
     );
 
     const toggleSidebar = () => {

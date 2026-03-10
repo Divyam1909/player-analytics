@@ -234,7 +234,7 @@ const FootballField = ({ events, showHeatmap = false }: FootballFieldProps) => {
         {/* Expand button for mobile */}
         <button
           onClick={() => setIsFullscreen(true)}
-          className="md:hidden absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
+          className="lg:hidden absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
           title="View fullscreen"
         >
           <Maximize2 className="w-4 h-4" />

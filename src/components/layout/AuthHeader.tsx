@@ -51,10 +51,10 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
         <header
             className={cn(
                 "fixed top-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl transition-all duration-300",
-                isCollapsed ? "md:left-16 left-0" : "md:left-64 left-0"
+                isCollapsed ? "lg:left-16 left-0" : "lg:left-64 left-0"
             )}
         >
-            <div className="container mx-auto px-4 sm:px-6">
+            <div className="w-full px-3 sm:px-6">
                 <div className="flex h-14 sm:h-16 items-center justify-between">
                     {/* Left Side - Logo, Back Button & Page Title */}
                     <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
@@ -63,7 +63,7 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
                             variant="ghost"
                             size="icon"
                             onClick={toggleSidebar}
-                            className="md:hidden text-muted-foreground shrink-0 w-8 h-8"
+                            className="lg:hidden text-muted-foreground shrink-0 w-8 h-8"
                         >
                             <Menu className="w-5 h-5" />
                         </Button>
@@ -134,7 +134,7 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
                     </div>
 
                     {/* Right Side */}
-                    <div className="flex items-center gap-1 sm:gap-4">
+                    <div className="flex items-center gap-1 sm:gap-3">
                         {/* User Email */}
                         {user && (
                             <span className="text-xs sm:text-sm text-muted-foreground hidden lg:block">
@@ -145,7 +145,7 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
                         {/* Theme Toggle */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground hover:text-foreground">
                                     <AnimatePresence mode="wait">
                                         <motion.div
                                             key={resolvedTheme}
@@ -194,7 +194,7 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
                             variant="secondary"
                             size="sm"
                             onClick={handleLogout}
-                            className="gap-2"
+                            className="gap-1.5 px-2 sm:px-3"
                         >
                             <span className="hidden sm:inline">Sign Out</span>
                             <LogOut className="w-4 h-4" />

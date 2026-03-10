@@ -575,10 +575,10 @@ const TeamPassingMap = ({
     return (
         <div className="space-y-4">
             {/* Pitch */}
-            <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
+            <div className="w-full pb-4">
                 <div
                     ref={containerRef}
-                    className="relative w-full mx-auto rounded-xl overflow-hidden border border-border shadow-xl min-w-[600px] md:min-w-0 aspect-[105/68]"
+                    className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]"
                 >
                     <TacticalField viewMode="full" className="absolute inset-0 w-full h-full">
                         {/* Pass lines */}
