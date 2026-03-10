@@ -95,7 +95,7 @@ const AdminDashboard = () => {
 
             <main className={cn(
                 "pt-24 pb-12 px-6 transition-all duration-300",
-                isCollapsed ? "ml-16" : "ml-64"
+                isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Welcome Section */}

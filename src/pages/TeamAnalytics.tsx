@@ -187,25 +187,26 @@ interface SectionNavProps {
 const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: SectionNavProps) => {
     return (
         <motion.div
-            initial={{ opacity: 0, x: 20, y: '-50%' }}
-            animate={{ opacity: 1, x: 0, y: '-50%' }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5, duration: 0.4 }}
             className={cn(
-                "fixed right-3 z-50",
-                embedded ? "top-[55%]" : "top-[55%]"
+                "fixed z-50 transition-all duration-300",
+                embedded
+                    ? "right-3 top-[55%] -translate-y-1/2"
+                    : "md:right-3 max-md:left-1/2 max-md:-translate-x-1/2 max-md:bottom-4 max-md:top-auto top-[55%] max-md:w-[90vw] max-md:max-w-md max-md:translate-y-0 md:-translate-y-1/2"
             )}
         >
             <div className={cn(
-                "flex flex-row items-stretch rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl",
-                embedded ? "p-1.5 gap-0" : "p-2 gap-0"
+                "flex rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl no-scrollbar overflow-hidden",
+                embedded
+                    ? "flex-row items-stretch p-1.5 gap-0"
+                    : "md:flex-row max-md:flex-col overflow-x-auto max-md:py-1.5 max-md:px-2 md:items-stretch md:p-2 md:gap-0"
             )}>
-                {/* Active indicator bar - positioned on the left side */}
-                <div className="relative flex flex-col justify-start mr-1.5">
+                {/* Desktop indicator */}
+                <div className={cn("relative justify-start mr-1.5", embedded ? "flex flex-col" : "hidden md:flex md:flex-col")}>
                     <motion.div
-                        className={cn(
-                            "rounded-full bg-primary",
-                            embedded ? "w-1 h-6" : "w-1.5 h-8"
-                        )}
+                        className={cn("rounded-full bg-primary", embedded ? "w-1 h-6" : "w-1.5 h-8")}
                         animate={{
                             y: SECTIONS.findIndex(s => s.id === activeSection) * (embedded ? 32 : 40) + (embedded ? 4 : 4)
                         }}
@@ -215,8 +216,8 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
 
                 {/* Buttons container */}
                 <div className={cn(
-                    "flex flex-col",
-                    embedded ? "gap-1" : "gap-1.5"
+                    "flex",
+                    embedded ? "flex-col gap-1" : "md:flex-col max-md:flex-row md:gap-1.5 max-md:justify-between max-md:w-full"
                 )}>
                     {SECTIONS.map((section, index) => {
                         const Icon = section.icon;
@@ -227,10 +228,10 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                                 key={section.id}
                                 onClick={() => onSectionClick(section.id)}
                                 className={cn(
-                                    "group relative flex items-center justify-center rounded-lg transition-all duration-200",
-                                    embedded ? "w-7 h-7" : "w-9 h-9",
+                                    "group relative flex items-center justify-center rounded-lg transition-all duration-200 shrink-0",
+                                    embedded ? "w-7 h-7" : "md:w-9 md:h-9 max-md:px-3 max-md:py-2 max-md:flex-col max-md:gap-1 max-md:min-w-[60px]",
                                     isActive
-                                        ? "bg-primary/20 text-primary"
+                                        ? "max-md:text-primary max-md:bg-primary/10 md:bg-primary/20 md:text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
                                 )}
                                 whileHover={{ scale: 1.05 }}
@@ -239,14 +240,22 @@ const SectionNav = ({ activeSection, onSectionClick, isCollapsed, embedded }: Se
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.6 + index * 0.05 }}
                             >
-                                <Icon className={cn(embedded ? "w-3.5 h-3.5" : "w-4 h-4")} />
+                                <Icon className={cn(embedded ? "w-3.5 h-3.5" : "w-4 h-4 max-md:w-5 max-md:h-5")} />
+                                <span className={cn(
+                                    "text-[10px] font-medium hidden",
+                                    !embedded && "max-md:block",
+                                    isActive ? "text-primary" : "text-muted-foreground"
+                                )}>
+                                    {section.shortLabel}
+                                </span>
 
-                                {/* Tooltip on hover */}
+                                {/* Tooltip on hover (desktop only) */}
                                 <div className={cn(
                                     "absolute right-full mr-3 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap",
                                     "bg-popover text-popover-foreground border border-border shadow-lg",
                                     "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
-                                    "transition-all duration-200 pointer-events-none"
+                                    "transition-all duration-200 pointer-events-none",
+                                    embedded ? "block" : "hidden md:block" // keep tooltips hidden on mobile
                                 )}>
                                     {section.label}
                                     <div className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-2.5 rotate-45 bg-popover border-r border-t border-border" />
@@ -1357,7 +1366,7 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
 
             <main className={cn(
                 embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
-                !embedded && (isCollapsed ? "ml-16" : "ml-64")
+                !embedded && (isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0")
             )}>
                 <div className="container mx-auto">
                     {/* Page Header */}
@@ -1587,28 +1596,47 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                         { label: "CONVERSION RATE", team: teamConversion !== null ? `${teamConversion}%` : "--", opponent: oppConversion !== null ? `${Math.round(oppConversion)}%` : "--" },
                                     ];
 
-                                    // Indices from DB - use avgWithNull to preserve null for missing data
-                                    const pci = avgWithNull(relevantStats, m => (m as any).home_possession_control_index);
-                                    const cci = avgWithNull(relevantStats, m => (m as any).home_chance_creation_index);
-                                    const se = avgWithNull(relevantStats, m => (m as any).home_shooting_efficiency);
-                                    const ds = avgWithNull(relevantStats, m => (m as any).home_defensive_solidity);
-                                    const tp = avgWithNull(relevantStats, m => (m as any).home_transition_progression);
-                                    const rpe = avgWithNull(relevantStats, m => (m as any).home_recovery_pressing_efficiency);
+                                    // Six new metrics
+                                    // 1. Performance Index
+                                    const teamPerformance = sumWithNull(relevantStats, m => (m as any).home_performance ?? (m as any).team_performance);
+                                    const oppPerformance = sumWithNull(relevantStats, m => (m as any).away_performance ?? (m as any).opponent_performance);
 
-                                    // Opponent indices (using away_*)
-                                    const oppPci = avgWithNull(relevantStats, m => (m as any).away_possession_control_index);
-                                    const oppCci = avgWithNull(relevantStats, m => (m as any).away_chance_creation_index);
-                                    const oppSe = avgWithNull(relevantStats, m => (m as any).away_shooting_efficiency);
-                                    const oppDs = avgWithNull(relevantStats, m => (m as any).away_defensive_solidity);
-                                    const oppTp = avgWithNull(relevantStats, m => (m as any).away_transition_progression);
-                                    const oppRpe = avgWithNull(relevantStats, m => (m as any).away_recovery_pressing_efficiency);
+                                    // 2. Shots on Target (variables already exist as teamShotsOnTarget, oppShotsOnTarget)
+
+                                    // 3. Successful Passes
+                                    const teamPasses = sumWithNull(relevantStats, m => (m as any).home_successful_passes);
+                                    const oppPasses = sumWithNull(relevantStats, m => (m as any).away_successful_passes);
+
+                                    // 4. Chances Created
+                                    const teamChances = sumWithNull(relevantStats, m => m.team_chances_created);
+                                    const oppChances = sumWithNull(relevantStats, m => m.opponent_chances_created);
+
+                                    // 5. Success Duels
+                                    const teamDuels = (teamAerialDuels === null && teamDribbles === null) ? null : ((teamAerialDuels ?? 0) + (teamDribbles ?? 0));
+                                    const oppDuels = (oppAerialDuels === null && oppDribbles === null) ? null : ((oppAerialDuels ?? 0) + (oppDribbles ?? 0));
+
+                                    // 6. Success Set Pieces
+                                    const teamCorners = sumWithNull(relevantStats, m => (m as any).home_corners ?? (m as any).team_corners);
+                                    const oppCorners = sumWithNull(relevantStats, m => (m as any).away_corners ?? (m as any).opponent_corners);
+
+                                    const teamSetPieces = (teamCorners === null && teamFreeKicks === null) ? null : ((teamCorners ?? 0) + (teamFreeKicks ?? 0));
+                                    const oppSetPieces = (oppCorners === null && oppFreeKicks === null) ? null : ((oppCorners ?? 0) + (oppFreeKicks ?? 0));
+
+                                    const getMaxValue = (team: number | null, opp: number | null, fallback: number) => {
+                                        const max = Math.max(team ?? 0, opp ?? 0);
+                                        if (max === 0) return fallback;
+                                        if (max > 100) return Math.ceil(max / 50) * 50;
+                                        if (max > 20) return Math.ceil(max / 10) * 10;
+                                        return Math.ceil(max / 2) * 2;
+                                    }
 
                                     const hexagonData = [
-                                        { label: "PCI", teamValue: pci, opponentValue: oppPci, maxValue: 100 },
-                                        { label: "CCI", teamValue: cci, opponentValue: oppCci, maxValue: 100 },
-                                        { label: "SE", teamValue: se, opponentValue: oppSe, maxValue: 100 },
-                                        { label: "DS", teamValue: ds, opponentValue: oppDs, maxValue: 100 },
-                                        { label: "T&P", teamValue: tp, opponentValue: oppTp, maxValue: 100 },
+                                        { label: "PI", teamValue: teamPerformance ?? 0, opponentValue: oppPerformance ?? 0, maxValue: 100 },
+                                        { label: "SOT", teamValue: teamShotsOnTarget ?? 0, opponentValue: oppShotsOnTarget ?? 0, maxValue: getMaxValue(teamShotsOnTarget, oppShotsOnTarget, 10) },
+                                        { label: "PASS", teamValue: teamPasses ?? 0, opponentValue: oppPasses ?? 0, maxValue: getMaxValue(teamPasses, oppPasses, 500) },
+                                        { label: "CC", teamValue: teamChances ?? 0, opponentValue: oppChances ?? 0, maxValue: getMaxValue(teamChances, oppChances, 20) },
+                                        { label: "DUEL", teamValue: teamDuels ?? 0, opponentValue: oppDuels ?? 0, maxValue: getMaxValue(teamDuels, oppDuels, 20) },
+                                        { label: "SET", teamValue: teamSetPieces ?? 0, opponentValue: oppSetPieces ?? 0, maxValue: getMaxValue(teamSetPieces, oppSetPieces, 10) },
                                     ];
 
 
@@ -1726,16 +1754,17 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                                     size={380}
                                                 />
                                                 {/* Legend for indices */}
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 w-full">
+                                                <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mt-6 w-full">
                                                     {[
-                                                        { label: "PCI", full: "Possession Control Index", statId: "pci" },
-                                                        { label: "CCI", full: "Chance Creation Index", statId: "cci" },
-                                                        { label: "SE", full: "Shooting Efficiency", statId: "se" },
-                                                        { label: "DS", full: "Defensive Solidity", statId: "ds" },
-                                                        { label: "T&P", full: "Transition & Progression", statId: "tp" },
+                                                        { label: "PI", full: "Performance Index", statId: "overall_rating" },
+                                                        { label: "SOT", full: "Shots on Target", statId: "shots_on_target" },
+                                                        { label: "PASS", full: "Successful Passes", statId: "pass_accuracy" },
+                                                        { label: "CC", full: "Chances Created", statId: "chances_created" },
+                                                        { label: "DUEL", full: "Success Duels", statId: "aerial_duels_won" },
+                                                        { label: "SET", full: "Success Set Pieces", statId: "corners" },
                                                     ].map((item) => (
                                                         <div key={item.label} className="text-center p-2 rounded-lg bg-background/50">
-                                                            <StatHint statId={item.statId} iconSize="sm">
+                                                            <StatHint statId={item.statId as any} iconSize="sm">
                                                                 <span className="text-xs font-bold text-primary">{item.label}</span>
                                                             </StatHint>
                                                             <p className="text-[10px] text-muted-foreground">{item.full}</p>
@@ -2259,222 +2288,224 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {/* Full field with both teams - like passing network */}
-                                    <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]">
-                                        <TacticalField
-                                            viewMode="full"
-                                            className="absolute inset-0 w-full h-full"
-                                        >
-                                            {/* Home Team Field Players - 11 slots (left side) */}
-                                            {fieldPlayers.map(({ slot, player }, index) => {
-                                                // Normalize formation depth to fill left half.
-                                                // This keeps forwards close to the midfield line regardless of
-                                                // each formation's raw Y range in `formationPositions`.
-                                                const svgX = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
-                                                const svgY = (slot.x / 100) * PITCH_H;
+                                    <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
+                                        <div className="relative w-full max-w-3xl mx-auto rounded-xl overflow-hidden border border-border shadow-xl min-w-[600px] md:min-w-0 aspect-[105/68]">
+                                            <TacticalField
+                                                viewMode="full"
+                                                className="absolute inset-0 w-full h-full"
+                                            >
+                                                {/* Home Team Field Players - 11 slots (left side) */}
+                                                {fieldPlayers.map(({ slot, player }, index) => {
+                                                    // Normalize formation depth to fill left half.
+                                                    // This keeps forwards close to the midfield line regardless of
+                                                    // each formation's raw Y range in `formationPositions`.
+                                                    const svgX = 5 + ((slot.y - formationDepthBounds.minY) / formationDepthBounds.rangeY) * 43.5;
+                                                    const svgY = (slot.x / 100) * PITCH_H;
 
-                                                const circleRadius = 2.2;
+                                                    const circleRadius = 2.2;
 
-                                                const handlePlayerClick = (e: React.MouseEvent) => {
-                                                    if (player && !draggedPlayerId) {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        window.history.replaceState(null, '', '/team#formation');
-                                                        navigate(`/player/${player.id}`);
-                                                    }
-                                                };
+                                                    const handlePlayerClick = (e: React.MouseEvent) => {
+                                                        if (player && !draggedPlayerId) {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            window.history.replaceState(null, '', '/team#formation');
+                                                            navigate(`/player/${player.id}`);
+                                                        }
+                                                    };
 
-                                                return (
-                                                    <g key={slot.id}>
-                                                        {/* Drop zone for drag and drop */}
-                                                        <foreignObject
-                                                            x={svgX - 5}
-                                                            y={svgY - 5}
-                                                            width={10}
-                                                            height={10}
-                                                            style={{ pointerEvents: 'all' }}
-                                                        >
-                                                            <div
-                                                                onDragOver={handleDragOver}
-                                                                onDrop={() => handleDropOnField(index)}
-                                                                style={{ width: '100%', height: '100%' }}
-                                                            />
-                                                        </foreignObject>
-
-                                                        {player ? (
-                                                            <g
-                                                                transform={`translate(${svgX}, ${svgY})`}
-                                                                className="cursor-pointer"
-                                                                onClick={handlePlayerClick}
+                                                    return (
+                                                        <g key={slot.id}>
+                                                            {/* Drop zone for drag and drop */}
+                                                            <foreignObject
+                                                                x={svgX - 5}
+                                                                y={svgY - 5}
+                                                                width={10}
+                                                                height={10}
                                                                 style={{ pointerEvents: 'all' }}
                                                             >
-                                                                {/* Shadow/halo */}
-                                                                <circle
-                                                                    cx={0}
-                                                                    cy={0}
-                                                                    r={circleRadius + 0.3}
-                                                                    fill="rgba(0,0,0,0.3)"
+                                                                <div
+                                                                    onDragOver={handleDragOver}
+                                                                    onDrop={() => handleDropOnField(index)}
+                                                                    style={{ width: '100%', height: '100%' }}
                                                                 />
+                                                            </foreignObject>
 
-                                                                {/* Main circle - home team blue */}
-                                                                <motion.circle
-                                                                    cx={0}
-                                                                    cy={0}
-                                                                    r={circleRadius}
-                                                                    fill={FORMATION_TEAM_COLORS.home.node}
-                                                                    stroke={FORMATION_TEAM_COLORS.home.border}
-                                                                    strokeWidth={0.3}
-                                                                    initial={{ scale: 0, opacity: 0 }}
-                                                                    animate={{ scale: 1, opacity: 1 }}
-                                                                    transition={{ delay: 0.1 + index * 0.03, type: "spring" }}
-                                                                    whileHover={{ scale: 1.3 }}
-                                                                    className={cn(
-                                                                        draggedPlayerId === player.id && "stroke-yellow-400 stroke-[0.5]"
-                                                                    )}
-                                                                />
-
-                                                                {/* Jersey number */}
-                                                                <text
-                                                                    x={0}
-                                                                    y={0.6}
-                                                                    textAnchor="middle"
-                                                                    fill="white"
-                                                                    fontSize="1.6"
-                                                                    fontWeight="bold"
-                                                                    fontFamily="Arial"
-                                                                    style={{ pointerEvents: 'none' }}
+                                                            {player ? (
+                                                                <g
+                                                                    transform={`translate(${svgX}, ${svgY})`}
+                                                                    className="cursor-pointer"
+                                                                    onClick={handlePlayerClick}
+                                                                    style={{ pointerEvents: 'all' }}
                                                                 >
-                                                                    {player.jerseyNumber}
-                                                                </text>
+                                                                    {/* Shadow/halo */}
+                                                                    <circle
+                                                                        cx={0}
+                                                                        cy={0}
+                                                                        r={circleRadius + 0.3}
+                                                                        fill="rgba(0,0,0,0.3)"
+                                                                    />
 
-                                                                {/* Player name (below circle) */}
-                                                                <text
-                                                                    x={0}
-                                                                    y={circleRadius + 2.2}
-                                                                    textAnchor="middle"
-                                                                    fill="white"
-                                                                    fontSize="1.4"
-                                                                    fontWeight="500"
-                                                                    fontFamily="system-ui, -apple-system, sans-serif"
-                                                                    stroke="rgba(0,0,0,0.5)"
-                                                                    strokeWidth="0.3"
-                                                                    paintOrder="stroke"
-                                                                    style={{ pointerEvents: 'none' }}
-                                                                >
-                                                                    {player.name.split(" ").pop()}
-                                                                </text>
-                                                            </g>
-                                                        ) : (
-                                                            <g transform={`translate(${svgX}, ${svgY})`}>
-                                                                <circle
-                                                                    cx={0}
-                                                                    cy={0}
-                                                                    r={circleRadius}
-                                                                    fill="rgba(0,0,0,0.2)"
-                                                                    stroke="rgba(255,255,255,0.4)"
-                                                                    strokeWidth={0.2}
-                                                                    strokeDasharray="0.8 0.8"
-                                                                />
-                                                                <text
-                                                                    x={0}
-                                                                    y={0.5}
-                                                                    textAnchor="middle"
-                                                                    fill="rgba(255,255,255,0.5)"
-                                                                    fontSize="1.3"
-                                                                >
-                                                                    {slot.role}
-                                                                </text>
-                                                            </g>
-                                                        )}
-                                                    </g>
-                                                );
-                                            })}
+                                                                    {/* Main circle - home team blue */}
+                                                                    <motion.circle
+                                                                        cx={0}
+                                                                        cy={0}
+                                                                        r={circleRadius}
+                                                                        fill={FORMATION_TEAM_COLORS.home.node}
+                                                                        stroke={FORMATION_TEAM_COLORS.home.border}
+                                                                        strokeWidth={0.3}
+                                                                        initial={{ scale: 0, opacity: 0 }}
+                                                                        animate={{ scale: 1, opacity: 1 }}
+                                                                        transition={{ delay: 0.1 + index * 0.03, type: "spring" }}
+                                                                        whileHover={{ scale: 1.3 }}
+                                                                        className={cn(
+                                                                            draggedPlayerId === player.id && "stroke-yellow-400 stroke-[0.5]"
+                                                                        )}
+                                                                    />
 
-                                            {/* Opponent Team Players (right side) - position-based */}
-                                            {opponentNodes.map((node, index) => {
-                                                const circleRadius = 2.2;
-                                                const lastName = node.player.name.split(" ").slice(-1)[0];
+                                                                    {/* Jersey number */}
+                                                                    <text
+                                                                        x={0}
+                                                                        y={0.6}
+                                                                        textAnchor="middle"
+                                                                        fill="white"
+                                                                        fontSize="1.6"
+                                                                        fontWeight="bold"
+                                                                        fontFamily="Arial"
+                                                                        style={{ pointerEvents: 'none' }}
+                                                                    >
+                                                                        {player.jerseyNumber}
+                                                                    </text>
 
-                                                return (
-                                                    <g
-                                                        key={node.player.id}
-                                                        style={{ cursor: 'default' }}
-                                                    >
-                                                        {/* Shadow */}
-                                                        <circle
-                                                            cx={node.x}
-                                                            cy={node.y}
-                                                            r={circleRadius + 0.3}
-                                                            fill="rgba(0,0,0,0.3)"
-                                                        />
-                                                        {/* Main circle - opponent red (non-clickable) */}
-                                                        <motion.circle
-                                                            cx={node.x}
-                                                            cy={node.y}
-                                                            r={circleRadius}
-                                                            fill={FORMATION_TEAM_COLORS.away.node}
-                                                            stroke={FORMATION_TEAM_COLORS.away.border}
-                                                            strokeWidth={0.3}
-                                                            initial={{ scale: 0, opacity: 0 }}
-                                                            animate={{ scale: 1, opacity: 1 }}
-                                                            transition={{ delay: 0.2 + index * 0.03, type: "spring" }}
-                                                        />
-                                                        {/* Jersey number */}
-                                                        <text
-                                                            x={node.x}
-                                                            y={node.y + 0.6}
-                                                            textAnchor="middle"
-                                                            fill="white"
-                                                            fontSize="1.6"
-                                                            fontWeight="bold"
-                                                            fontFamily="Arial"
-                                                            style={{ pointerEvents: 'none' }}
+                                                                    {/* Player name (below circle) */}
+                                                                    <text
+                                                                        x={0}
+                                                                        y={circleRadius + 2.2}
+                                                                        textAnchor="middle"
+                                                                        fill="white"
+                                                                        fontSize="1.4"
+                                                                        fontWeight="500"
+                                                                        fontFamily="system-ui, -apple-system, sans-serif"
+                                                                        stroke="rgba(0,0,0,0.5)"
+                                                                        strokeWidth="0.3"
+                                                                        paintOrder="stroke"
+                                                                        style={{ pointerEvents: 'none' }}
+                                                                    >
+                                                                        {player.name.split(" ").pop()}
+                                                                    </text>
+                                                                </g>
+                                                            ) : (
+                                                                <g transform={`translate(${svgX}, ${svgY})`}>
+                                                                    <circle
+                                                                        cx={0}
+                                                                        cy={0}
+                                                                        r={circleRadius}
+                                                                        fill="rgba(0,0,0,0.2)"
+                                                                        stroke="rgba(255,255,255,0.4)"
+                                                                        strokeWidth={0.2}
+                                                                        strokeDasharray="0.8 0.8"
+                                                                    />
+                                                                    <text
+                                                                        x={0}
+                                                                        y={0.5}
+                                                                        textAnchor="middle"
+                                                                        fill="rgba(255,255,255,0.5)"
+                                                                        fontSize="1.3"
+                                                                    >
+                                                                        {slot.role}
+                                                                    </text>
+                                                                </g>
+                                                            )}
+                                                        </g>
+                                                    );
+                                                })}
+
+                                                {/* Opponent Team Players (right side) - position-based */}
+                                                {opponentNodes.map((node, index) => {
+                                                    const circleRadius = 2.2;
+                                                    const lastName = node.player.name.split(" ").slice(-1)[0];
+
+                                                    return (
+                                                        <g
+                                                            key={node.player.id}
+                                                            style={{ cursor: 'default' }}
                                                         >
-                                                            {node.player.jerseyNumber}
-                                                        </text>
-                                                        {/* Player name */}
-                                                        <text
-                                                            x={node.x}
-                                                            y={node.y - circleRadius - 1.2}
-                                                            textAnchor="middle"
-                                                            dominantBaseline="auto"
-                                                            fontSize="1.4"
-                                                            fontWeight="500"
-                                                            fontFamily="system-ui, -apple-system, sans-serif"
-                                                            fill="white"
-                                                            stroke="rgba(0,0,0,0.5)"
-                                                            strokeWidth="0.3"
-                                                            paintOrder="stroke"
-                                                            style={{ pointerEvents: 'none' }}
-                                                        >
-                                                            {lastName}
-                                                        </text>
-                                                    </g>
-                                                );
-                                            })}
-                                        </TacticalField>
+                                                            {/* Shadow */}
+                                                            <circle
+                                                                cx={node.x}
+                                                                cy={node.y}
+                                                                r={circleRadius + 0.3}
+                                                                fill="rgba(0,0,0,0.3)"
+                                                            />
+                                                            {/* Main circle - opponent red (non-clickable) */}
+                                                            <motion.circle
+                                                                cx={node.x}
+                                                                cy={node.y}
+                                                                r={circleRadius}
+                                                                fill={FORMATION_TEAM_COLORS.away.node}
+                                                                stroke={FORMATION_TEAM_COLORS.away.border}
+                                                                strokeWidth={0.3}
+                                                                initial={{ scale: 0, opacity: 0 }}
+                                                                animate={{ scale: 1, opacity: 1 }}
+                                                                transition={{ delay: 0.2 + index * 0.03, type: "spring" }}
+                                                            />
+                                                            {/* Jersey number */}
+                                                            <text
+                                                                x={node.x}
+                                                                y={node.y + 0.6}
+                                                                textAnchor="middle"
+                                                                fill="white"
+                                                                fontSize="1.6"
+                                                                fontWeight="bold"
+                                                                fontFamily="Arial"
+                                                                style={{ pointerEvents: 'none' }}
+                                                            >
+                                                                {node.player.jerseyNumber}
+                                                            </text>
+                                                            {/* Player name */}
+                                                            <text
+                                                                x={node.x}
+                                                                y={node.y - circleRadius - 1.2}
+                                                                textAnchor="middle"
+                                                                dominantBaseline="auto"
+                                                                fontSize="1.4"
+                                                                fontWeight="500"
+                                                                fontFamily="system-ui, -apple-system, sans-serif"
+                                                                fill="white"
+                                                                stroke="rgba(0,0,0,0.5)"
+                                                                strokeWidth="0.3"
+                                                                paintOrder="stroke"
+                                                                style={{ pointerEvents: 'none' }}
+                                                            >
+                                                                {lastName}
+                                                            </text>
+                                                        </g>
+                                                    );
+                                                })}
+                                            </TacticalField>
 
-                                        {/* Team labels overlay */}
-                                        <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
-                                            <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
-                                                <span
-                                                    className="w-2.5 h-2.5 rounded-full"
-                                                    style={{ backgroundColor: FORMATION_TEAM_COLORS.home.node }}
-                                                />
-                                                <span className="text-xs font-semibold text-white/90">
-                                                    {homeTeamName}
-                                                </span>
-                                            </div>
-                                            {opponentPlayers.length > 0 && (
+                                            {/* Team labels overlay */}
+                                            <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
                                                 <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
                                                     <span
                                                         className="w-2.5 h-2.5 rounded-full"
-                                                        style={{ backgroundColor: FORMATION_TEAM_COLORS.away.node }}
+                                                        style={{ backgroundColor: FORMATION_TEAM_COLORS.home.node }}
                                                     />
                                                     <span className="text-xs font-semibold text-white/90">
-                                                        {opponentTeamName}
+                                                        {homeTeamName}
                                                     </span>
                                                 </div>
-                                            )}
+                                                {opponentPlayers.length > 0 && (
+                                                    <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
+                                                        <span
+                                                            className="w-2.5 h-2.5 rounded-full"
+                                                            style={{ backgroundColor: FORMATION_TEAM_COLORS.away.node }}
+                                                        />
+                                                        <span className="text-xs font-semibold text-white/90">
+                                                            {opponentTeamName}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2720,95 +2751,97 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {/* Goal Pitch Visualization - full field */}
-                                <div className="relative w-full max-w-3xl mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 aspect-[16/10]">
-                                    <TacticalField
-                                        viewMode="full"
-                                        className="w-full h-full"
-                                        interactive
-                                    >
-                                        {/* Half dimming overlay — dims the INACTIVE half */}
-                                        {goalHalfFilter === '1st' && (
-                                            <rect x={52.5} y={-6} width={56} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
-                                        )}
-                                        {goalHalfFilter === '2nd' && (
-                                            <rect x={-8} y={-6} width={60.5} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
-                                        )}
-
-                                        {/* Current Goal Animation */}
-                                        <AnimatePresence mode="wait">
-                                            {currentGoal && (
-                                                <g key={`${currentGoal.matchId}-${currentGoal.minute}`}>
-                                                    {(() => {
-                                                        // Map normalised event coords (0-100) to full pitch SVG coords
-                                                        const svgX = (currentGoal.event.x / 100) * 105;
-                                                        const svgY = (currentGoal.event.y / 100) * 68;
-                                                        // Goal on the right side
-                                                        const goalX = 105;
-                                                        const goalY = 34;
-
-                                                        return (
-                                                            <>
-                                                                {/* Shot trajectory line */}
-                                                                <motion.line
-                                                                    x1={svgX} y1={svgY} x2={goalX} y2={goalY}
-                                                                    stroke="hsl(var(--destructive))"
-                                                                    strokeWidth="0.5"
-                                                                    strokeDasharray="1.5 0.8"
-                                                                    initial={{ pathLength: 0, opacity: 0 }}
-                                                                    animate={{ pathLength: 1, opacity: 1 }}
-                                                                    transition={{ duration: 0.8, ease: "easeOut" }}
-                                                                />
-
-                                                                {/* Shooter circle — click to go to player shot map */}
-                                                                <motion.g
-                                                                    initial={{ scale: 0 }}
-                                                                    animate={{ scale: 1 }}
-                                                                    transition={{ delay: 0.2, type: "spring" }}
-                                                                    style={{ cursor: 'pointer' }}
-                                                                    onClick={() => {
-                                                                        // Stamp current URL with #goals so back-button returns to this section
-                                                                        window.history.replaceState(null, '', '/team#goals');
-                                                                        navigate(`/player/${currentGoal.scorer.id}#shots`);
-                                                                    }}
-                                                                >
-                                                                    <circle cx={svgX} cy={svgY} r={2.2}
-                                                                        fill="hsl(var(--destructive))" fillOpacity={0.9}
-                                                                        stroke="hsl(var(--destructive))" strokeWidth="0.3"
-                                                                    />
-                                                                    <text x={svgX} y={svgY + 0.5}
-                                                                        textAnchor="middle" fill="white"
-                                                                        fontSize="1.4" fontWeight="bold" fontFamily="Arial"
-                                                                    >
-                                                                        {currentGoal.scorer.jerseyNumber}
-                                                                    </text>
-                                                                </motion.g>
-
-                                                                {/* Ball in net */}
-                                                                <motion.circle
-                                                                    cx={goalX} cy={goalY} r={1}
-                                                                    fill="white" stroke="black" strokeWidth="0.15"
-                                                                    initial={{ scale: 0, opacity: 0 }}
-                                                                    animate={{ scale: 1, opacity: 1 }}
-                                                                    transition={{ delay: 0.8, type: "spring" }}
-                                                                />
-
-                                                                {/* Scorer label below circle */}
-                                                                <motion.text
-                                                                    x={svgX} y={svgY + 4}
-                                                                    textAnchor="middle" fill="white"
-                                                                    fontSize="1.8" fontWeight="600" fontFamily="Arial"
-                                                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                                                    transition={{ delay: 0.4 }}
-                                                                >
-                                                                    {currentGoal.scorer.name.split(' ').pop()} {currentGoal.minute}'
-                                                                </motion.text>
-                                                            </>
-                                                        );
-                                                    })()}
-                                                </g>
+                                <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
+                                    <div className="relative w-full max-w-3xl mx-auto rounded-xl border border-border overflow-hidden bg-muted/20 min-w-[600px] md:min-w-0 aspect-[16/10]">
+                                        <TacticalField
+                                            viewMode="full"
+                                            className="w-full h-full"
+                                            interactive
+                                        >
+                                            {/* Half dimming overlay — dims the INACTIVE half */}
+                                            {goalHalfFilter === '1st' && (
+                                                <rect x={52.5} y={-6} width={56} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
                                             )}
-                                        </AnimatePresence>
-                                    </TacticalField>
+                                            {goalHalfFilter === '2nd' && (
+                                                <rect x={-8} y={-6} width={60.5} height={80} fill="black" fillOpacity={0.5} rx={0} style={{ pointerEvents: 'none' }} />
+                                            )}
+
+                                            {/* Current Goal Animation */}
+                                            <AnimatePresence mode="wait">
+                                                {currentGoal && (
+                                                    <g key={`${currentGoal.matchId}-${currentGoal.minute}`}>
+                                                        {(() => {
+                                                            // Map normalised event coords (0-100) to full pitch SVG coords
+                                                            const svgX = (currentGoal.event.x / 100) * 105;
+                                                            const svgY = (currentGoal.event.y / 100) * 68;
+                                                            // Goal on the right side
+                                                            const goalX = 105;
+                                                            const goalY = 34;
+
+                                                            return (
+                                                                <>
+                                                                    {/* Shot trajectory line */}
+                                                                    <motion.line
+                                                                        x1={svgX} y1={svgY} x2={goalX} y2={goalY}
+                                                                        stroke="hsl(var(--destructive))"
+                                                                        strokeWidth="0.5"
+                                                                        strokeDasharray="1.5 0.8"
+                                                                        initial={{ pathLength: 0, opacity: 0 }}
+                                                                        animate={{ pathLength: 1, opacity: 1 }}
+                                                                        transition={{ duration: 0.8, ease: "easeOut" }}
+                                                                    />
+
+                                                                    {/* Shooter circle — click to go to player shot map */}
+                                                                    <motion.g
+                                                                        initial={{ scale: 0 }}
+                                                                        animate={{ scale: 1 }}
+                                                                        transition={{ delay: 0.2, type: "spring" }}
+                                                                        style={{ cursor: 'pointer' }}
+                                                                        onClick={() => {
+                                                                            // Stamp current URL with #goals so back-button returns to this section
+                                                                            window.history.replaceState(null, '', '/team#goals');
+                                                                            navigate(`/player/${currentGoal.scorer.id}#shots`);
+                                                                        }}
+                                                                    >
+                                                                        <circle cx={svgX} cy={svgY} r={2.2}
+                                                                            fill="hsl(var(--destructive))" fillOpacity={0.9}
+                                                                            stroke="hsl(var(--destructive))" strokeWidth="0.3"
+                                                                        />
+                                                                        <text x={svgX} y={svgY + 0.5}
+                                                                            textAnchor="middle" fill="white"
+                                                                            fontSize="1.4" fontWeight="bold" fontFamily="Arial"
+                                                                        >
+                                                                            {currentGoal.scorer.jerseyNumber}
+                                                                        </text>
+                                                                    </motion.g>
+
+                                                                    {/* Ball in net */}
+                                                                    <motion.circle
+                                                                        cx={goalX} cy={goalY} r={1}
+                                                                        fill="white" stroke="black" strokeWidth="0.15"
+                                                                        initial={{ scale: 0, opacity: 0 }}
+                                                                        animate={{ scale: 1, opacity: 1 }}
+                                                                        transition={{ delay: 0.8, type: "spring" }}
+                                                                    />
+
+                                                                    {/* Scorer label below circle */}
+                                                                    <motion.text
+                                                                        x={svgX} y={svgY + 4}
+                                                                        textAnchor="middle" fill="white"
+                                                                        fontSize="1.8" fontWeight="600" fontFamily="Arial"
+                                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                                        transition={{ delay: 0.4 }}
+                                                                    >
+                                                                        {currentGoal.scorer.name.split(' ').pop()} {currentGoal.minute}'
+                                                                    </motion.text>
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </g>
+                                                )}
+                                            </AnimatePresence>
+                                        </TacticalField>
+                                    </div>
                                 </div>
 
                                 {/* Goal counter */}

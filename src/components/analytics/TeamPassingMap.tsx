@@ -575,197 +575,199 @@ const TeamPassingMap = ({
     return (
         <div className="space-y-4">
             {/* Pitch */}
-            <div
-                ref={containerRef}
-                className="relative w-full mx-auto rounded-xl overflow-hidden border border-border shadow-xl aspect-[105/68]"
-            >
-                <TacticalField viewMode="full" className="absolute inset-0 w-full h-full">
-                    {/* Pass lines */}
-                    {visibleConnections.map((conn, i) => {
-                        const from = nodePositions.get(conn.fromId);
-                        const to = nodePositions.get(conn.toId);
-                        if (!from || !to) return null;
+            <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 md:mx-0 md:px-0 scrollbar-hide">
+                <div
+                    ref={containerRef}
+                    className="relative w-full mx-auto rounded-xl overflow-hidden border border-border shadow-xl min-w-[600px] md:min-w-0 aspect-[105/68]"
+                >
+                    <TacticalField viewMode="full" className="absolute inset-0 w-full h-full">
+                        {/* Pass lines */}
+                        {visibleConnections.map((conn, i) => {
+                            const from = nodePositions.get(conn.fromId);
+                            const to = nodePositions.get(conn.toId);
+                            if (!from || !to) return null;
 
-                        const palette = teamColorMap.get(conn.teamId);
-                        if (!palette) return null;
+                            const palette = teamColorMap.get(conn.teamId);
+                            if (!palette) return null;
 
-                        const w =
-                            MIN_LINE_W +
-                            (conn.total / maxConnPasses) * (MAX_LINE_W - MIN_LINE_W);
+                            const w =
+                                MIN_LINE_W +
+                                (conn.total / maxConnPasses) * (MAX_LINE_W - MIN_LINE_W);
 
-                        const isHovered =
-                            hoveredConn?.fromId === conn.fromId &&
-                            hoveredConn?.toId === conn.toId;
-                        const isNodeHov =
-                            hoveredNodeId === conn.fromId || hoveredNodeId === conn.toId;
-                        const isDimmed =
-                            selectedPlayerIds.size > 0 &&
-                            !selectedPlayerIds.has(conn.fromId) &&
-                            !selectedPlayerIds.has(conn.toId);
+                            const isHovered =
+                                hoveredConn?.fromId === conn.fromId &&
+                                hoveredConn?.toId === conn.toId;
+                            const isNodeHov =
+                                hoveredNodeId === conn.fromId || hoveredNodeId === conn.toId;
+                            const isDimmed =
+                                selectedPlayerIds.size > 0 &&
+                                !selectedPlayerIds.has(conn.fromId) &&
+                                !selectedPlayerIds.has(conn.toId);
 
-                        const stroke = isHovered
-                            ? palette.lineHover
-                            : isNodeHov
+                            const stroke = isHovered
                                 ? palette.lineHover
-                                : isDimmed
-                                    ? "rgba(255,255,255,0.05)"
-                                    : palette.line;
+                                : isNodeHov
+                                    ? palette.lineHover
+                                    : isDimmed
+                                        ? "rgba(255,255,255,0.05)"
+                                        : palette.line;
 
-                        return (
-                            <line
-                                key={`l-${i}`}
-                                x1={from.x}
-                                y1={from.y}
-                                x2={to.x}
-                                y2={to.y}
-                                stroke={stroke}
-                                strokeWidth={isHovered ? w * 1.3 : w}
-                                strokeLinecap="round"
-                                style={{ cursor: "pointer", transition: "stroke 0.15s" }}
-                                onMouseMove={(e) => handleConnHover(conn, e)}
-                                onMouseLeave={() => handleConnHover(null)}
-                            />
-                        );
-                    })}
+                            return (
+                                <line
+                                    key={`l-${i}`}
+                                    x1={from.x}
+                                    y1={from.y}
+                                    x2={to.x}
+                                    y2={to.y}
+                                    stroke={stroke}
+                                    strokeWidth={isHovered ? w * 1.3 : w}
+                                    strokeLinecap="round"
+                                    style={{ cursor: "pointer", transition: "stroke 0.15s" }}
+                                    onMouseMove={(e) => handleConnHover(conn, e)}
+                                    onMouseLeave={() => handleConnHover(null)}
+                                />
+                            );
+                        })}
 
-                    {/* Player nodes */}
-                    {playerNodes.map((node) => {
-                        const pos = nodePositions.get(node.player.id);
-                        if (!pos) return null;
+                        {/* Player nodes */}
+                        {playerNodes.map((node) => {
+                            const pos = nodePositions.get(node.player.id);
+                            if (!pos) return null;
 
-                        const palette = teamColorMap.get(node.teamId);
-                        if (!palette) return null;
+                            const palette = teamColorMap.get(node.teamId);
+                            if (!palette) return null;
 
-                        const dimmed = isNodeDimmed(node.player.id);
-                        const isSelected = selectedPlayerIds.has(node.player.id);
-                        const isHovered = hoveredNodeId === node.player.id;
-                        const lastName = node.player.name.split(" ").slice(-1)[0];
+                            const dimmed = isNodeDimmed(node.player.id);
+                            const isSelected = selectedPlayerIds.has(node.player.id);
+                            const isHovered = hoveredNodeId === node.player.id;
+                            const lastName = node.player.name.split(" ").slice(-1)[0];
 
-                        return (
-                            <g
-                                key={node.player.id}
-                                style={{ cursor: "pointer" }}
-                                opacity={dimmed ? 0.15 : 1}
-                                onClick={() => togglePlayer(node.player.id)}
-                                onMouseMove={(e) => handleNodeHover(node.player.id, e)}
-                                onMouseLeave={() => handleNodeHover(null)}
-                            >
-                                {(isSelected || isHovered) && (
+                            return (
+                                <g
+                                    key={node.player.id}
+                                    style={{ cursor: "pointer" }}
+                                    opacity={dimmed ? 0.15 : 1}
+                                    onClick={() => togglePlayer(node.player.id)}
+                                    onMouseMove={(e) => handleNodeHover(node.player.id, e)}
+                                    onMouseLeave={() => handleNodeHover(null)}
+                                >
+                                    {(isSelected || isHovered) && (
+                                        <circle
+                                            cx={pos.x}
+                                            cy={pos.y}
+                                            r={NODE_R + 0.8}
+                                            fill="none"
+                                            stroke="white"
+                                            strokeWidth="0.4"
+                                            opacity={0.85}
+                                        />
+                                    )}
                                     <circle
                                         cx={pos.x}
                                         cy={pos.y}
-                                        r={NODE_R + 0.8}
-                                        fill="none"
-                                        stroke="white"
-                                        strokeWidth="0.4"
-                                        opacity={0.85}
+                                        r={NODE_R}
+                                        fill={palette.node}
+                                        stroke={palette.border}
+                                        strokeWidth="0.3"
                                     />
-                                )}
-                                <circle
-                                    cx={pos.x}
-                                    cy={pos.y}
-                                    r={NODE_R}
-                                    fill={palette.node}
-                                    stroke={palette.border}
-                                    strokeWidth="0.3"
-                                />
-                                <text
-                                    x={pos.x}
-                                    y={pos.y - NODE_R - 1.2}
-                                    textAnchor="middle"
-                                    dominantBaseline="auto"
-                                    fontSize="2"
-                                    fontWeight="500"
-                                    fontFamily="system-ui, -apple-system, sans-serif"
-                                    fill="white"
-                                    stroke="rgba(0,0,0,0.5)"
-                                    strokeWidth="0.3"
-                                    paintOrder="stroke"
-                                >
-                                    {lastName}
-                                </text>
-                            </g>
-                        );
-                    })}
-                </TacticalField>
+                                    <text
+                                        x={pos.x}
+                                        y={pos.y - NODE_R - 1.2}
+                                        textAnchor="middle"
+                                        dominantBaseline="auto"
+                                        fontSize="2"
+                                        fontWeight="500"
+                                        fontFamily="system-ui, -apple-system, sans-serif"
+                                        fill="white"
+                                        stroke="rgba(0,0,0,0.5)"
+                                        strokeWidth="0.3"
+                                        paintOrder="stroke"
+                                    >
+                                        {lastName}
+                                    </text>
+                                </g>
+                            );
+                        })}
+                    </TacticalField>
 
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-black/[0.04] pointer-events-none" />
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-black/[0.04] pointer-events-none" />
 
-                {/* Team label (home team only) */}
-                {teamColorMap.size > 0 && (() => {
-                    const homePalette = [...teamColorMap.entries()].find(([, p]) => p.isHome)?.[1];
-                    if (!homePalette) return null;
-                    return (
-                        <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
-                            <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
-                                <span
-                                    className="w-2.5 h-2.5 rounded-full"
-                                    style={{ backgroundColor: homePalette.node }}
-                                />
-                                <span className="text-xs font-semibold text-white/90">
-                                    {homePalette.teamName}
-                                </span>
-                            </div>
-                        </div>
-                    );
-                })()}
-
-                {/* Empty state */}
-                {playerNodes.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                        <p className="text-white/60 text-sm font-medium bg-black/30 px-4 py-2 rounded-lg">
-                            No player data available
-                        </p>
-                    </div>
-                )}
-
-                {/* Tooltip — connection */}
-                {hoveredConn && (
-                    <div
-                        className="absolute pointer-events-none z-50 px-3 py-2 rounded-lg bg-popover/95 backdrop-blur border border-border shadow-xl"
-                        style={{
-                            left: tooltipPos.x,
-                            top: tooltipPos.y,
-                            transform: "translate(-50%, -100%)",
-                        }}
-                    >
-                        <p className="font-semibold text-foreground text-xs">
-                            {hoveredConn.fromName.split(" ").slice(-1)[0]} ↔{" "}
-                            {hoveredConn.toName.split(" ").slice(-1)[0]}:{" "}
-                            <span className="text-primary">{hoveredConn.total} passes</span>
-                        </p>
-                    </div>
-                )}
-
-                {/* Tooltip — node */}
-                {hoveredNodeId &&
-                    !hoveredConn &&
-                    (() => {
-                        const node = playerNodes.find((n) => n.player.id === hoveredNodeId);
-                        if (!node) return null;
+                    {/* Team label (home team only) */}
+                    {teamColorMap.size > 0 && (() => {
+                        const homePalette = [...teamColorMap.entries()].find(([, p]) => p.isHome)?.[1];
+                        if (!homePalette) return null;
                         return (
-                            <div
-                                className="absolute pointer-events-none z-50 px-3 py-2 rounded-lg bg-popover/95 backdrop-blur border border-border shadow-xl"
-                                style={{
-                                    left: tooltipPos.x,
-                                    top: tooltipPos.y,
-                                    transform: "translate(-50%, -100%)",
-                                }}
-                            >
-                                <p className="font-semibold text-foreground text-xs">
-                                    {node.player.name}{" "}
-                                    <span className="text-muted-foreground">
-                                        #{node.player.jerseyNumber}
+                            <div className="absolute top-3 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none select-none px-4">
+                                <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full">
+                                    <span
+                                        className="w-2.5 h-2.5 rounded-full"
+                                        style={{ backgroundColor: homePalette.node }}
+                                    />
+                                    <span className="text-xs font-semibold text-white/90">
+                                        {homePalette.teamName}
                                     </span>
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {node.player.position} • {node.passCount} passes •{" "}
-                                    {node.player.team}
-                                </p>
+                                </div>
                             </div>
                         );
                     })()}
+
+                    {/* Empty state */}
+                    {playerNodes.length === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                            <p className="text-white/60 text-sm font-medium bg-black/30 px-4 py-2 rounded-lg">
+                                No player data available
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Tooltip — connection */}
+                    {hoveredConn && (
+                        <div
+                            className="absolute pointer-events-none z-50 px-3 py-2 rounded-lg bg-popover/95 backdrop-blur border border-border shadow-xl"
+                            style={{
+                                left: tooltipPos.x,
+                                top: tooltipPos.y,
+                                transform: "translate(-50%, -100%)",
+                            }}
+                        >
+                            <p className="font-semibold text-foreground text-xs">
+                                {hoveredConn.fromName.split(" ").slice(-1)[0]} ↔{" "}
+                                {hoveredConn.toName.split(" ").slice(-1)[0]}:{" "}
+                                <span className="text-primary">{hoveredConn.total} passes</span>
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Tooltip — node */}
+                    {hoveredNodeId &&
+                        !hoveredConn &&
+                        (() => {
+                            const node = playerNodes.find((n) => n.player.id === hoveredNodeId);
+                            if (!node) return null;
+                            return (
+                                <div
+                                    className="absolute pointer-events-none z-50 px-3 py-2 rounded-lg bg-popover/95 backdrop-blur border border-border shadow-xl"
+                                    style={{
+                                        left: tooltipPos.x,
+                                        top: tooltipPos.y,
+                                        transform: "translate(-50%, -100%)",
+                                    }}
+                                >
+                                    <p className="font-semibold text-foreground text-xs">
+                                        {node.player.name}{" "}
+                                        <span className="text-muted-foreground">
+                                            #{node.player.jerseyNumber}
+                                        </span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {node.player.position} • {node.passCount} passes •{" "}
+                                        {node.player.team}
+                                    </p>
+                                </div>
+                            );
+                        })()}
+                </div>
             </div>
 
             {/* Time controls */}

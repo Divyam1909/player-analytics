@@ -78,7 +78,7 @@ const CompareModal = ({ isOpen, onClose, players, initialPlayer }: CompareModalP
                 </DialogHeader>
 
                 {/* Player Selection */}
-                <div className="grid grid-cols-2 gap-6 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">Player 1</label>
                         <Select value={player1Id} onValueChange={setPlayer1Id}>

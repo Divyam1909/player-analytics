@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -57,7 +57,24 @@ const menuItems: MenuItem[] = [
 const Sidebar = ({ className }: SidebarProps) => {
     const location = useLocation();
     const [expandedItems, setExpandedItems] = useState<string[]>(['Matches']);
-    const { isCollapsed, toggleSidebar } = useSidebarContext();
+    const { isCollapsed, toggleSidebar, setCollapsed } = useSidebarContext();
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Close sidebar on mobile when navigating
+    useEffect(() => {
+        if (isMobile && !isCollapsed) {
+            setCollapsed(true);
+        }
+    }, [location.pathname, isMobile, isCollapsed, setCollapsed]);
 
     const toggleExpand = (label: string) => {
         if (isCollapsed) return; // Don't expand when collapsed
@@ -79,146 +96,160 @@ const Sidebar = ({ className }: SidebarProps) => {
     };
 
     return (
-        <motion.aside
-            className={cn(
-                "fixed left-0 top-0 bottom-0 bg-card border-r border-border z-40 overflow-y-auto overflow-x-hidden",
-                className
-            )}
-            animate={{ width: isCollapsed ? 64 : 256 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-        >
-            <div className="p-3 h-full flex flex-col">
-                {/* Collapse Toggle at top */}
-                <div className={cn(
-                    "flex mb-4",
-                    isCollapsed ? "justify-center" : "justify-end"
-                )}>
-                    <button
-                        onClick={toggleSidebar}
-                        className="p-1.5 rounded-md transition-colors text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center gap-1.5"
-                        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    >
-                        {isCollapsed ? (
-                            <ChevronRight className="w-4 h-4" />
-                        ) : (
-                            <>
-                                <span className="text-xs font-medium">Collapse</span>
-                                <ChevronLeft className="w-4 h-4" />
-                            </>
-                        )}
-                    </button>
-                </div>
+        <>
+            <AnimatePresence>
+                {!isCollapsed && isMobile && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setCollapsed(true)}
+                        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+                    />
+                )}
+            </AnimatePresence>
+            <motion.aside
+                className={cn(
+                    "fixed left-0 top-0 bottom-0 bg-card border-r border-border z-50 overflow-y-auto overflow-x-hidden transition-transform duration-300",
+                    isCollapsed ? "max-md:-translate-x-full" : "max-md:translate-x-0",
+                    className
+                )}
+                animate={{ width: isMobile ? 256 : (isCollapsed ? 64 : 256) }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+            >
+                <div className="p-3 h-full flex flex-col min-w-[256px] md:min-w-0">
+                    {/* Collapse Toggle at top */}
+                    <div className={cn(
+                        "flex mb-4",
+                        isMobile ? "justify-end hidden md:flex" : (isCollapsed ? "justify-center" : "justify-end")
+                    )}>
+                        <button
+                            onClick={toggleSidebar}
+                            className="p-1.5 rounded-md transition-colors text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center gap-1.5"
+                            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                        >
+                            {isCollapsed ? (
+                                <ChevronRight className="w-4 h-4" />
+                            ) : (
+                                <>
+                                    <span className="text-xs font-medium">Collapse</span>
+                                    <ChevronLeft className="w-4 h-4" />
+                                </>
+                            )}
+                        </button>
+                    </div>
 
-                {/* Navigation */}
-                <nav className="space-y-1 flex-1">
-                    {menuItems.map((item) => (
-                        <div key={item.label}>
-                            {item.children ? (
-                                // Dropdown item
-                                <div>
-                                    <button
-                                        onClick={() => toggleExpand(item.label)}
+                    {/* Navigation */}
+                    <nav className="space-y-1 flex-1">
+                        {menuItems.map((item) => (
+                            <div key={item.label}>
+                                {item.children ? (
+                                    // Dropdown item
+                                    <div>
+                                        <button
+                                            onClick={() => toggleExpand(item.label)}
+                                            className={cn(
+                                                "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-left",
+                                                isCollapsed ? "justify-center" : "justify-between",
+                                                isChildActive(item.children)
+                                                    ? "bg-primary/10 text-primary"
+                                                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                            )}
+                                            title={isCollapsed ? item.label : undefined}
+                                        >
+                                            <div className={cn(
+                                                "flex items-center gap-3",
+                                                isCollapsed && "justify-center"
+                                            )}>
+                                                {item.icon}
+                                                <AnimatePresence>
+                                                    {!isCollapsed && (
+                                                        <motion.span
+                                                            initial={{ opacity: 0, width: 0 }}
+                                                            animate={{ opacity: 1, width: "auto" }}
+                                                            exit={{ opacity: 0, width: 0 }}
+                                                            transition={{ duration: 0.2 }}
+                                                            className="text-[15px] font-medium whitespace-nowrap overflow-hidden"
+                                                        >
+                                                            {item.label}
+                                                        </motion.span>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                            {!isCollapsed && (
+                                                <motion.div
+                                                    animate={{ rotate: expandedItems.includes(item.label) ? 180 : 0 }}
+                                                    transition={{ duration: 0.2 }}
+                                                >
+                                                    <ChevronDown className="w-4 h-4" />
+                                                </motion.div>
+                                            )}
+                                        </button>
+                                        <AnimatePresence>
+                                            {expandedItems.includes(item.label) && !isCollapsed && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.2 }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
+                                                        {item.children.map((child) => (
+                                                            <Link
+                                                                key={child.href}
+                                                                to={child.href}
+                                                                className={cn(
+                                                                    "flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-[14px]",
+                                                                    isActive(child.href)
+                                                                        ? "bg-primary/10 text-primary"
+                                                                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                                                )}
+                                                            >
+                                                                {child.icon}
+                                                                <span>{child.label}</span>
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                ) : (
+                                    // Regular link item
+                                    <Link
+                                        to={item.href!}
                                         className={cn(
-                                            "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-left",
-                                            isCollapsed ? "justify-center" : "justify-between",
-                                            isChildActive(item.children)
+                                            "flex items-center gap-3 px-3 py-3 rounded-lg transition-colors",
+                                            isCollapsed && "justify-center",
+                                            isActive(item.href)
                                                 ? "bg-primary/10 text-primary"
                                                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                                         )}
                                         title={isCollapsed ? item.label : undefined}
                                     >
-                                        <div className={cn(
-                                            "flex items-center gap-3",
-                                            isCollapsed && "justify-center"
-                                        )}>
-                                            {item.icon}
-                                            <AnimatePresence>
-                                                {!isCollapsed && (
-                                                    <motion.span
-                                                        initial={{ opacity: 0, width: 0 }}
-                                                        animate={{ opacity: 1, width: "auto" }}
-                                                        exit={{ opacity: 0, width: 0 }}
-                                                        transition={{ duration: 0.2 }}
-                                                        className="text-[15px] font-medium whitespace-nowrap overflow-hidden"
-                                                    >
-                                                        {item.label}
-                                                    </motion.span>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
-                                        {!isCollapsed && (
-                                            <motion.div
-                                                animate={{ rotate: expandedItems.includes(item.label) ? 180 : 0 }}
-                                                transition={{ duration: 0.2 }}
-                                            >
-                                                <ChevronDown className="w-4 h-4" />
-                                            </motion.div>
-                                        )}
-                                    </button>
-                                    <AnimatePresence>
-                                        {expandedItems.includes(item.label) && !isCollapsed && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                transition={{ duration: 0.2 }}
-                                                className="overflow-hidden"
-                                            >
-                                                <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
-                                                    {item.children.map((child) => (
-                                                        <Link
-                                                            key={child.href}
-                                                            to={child.href}
-                                                            className={cn(
-                                                                "flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-[14px]",
-                                                                isActive(child.href)
-                                                                    ? "bg-primary/10 text-primary"
-                                                                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                                            )}
-                                                        >
-                                                            {child.icon}
-                                                            <span>{child.label}</span>
-                                                        </Link>
-                                                    ))}
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            ) : (
-                                // Regular link item
-                                <Link
-                                    to={item.href!}
-                                    className={cn(
-                                        "flex items-center gap-3 px-3 py-3 rounded-lg transition-colors",
-                                        isCollapsed && "justify-center",
-                                        isActive(item.href)
-                                            ? "bg-primary/10 text-primary"
-                                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                    )}
-                                    title={isCollapsed ? item.label : undefined}
-                                >
-                                    {item.icon}
-                                    <AnimatePresence>
-                                        {!isCollapsed && (
-                                            <motion.span
-                                                initial={{ opacity: 0, width: 0 }}
-                                                animate={{ opacity: 1, width: "auto" }}
-                                                exit={{ opacity: 0, width: 0 }}
-                                                transition={{ duration: 0.2 }}
-                                                className="text-[15px] font-medium whitespace-nowrap overflow-hidden"
-                                            >
-                                                {item.label}
-                                            </motion.span>
-                                        )}
-                                    </AnimatePresence>
-                                </Link>
-                            )}
-                        </div>
-                    ))}
-                </nav>
-            </div>
-        </motion.aside>
+                                        {item.icon}
+                                        <AnimatePresence>
+                                            {!isCollapsed && (
+                                                <motion.span
+                                                    initial={{ opacity: 0, width: 0 }}
+                                                    animate={{ opacity: 1, width: "auto" }}
+                                                    exit={{ opacity: 0, width: 0 }}
+                                                    transition={{ duration: 0.2 }}
+                                                    className="text-[15px] font-medium whitespace-nowrap overflow-hidden"
+                                                >
+                                                    {item.label}
+                                                </motion.span>
+                                            )}
+                                        </AnimatePresence>
+                                    </Link>
+                                )}
+                            </div>
+                        ))}
+                    </nav>
+                </div>
+            </motion.aside>
+        </>
     );
 };
 

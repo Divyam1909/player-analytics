@@ -103,7 +103,7 @@ const MatchSchedule = () => {
 
             <main className={cn(
                 "pt-24 pb-12 px-6 transition-all duration-300",
-                isCollapsed ? "ml-16" : "ml-64"
+                isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Header */}
@@ -143,7 +143,7 @@ const MatchSchedule = () => {
 
                     {/* Stats Row */}
                     <motion.div
-                        className="grid grid-cols-4 gap-4 mb-8"
+                        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}

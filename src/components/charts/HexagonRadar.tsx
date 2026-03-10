@@ -132,7 +132,11 @@ const HexagonRadar = ({
 
     return (
         <div className="relative flex flex-col items-center">
-            <svg width={size} height={size} className="mx-auto overflow-visible">
+            <svg
+                viewBox={`0 0 ${size} ${size}`}
+                className="mx-auto overflow-visible w-full h-auto"
+                style={{ maxWidth: size, maxHeight: size }}
+            >
                 {/* Defs for gradients and filters */}
                 <defs>
                     <linearGradient id="teamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -367,19 +371,19 @@ const HexagonRadar = ({
             {/* Legend - Improved styling */}
             <div className="flex items-center justify-center gap-8 mt-2 px-4 py-2 rounded-lg bg-secondary/30">
                 <div className="flex items-center gap-2">
-                    <div 
-                        className="w-3.5 h-3.5 rounded-full shadow-md" 
-                        style={{ 
+                    <div
+                        className="w-3.5 h-3.5 rounded-full shadow-md"
+                        style={{
                             backgroundColor: useComparisonColors ? TEAM_COLORS.home : 'hsl(var(--primary))',
                             boxShadow: useComparisonColors ? `0 4px 6px ${TEAM_COLORS.home}40` : undefined
-                        }} 
+                        }}
                     />
                     <span className="text-xs text-foreground font-medium">{teamName}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div 
-                        className="w-3.5 h-3.5 rounded-full" 
-                        style={{ backgroundColor: useComparisonColors ? TEAM_COLORS.away : 'hsl(var(--muted-foreground) / 0.6)' }} 
+                    <div
+                        className="w-3.5 h-3.5 rounded-full"
+                        style={{ backgroundColor: useComparisonColors ? TEAM_COLORS.away : 'hsl(var(--muted-foreground) / 0.6)' }}
                     />
                     <span className="text-xs text-muted-foreground">{opponentName}</span>
                 </div>

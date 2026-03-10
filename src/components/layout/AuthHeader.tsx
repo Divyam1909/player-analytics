@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Sun, Monitor, LogOut, ArrowLeft } from 'lucide-react';
+import { Moon, Sun, Monitor, LogOut, ArrowLeft, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,7 +31,7 @@ interface AuthHeaderProps {
 const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOptions, selectedMatchId, onMatchChange }: AuthHeaderProps) => {
     const { theme, setTheme, resolvedTheme } = useTheme();
     const { user, logout } = useAuth();
-    const { isCollapsed } = useSidebarContext();
+    const { isCollapsed, toggleSidebar } = useSidebarContext();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -48,40 +48,50 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
     };
 
     return (
-        <header 
+        <header
             className={cn(
                 "fixed top-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl transition-all duration-300",
-                isCollapsed ? "left-16" : "left-64"
+                isCollapsed ? "md:left-16 left-0" : "md:left-64 left-0"
             )}
         >
-            <div className="container mx-auto px-6">
-                <div className="flex h-16 items-center justify-between">
+            <div className="container mx-auto px-4 sm:px-6">
+                <div className="flex h-14 sm:h-16 items-center justify-between">
                     {/* Left Side - Logo, Back Button & Page Title */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+                        {/* Mobile Menu Button */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleSidebar}
+                            className="md:hidden text-muted-foreground shrink-0 w-8 h-8"
+                        >
+                            <Menu className="w-5 h-5" />
+                        </Button>
+
                         {/* Logo */}
-                        <Link to="/dashboard" className="flex items-center gap-2">
+                        <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
                             <img
                                 src="/image.png"
                                 alt="Thinking Engines"
-                                className="w-8 h-8 rounded-lg object-cover"
+                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover"
                             />
                         </Link>
 
                         {/* Divider */}
-                        <div className="h-6 w-px bg-border" />
+                        <div className="hidden sm:block h-6 w-px bg-border shrink-0" />
 
                         {showBack && (
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={handleBack}
-                                className="gap-2 text-muted-foreground hover:text-foreground"
+                                className="gap-1 sm:gap-2 text-muted-foreground hover:text-foreground px-2 sm:px-3 shrink-0"
                             >
                                 <ArrowLeft className="w-4 h-4" />
                                 <span className="hidden sm:inline">Back</span>
                             </Button>
                         )}
-                        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+                        <h1 className="text-sm sm:text-xl font-semibold text-foreground truncate max-w-[120px] sm:max-w-[200px]">{title}</h1>
 
                         {/* Match Selector Dropdown */}
                         {matchOptions && matchOptions.length > 0 && onMatchChange && (
@@ -124,10 +134,10 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
                     </div>
 
                     {/* Right Side */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1 sm:gap-4">
                         {/* User Email */}
                         {user && (
-                            <span className="text-sm text-muted-foreground hidden sm:block">
+                            <span className="text-xs sm:text-sm text-muted-foreground hidden lg:block">
                                 {user.email}
                             </span>
                         )}

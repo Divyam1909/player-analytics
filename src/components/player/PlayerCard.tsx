@@ -156,7 +156,7 @@ const PlayerCard = ({ player, onCompare, statFilter = "none", matchId }: PlayerC
             {/* Attributes or Filtered Stats */}
             {statFilter === "none" ? (
               <>
-                <div className="mt-4 grid grid-cols-5 gap-3">
+                <div className="mt-4 flex flex-wrap justify-center sm:grid sm:grid-cols-5 gap-3">
                   {Object.entries(player.attributes).map(([key, value]) => (
                     <div key={key} className="text-center">
                       <div className={cn("text-lg font-bold", getRatingColor(value))}>
