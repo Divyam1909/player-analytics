@@ -127,28 +127,28 @@ const UpcomingMatches = () => {
             <Sidebar />
 
             <main className={cn(
-                "pt-24 pb-12 px-6 transition-all duration-300",
+                "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Header */}
                     <motion.div
-                        className="mb-8"
+                        className="mb-6 sm:mb-8"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <h1 className="text-3xl font-bold text-foreground mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                             Upcoming <span className="text-primary">Matches</span>
                         </h1>
-                        <p className="text-muted-foreground">
+                        <p className="text-sm sm:text-base text-muted-foreground">
                             View and prepare for your next {upcomingMatchesData.length} fixtures
                         </p>
                     </motion.div>
 
                     {/* Summary Cards */}
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
+                        className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8"
                         variants={containerVariants}
                         initial="hidden"
                         animate="show"
@@ -200,53 +200,56 @@ const UpcomingMatches = () => {
                                     )}>
                                         <CardContent className="p-0">
                                             {/* Main Row */}
-                                            <div className="p-5 flex items-center gap-6">
-                                                {/* Date Badge */}
-                                                <div className="flex-shrink-0 text-center">
-                                                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex flex-col items-center justify-center">
-                                                        <span className="text-xs text-muted-foreground uppercase">
-                                                            {new Date(match.date).toLocaleDateString('en-US', { month: 'short' })}
-                                                        </span>
-                                                        <span className="text-2xl font-bold text-primary">
-                                                            {new Date(match.date).getDate()}
-                                                        </span>
+                                            <div className="p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+                                                {/* Date Badge + Match Info on mobile */}
+                                                <div className="flex items-center gap-3 sm:gap-6 flex-1">
+                                                    {/* Date Badge */}
+                                                    <div className="flex-shrink-0 text-center">
+                                                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex flex-col items-center justify-center">
+                                                            <span className="text-[10px] sm:text-xs text-muted-foreground uppercase">
+                                                                {new Date(match.date).toLocaleDateString('en-US', { month: 'short' })}
+                                                            </span>
+                                                            <span className="text-xl sm:text-2xl font-bold text-primary">
+                                                                {new Date(match.date).getDate()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[10px] text-muted-foreground mt-1">{getDaysUntil(match.date)}</p>
                                                     </div>
-                                                    <p className="text-[10px] text-muted-foreground mt-1">{getDaysUntil(match.date)}</p>
-                                                </div>
 
-                                                {/* Match Info */}
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <h3 className="text-lg font-bold text-foreground">vs {match.opponent}</h3>
-                                                        <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", importanceBadge.color)}>
-                                                            {importanceBadge.text}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock className="w-3.5 h-3.5" />
-                                                            {match.time}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <MapPin className="w-3.5 h-3.5" />
-                                                            {match.venue}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Trophy className="w-3.5 h-3.5" />
-                                                            {match.tournament}
-                                                        </span>
+                                                    {/* Match Info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                            <h3 className="text-base sm:text-lg font-bold text-foreground">vs {match.opponent}</h3>
+                                                            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", importanceBadge.color)}>
+                                                                {importanceBadge.text}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                                                            <span className="flex items-center gap-1">
+                                                                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                                                {match.time}
+                                                            </span>
+                                                            <span className="flex items-center gap-1">
+                                                                <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                                                <span className="truncate max-w-[100px] sm:max-w-none">{match.venue}</span>
+                                                            </span>
+                                                            <span className="flex items-center gap-1">
+                                                                <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                                                {match.tournament}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Quick Stats */}
-                                                <div className="flex items-center gap-6">
+                                                <div className="flex items-center gap-4 sm:gap-6 pl-[68px] sm:pl-0">
                                                     <div className="text-center">
-                                                        <p className="text-xs text-muted-foreground mb-1">Opponent Rank</p>
-                                                        <p className="text-lg font-bold text-foreground">#{match.opponentRank}</p>
+                                                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">Rank</p>
+                                                        <p className="text-base sm:text-lg font-bold text-foreground">#{match.opponentRank}</p>
                                                     </div>
                                                     <div className="text-center">
-                                                        <p className="text-xs text-muted-foreground mb-1">Last Result</p>
-                                                        <p className={cn("text-lg font-bold", getResultColor(match.lastResult))}>
+                                                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">Last</p>
+                                                        <p className={cn("text-base sm:text-lg font-bold", getResultColor(match.lastResult))}>
                                                             {match.lastResult}
                                                         </p>
                                                     </div>

@@ -69,7 +69,7 @@ const LoginSelection = () => {
             {/* Right Panel - Role Selection */}
             <div className="w-full lg:w-1/2 bg-background flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6">
+                <div className="flex items-center justify-between p-4 sm:p-6">
                     <div className="flex items-center gap-2">
                         <img
                             src="/image.png"
@@ -94,7 +94,7 @@ const LoginSelection = () => {
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 flex flex-col items-center justify-center p-6">
+                <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
                     {/* Title */}
                     <motion.div
                         className="text-center mb-10"

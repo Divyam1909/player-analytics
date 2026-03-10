@@ -69,7 +69,7 @@ const CompareModal = ({ isOpen, onClose, players, initialPlayer }: CompareModalP
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border w-[95vw] sm:w-auto">
                 <DialogHeader>
                     <DialogTitle className="text-xl flex items-center gap-2">
                         <ArrowLeftRight className="w-5 h-5 text-primary" />
@@ -123,20 +123,20 @@ const CompareModal = ({ isOpen, onClose, players, initialPlayer }: CompareModalP
                             className="space-y-6 mt-6"
                         >
                             {/* Radar Charts */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 items-center">
                                 <div className="flex flex-col items-center">
-                                    <h3 className="text-lg font-bold text-foreground mb-2">{player1.name}</h3>
-                                    <p className="text-sm text-muted-foreground mb-4">{player1.position} • #{player1.jerseyNumber}</p>
+                                    <h3 className="text-sm sm:text-lg font-bold text-foreground mb-1 sm:mb-2 truncate max-w-full">{player1.name}</h3>
+                                    <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4">{player1.position} • #{player1.jerseyNumber}</p>
                                     <RadarChart attributes={player1.attributes} size="sm" />
                                 </div>
 
-                                <div className="flex items-center justify-center">
+                                <div className="hidden md:flex items-center justify-center">
                                     <div className="text-4xl font-bold text-muted-foreground/30">VS</div>
                                 </div>
 
                                 <div className="flex flex-col items-center">
-                                    <h3 className="text-lg font-bold text-foreground mb-2">{player2.name}</h3>
-                                    <p className="text-sm text-muted-foreground mb-4">{player2.position} • #{player2.jerseyNumber}</p>
+                                    <h3 className="text-sm sm:text-lg font-bold text-foreground mb-1 sm:mb-2 truncate max-w-full">{player2.name}</h3>
+                                    <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4">{player2.position} • #{player2.jerseyNumber}</p>
                                     <RadarChart attributes={player2.attributes} size="sm" />
                                 </div>
                             </div>

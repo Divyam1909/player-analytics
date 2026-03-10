@@ -177,13 +177,13 @@ const MatchDetails = () => {
             <Sidebar />
 
             <main className={cn(
-                "pt-24 pb-12 px-6 transition-all duration-300",
+                "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Match Header */}
                     <motion.div
-                        className="relative overflow-hidden rounded-xl border border-border bg-card p-6 mb-6"
+                        className="relative overflow-hidden rounded-xl border border-border bg-card p-4 sm:p-6 mb-4 sm:mb-6"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
@@ -191,9 +191,9 @@ const MatchDetails = () => {
                         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
                         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full" />
 
-                        <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
                             <div>
-                                <h1 className="text-2xl font-bold text-foreground mb-2">
+                                <h1 className="text-lg sm:text-2xl font-bold text-foreground mb-1 sm:mb-2">
                                     {matchDetails.teamName} vs {matchDetails.opponent}
                                 </h1>
                                 <p className="text-muted-foreground">
@@ -206,18 +206,18 @@ const MatchDetails = () => {
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                                 <div className="text-center">
-                                    <p className="text-xs uppercase text-muted-foreground mb-1">{matchDetails.teamName}</p>
-                                    <p className="text-3xl font-bold text-primary">{matchDetails.homeScore}</p>
+                                    <p className="text-[10px] sm:text-xs uppercase text-muted-foreground mb-0.5 sm:mb-1 truncate max-w-[80px] sm:max-w-none">{matchDetails.teamName}</p>
+                                    <p className="text-2xl sm:text-3xl font-bold text-primary">{matchDetails.homeScore}</p>
                                 </div>
-                                <div className="text-2xl font-light text-muted-foreground">-</div>
+                                <div className="text-xl sm:text-2xl font-light text-muted-foreground">-</div>
                                 <div className="text-center">
-                                    <p className="text-xs uppercase text-muted-foreground mb-1">{matchDetails.opponent}</p>
-                                    <p className="text-3xl font-bold text-foreground">{matchDetails.awayScore}</p>
+                                    <p className="text-[10px] sm:text-xs uppercase text-muted-foreground mb-0.5 sm:mb-1 truncate max-w-[80px] sm:max-w-none">{matchDetails.opponent}</p>
+                                    <p className="text-2xl sm:text-3xl font-bold text-foreground">{matchDetails.awayScore}</p>
                                 </div>
                                 {/* Win/Loss/Draw Badge with Glow */}
-                                <div className={`ml-4 px-4 py-1.5 rounded-full text-sm font-bold uppercase shadow-lg ${matchDetails.homeScore > matchDetails.awayScore
+                                <div className={`ml-2 sm:ml-4 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-bold uppercase shadow-lg ${matchDetails.homeScore > matchDetails.awayScore
                                     ? 'bg-success/30 text-success border border-success/50 shadow-success/30'
                                     : matchDetails.homeScore < matchDetails.awayScore
                                         ? 'bg-destructive/30 text-destructive border border-destructive/50 shadow-destructive/30'
@@ -242,30 +242,31 @@ const MatchDetails = () => {
                     </motion.div>
 
                     {/* Tabs */}
-                    <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                        <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1 sticky top-16 z-30">
+                    <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
+                        <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1 sticky top-14 sm:top-16 z-30 w-full">
                             <TabsTrigger
                                 value="overview"
-                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
                             >
-                                <BarChart3 className="w-4 h-4" />
-                                Overview
+                                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Overview</span>
+                                <span className="sm:hidden">Stats</span>
                             </TabsTrigger>
                             {isPremium && (
                                 <TabsTrigger
                                     value="player-overview"
-                                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+                                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
                                 >
-                                    <Users className="w-4 h-4" />
-                                    Player Overview
+                                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    Players
                                 </TabsTrigger>
                             )}
 
                             <TabsTrigger
                                 value="custom"
-                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
                             >
-                                <Sparkles className="w-4 h-4" />
+                                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 Custom
                                 {isCustomMode && hasCustomStats && (
                                     <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
@@ -273,17 +274,18 @@ const MatchDetails = () => {
                             </TabsTrigger>
                             <TabsTrigger
                                 value="pre-match"
-                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
                             >
-                                <PlayCircle className="w-4 h-4" />
-                                Pre Match
+                                <PlayCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Pre Match</span>
+                                <span className="sm:hidden">Pre</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="match-video"
-                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
                             >
-                                <Video className="w-4 h-4" />
-                                Match Video
+                                <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                Video
                             </TabsTrigger>
                         </TabsList>
 

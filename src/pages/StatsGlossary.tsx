@@ -182,17 +182,17 @@ export default function StatsGlossary() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
             <Link to="/overview">
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-1 sm:gap-2 px-2 sm:px-3">
                 <ArrowLeft className="w-4 h-4" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </Button>
             </Link>
             <div className="flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-primary" />
-              <h1 className="text-2xl font-bold">Stats Glossary</h1>
+              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <h1 className="text-lg sm:text-2xl font-bold">Stats Glossary</h1>
             </div>
           </div>
 
@@ -210,7 +210,7 @@ export default function StatsGlossary() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <Tabs
           value={activeCategory}
           onValueChange={(v) => setActiveCategory(v as StatCategory | "all")}

@@ -120,18 +120,18 @@ const CoachDashboard = () => {
             <Sidebar />
 
             <main className={cn(
-                "pt-24 pb-12 px-6 transition-all duration-300",
+                "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Welcome Section */}
                     <motion.div
-                        className="mb-8 p-6 rounded-xl bg-card border border-border"
+                        className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-xl bg-card border border-border"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <h1 className="text-3xl font-bold text-foreground">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                             Welcome Coach {coachName}!
                         </h1>
                         <p className="text-muted-foreground mt-1">
@@ -141,7 +141,7 @@ const CoachDashboard = () => {
 
                     {/* Stats Cards */}
                     <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+                        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8"
                         variants={containerVariants}
                         initial="hidden"
                         animate="show"
@@ -156,7 +156,7 @@ const CoachDashboard = () => {
                                             <span className="text-sm font-medium">Match Record</span>
                                         </StatHint>
                                     </div>
-                                    <p className="text-3xl font-bold text-foreground mb-3">
+                                    <p className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
                                         {stats.totalMatches} Matches
                                     </p>
                                     <div className="flex gap-2">
@@ -190,11 +190,11 @@ const CoachDashboard = () => {
                                     </div>
                                     <div className="flex items-baseline gap-3 mb-2">
                                         <StatHint statId="goals_scored" iconSize="sm">
-                                            <span className="text-3xl font-bold text-emerald-500">{stats.goalsScored}</span>
+                                            <span className="text-2xl sm:text-3xl font-bold text-emerald-500">{stats.goalsScored}</span>
                                         </StatHint>
                                         <span className="text-muted-foreground">-</span>
                                         <StatHint statId="goals_conceded_team" iconSize="sm">
-                                            <span className="text-3xl font-bold text-red-500">{stats.goalsConceded}</span>
+                                            <span className="text-2xl sm:text-3xl font-bold text-red-500">{stats.goalsConceded}</span>
                                         </StatHint>
                                     </div>
                                     <div className="flex gap-4 text-xs text-muted-foreground">
@@ -250,7 +250,7 @@ const CoachDashboard = () => {
                                         <Video className="w-4 h-4" />
                                         <span className="text-sm font-medium">Pre-Match Videos</span>
                                     </div>
-                                    <p className="text-3xl font-bold text-foreground mb-2">
+                                    <p className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
                                         0 Videos
                                     </p>
                                     <p className="text-sm text-muted-foreground">
@@ -287,7 +287,7 @@ const CoachDashboard = () => {
                                 </Link>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                                 {matches.slice(0, 5).map((match, index) => {
                                     const isWin = match.homeScore > match.awayScore;
                                     const isLoss = match.homeScore < match.awayScore;

@@ -1365,18 +1365,18 @@ const TeamAnalytics = ({ embedded = false, defaultMatchId }: TeamAnalyticsProps)
             />
 
             <main className={cn(
-                embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
+                embedded ? "pb-12 px-2 sm:px-6" : "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 !embedded && (isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0")
             )}>
                 <div className="container mx-auto">
                     {/* Page Header */}
                     <motion.div
-                        className="mb-8"
+                        className="mb-6 sm:mb-8"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <h1 className="text-3xl font-bold text-foreground mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                             Team <span className="text-primary">Analytics</span>
                         </h1>
                         <p className="text-muted-foreground">

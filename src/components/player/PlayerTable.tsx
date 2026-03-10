@@ -232,7 +232,8 @@ const PlayerTable = ({ players, onCompare, statFilter = "none", matchId }: Playe
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <Table>
+      <div className="overflow-x-auto -mx-0">
+      <Table className="min-w-[700px]">
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
             <TableHead className="w-[35px] px-2 text-center h-10">
@@ -339,7 +340,8 @@ const PlayerTable = ({ players, onCompare, statFilter = "none", matchId }: Playe
           ))}
         </TableBody>
       </Table>
-    </div >
+      </div>
+    </div>
   );
 };
 

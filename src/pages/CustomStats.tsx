@@ -773,7 +773,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
             {!embedded && <Sidebar />}
 
             <main className={cn(
-                embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
+                embedded ? "pb-12 px-2 sm:px-6" : "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 !embedded && (isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0")
             )}>
                 <div className="container mx-auto max-w-6xl">
@@ -784,7 +784,7 @@ const CustomStats = ({ embedded = false, matchId }: CustomStatsProps) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <h1 className="text-3xl font-bold text-foreground mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                             Custom <span className="text-primary">Stats</span>
                         </h1>
                         <p className="text-muted-foreground">

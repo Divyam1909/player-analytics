@@ -107,57 +107,57 @@ const MatchSelection = () => {
             <Sidebar />
 
             <main className={cn(
-                "pt-24 pb-12 px-6 transition-all duration-300",
+                "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Page Header */}
                     <motion.div
-                        className="mb-8"
+                        className="mb-6 sm:mb-8"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <h1 className="text-3xl font-bold text-foreground mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                             Match <span className="text-primary">Center</span>
                         </h1>
-                        <p className="text-muted-foreground">
+                        <p className="text-sm sm:text-base text-muted-foreground">
                             Select a match to view detailed analytics and player performance
                         </p>
                     </motion.div>
 
                     {/* All Matches Card */}
                     <Card className="bg-card border-border">
-                        <CardHeader className="flex flex-row items-center justify-between pb-4">
+                        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-primary/10">
+                                <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                                     <Trophy className="w-5 h-5 text-primary" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-xl">All Matches</CardTitle>
-                                    <p className="text-sm text-muted-foreground">Your complete match history</p>
+                                    <CardTitle className="text-lg sm:text-xl">All Matches</CardTitle>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">Your complete match history</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 sm:gap-4">
                                 {/* Search Bar */}
-                                <div className="relative">
+                                <div className="relative flex-1 sm:flex-none">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                     <input
                                         type="text"
                                         placeholder="Search matches..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-64 pl-10 pr-4 py-2 text-sm rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                                        className="w-full sm:w-64 pl-10 pr-4 py-2 text-sm rounded-lg bg-secondary border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                                     />
                                 </div>
-                                <span className="px-3 py-1 rounded-lg bg-secondary text-sm font-medium">
+                                <span className="px-2 sm:px-3 py-1 rounded-lg bg-secondary text-xs sm:text-sm font-medium whitespace-nowrap shrink-0">
                                     {filteredMatches.length} Matches
                                 </span>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {/* Table Header */}
-                            <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground border-b border-border mb-2">
+                            {/* Table Header - hidden on mobile */}
+                            <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground border-b border-border mb-2">
                                 <div className="col-span-4">Match</div>
                                 <div className="col-span-2 text-center">Score</div>
                                 <div className="col-span-2">Date</div>
@@ -167,7 +167,7 @@ const MatchSelection = () => {
 
                             {/* Match List */}
                             <motion.div
-                                className="space-y-1"
+                                className="space-y-2 sm:space-y-1"
                                 variants={containerVariants}
                                 initial="hidden"
                                 animate="show"
@@ -188,32 +188,27 @@ const MatchSelection = () => {
                                                 variants={itemVariants}
                                                 className="group"
                                             >
+                                                {/* Desktop: grid layout */}
                                                 <Link
                                                     to={`/match/${match.matchId}`}
-                                                    className="relative overflow-hidden grid grid-cols-12 gap-4 items-center px-4 py-4 rounded-lg hover:bg-secondary/50 transition-all duration-200 border border-border"
+                                                    className="relative overflow-hidden hidden md:grid grid-cols-12 gap-4 items-center px-4 py-4 rounded-lg hover:bg-secondary/50 transition-all duration-200 border border-border"
                                                 >
-                                                    {/* Win/Loss Indicator Bar */}
                                                     <div className={cn(
                                                         "absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg",
                                                         isWin && "bg-emerald-500",
                                                         isLoss && "bg-red-500",
                                                         !isWin && !isLoss && "bg-orange-500"
                                                     )} />
-                                                    {/* Match Name */}
                                                     <div className="col-span-4">
                                                         <p className="font-medium text-foreground">
                                                             {match.teamName} vs {match.opponent}
                                                         </p>
                                                     </div>
-
-                                                    {/* Score */}
                                                     <div className="col-span-2 flex justify-center">
                                                         <span className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground font-bold text-sm">
                                                             {match.homeScore} - {match.awayScore}
                                                         </span>
                                                     </div>
-
-                                                    {/* Date */}
                                                     <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
                                                         <Calendar className="w-4 h-4" />
                                                         <span className="text-sm">
@@ -224,19 +219,49 @@ const MatchSelection = () => {
                                                             })}
                                                         </span>
                                                     </div>
-
-                                                    {/* Tournament */}
                                                     <div className="col-span-3">
                                                         <span className="text-sm text-primary">
                                                             {match.tournament}
                                                         </span>
                                                     </div>
-
-                                                    {/* Action */}
                                                     <div className="col-span-1 flex items-center justify-end gap-1 text-muted-foreground group-hover:text-primary transition-colors">
                                                         <Eye className="w-4 h-4" />
                                                         <span className="text-sm font-medium">View Details</span>
                                                         <ChevronRight className="w-4 h-4 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                                                    </div>
+                                                </Link>
+
+                                                {/* Mobile: card layout */}
+                                                <Link
+                                                    to={`/match/${match.matchId}`}
+                                                    className="relative overflow-hidden md:hidden flex flex-col gap-2 p-3 rounded-lg hover:bg-secondary/50 transition-all duration-200 border border-border"
+                                                >
+                                                    <div className={cn(
+                                                        "absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg",
+                                                        isWin && "bg-emerald-500",
+                                                        isLoss && "bg-red-500",
+                                                        !isWin && !isLoss && "bg-orange-500"
+                                                    )} />
+                                                    <div className="flex items-center justify-between pl-2">
+                                                        <p className="font-medium text-sm text-foreground truncate flex-1">
+                                                            {match.teamName} vs {match.opponent}
+                                                        </p>
+                                                        <span className="px-3 py-1 rounded-md bg-primary text-primary-foreground font-bold text-sm ml-2 shrink-0">
+                                                            {match.homeScore} - {match.awayScore}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between pl-2 text-xs text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3" />
+                                                            {new Date(match.date).toLocaleDateString('en-US', {
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </span>
+                                                        <span className="text-primary text-xs truncate ml-2">
+                                                            {match.tournament}
+                                                        </span>
                                                     </div>
                                                 </Link>
                                             </motion.div>

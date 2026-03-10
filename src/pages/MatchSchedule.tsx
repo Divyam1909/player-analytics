@@ -102,22 +102,22 @@ const MatchSchedule = () => {
             <Sidebar />
 
             <main className={cn(
-                "pt-24 pb-12 px-6 transition-all duration-300",
+                "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto">
                     {/* Header */}
                     <motion.div
-                        className="mb-8 flex items-center justify-between"
+                        className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
                         <div>
-                            <h1 className="text-3xl font-bold text-foreground mb-2">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                                 Match <span className="text-primary">Schedule</span>
                             </h1>
-                            <p className="text-muted-foreground">
+                            <p className="text-sm sm:text-base text-muted-foreground">
                                 Full season schedule and fixture calendar
                             </p>
                         </div>
@@ -156,7 +156,7 @@ const MatchSchedule = () => {
                         ].map((stat) => (
                             <Card key={stat.label} className="bg-card border-border">
                                 <CardContent className="p-4 text-center">
-                                    <p className={cn("text-3xl font-bold", stat.color)}>{stat.value}</p>
+                                    <p className={cn("text-2xl sm:text-3xl font-bold", stat.color)}>{stat.value}</p>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
                                 </CardContent>
                             </Card>
@@ -218,7 +218,7 @@ const MatchSchedule = () => {
                                                         }
                                                     }}
                                                     className={cn(
-                                                        "min-h-[90px] rounded-lg p-2 border transition-all",
+                                                        "min-h-[60px] sm:min-h-[90px] rounded-lg p-1 sm:p-2 border transition-all",
                                                         day ? "bg-secondary/20 border-border hover:border-primary/50 cursor-pointer" : "bg-transparent border-transparent",
                                                         isToday && "ring-2 ring-primary",
                                                         match && "bg-primary/10 border-primary/30",
@@ -286,14 +286,14 @@ const MatchSchedule = () => {
                                             <div className="flex items-center">
                                                 {/* Date Strip */}
                                                 <div className={cn(
-                                                    "w-20 py-4 text-center flex-shrink-0",
+                                                    "w-16 sm:w-20 py-3 sm:py-4 text-center flex-shrink-0",
                                                     match.type === 'past' ? "bg-secondary" : "bg-primary/20"
                                                 )}>
-                                                    <p className="text-xs text-muted-foreground uppercase">
+                                                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">
                                                         {new Date(match.date).toLocaleDateString('en-US', { month: 'short' })}
                                                     </p>
                                                     <p className={cn(
-                                                        "text-2xl font-bold",
+                                                        "text-xl sm:text-2xl font-bold",
                                                         match.type === 'past' ? "text-muted-foreground" : "text-primary"
                                                     )}>
                                                         {new Date(match.date).getDate()}
@@ -301,39 +301,39 @@ const MatchSchedule = () => {
                                                 </div>
 
                                                 {/* Match Info */}
-                                                <div className="flex-1 p-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <h3 className="font-semibold text-foreground">vs {match.opponent}</h3>
+                                                <div className="flex-1 p-2 sm:p-4 min-w-0">
+                                                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                                        <h3 className="font-semibold text-sm sm:text-base text-foreground">vs {match.opponent}</h3>
                                                         {match.result && (
                                                             <span className={cn(
-                                                                "text-xs px-2 py-0.5 rounded text-white font-medium",
+                                                                "text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded text-white font-medium",
                                                                 getResultColor(match.result)
                                                             )}>
                                                                 {match.result}
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                                    <div className="flex items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-muted-foreground">
                                                         <span className="flex items-center gap-1">
-                                                            {match.venue === 'Home' ? <Home className="w-3.5 h-3.5" /> : <Plane className="w-3.5 h-3.5" />}
+                                                            {match.venue === 'Home' ? <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Plane className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                                                             {match.venue}
                                                         </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Trophy className="w-3.5 h-3.5" />
-                                                            {match.tournament}
+                                                        <span className="flex items-center gap-1 truncate">
+                                                            <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                                                            <span className="truncate">{match.tournament}</span>
                                                         </span>
                                                     </div>
                                                 </div>
 
                                                 {/* Status */}
-                                                <div className="px-4">
+                                                <div className="px-2 sm:px-4 shrink-0">
                                                     <span className={cn(
-                                                        "text-xs px-3 py-1 rounded-full font-medium",
+                                                        "text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded-full font-medium",
                                                         match.type === 'past'
                                                             ? "bg-secondary text-muted-foreground"
                                                             : "bg-primary/20 text-primary"
                                                     )}>
-                                                        {match.type === 'past' ? 'Completed' : 'Upcoming'}
+                                                        {match.type === 'past' ? 'Done' : 'Soon'}
                                                     </span>
                                                 </div>
                                             </div>

@@ -114,13 +114,13 @@ const PlayerOverview = () => {
                 <Sidebar />
                 <main
                     className={cn(
-                        "pt-24 pb-12 px-6 transition-all duration-300",
-                        isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
-                    )}
-                >
-                    <div className="container mx-auto flex items-center justify-center min-h-[60vh]">
-                        <div className="animate-pulse text-primary text-lg">
-                            Loading players...
+                    "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
+                    isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
+                )}
+            >
+                <div className="container mx-auto flex items-center justify-center min-h-[60vh]">
+                    <div className="animate-pulse text-primary text-lg">
+                        Loading players...
                         </div>
                     </div>
                 </main>
@@ -135,12 +135,12 @@ const PlayerOverview = () => {
                 <Sidebar />
                 <main
                     className={cn(
-                        "pt-24 pb-12 px-6 transition-all duration-300",
-                        isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
-                    )}
-                >
-                    <div className="container mx-auto flex items-center justify-center min-h-[60vh]">
-                        <p className="text-destructive">
+                    "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
+                    isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
+                )}
+            >
+                <div className="container mx-auto flex items-center justify-center min-h-[60vh]">
+                    <p className="text-destructive">
                             Error loading player data. Please try again.
                         </p>
                     </div>
@@ -156,19 +156,19 @@ const PlayerOverview = () => {
 
             <main
                 className={cn(
-                    "pt-24 pb-12 px-6 transition-all duration-300",
+                    "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                     isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
                 )}
             >
                 <div className="container mx-auto">
                     {/* Page Title */}
-                    <div className="mb-8">
+                    <div className="mb-6 sm:mb-8">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                                <Users className="w-5 h-5 text-primary" />
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-foreground">
+                                <h1 className="text-xl sm:text-2xl font-bold text-foreground">
                                     Player Overview
                                 </h1>
                                 <p className="text-sm text-muted-foreground">
@@ -377,7 +377,7 @@ const PlayerOverview = () => {
                                         </div>
 
                                         {/* Stats Breakdown */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                                             {/* Passing Stats */}
                                             <Card className="bg-card border-border">
                                                 <CardHeader className="pb-2">

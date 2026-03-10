@@ -80,18 +80,18 @@ const Profile = () => {
             <Sidebar />
 
             <main className={cn(
-                "pt-24 pb-12 px-6 transition-all duration-300",
+                "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
                 isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0"
             )}>
                 <div className="container mx-auto max-w-4xl">
                     {/* Page Header */}
                     <motion.div
-                        className="mb-8"
+                        className="mb-6 sm:mb-8"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <h1 className="text-3xl font-bold text-foreground mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                             Coach <span className="text-primary">Profile</span>
                         </h1>
                         <p className="text-muted-foreground">
@@ -255,26 +255,26 @@ const Profile = () => {
                                     </CardHeader>
                                     <CardContent className="space-y-6">
                                         {/* Theme Selection */}
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-secondary">
+                                                <div className="p-2 rounded-lg bg-secondary shrink-0">
                                                     <Palette className="w-4 h-4 text-primary" />
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-foreground">Theme</p>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <p className="text-xs sm:text-sm text-muted-foreground">
                                                         Choose your preferred appearance
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 ml-11 sm:ml-0">
                                                 {['light', 'dark', 'system'].map((t) => (
                                                     <Button
                                                         key={t}
                                                         variant={theme === t ? 'default' : 'outline'}
                                                         size="sm"
                                                         onClick={() => setTheme(t as 'light' | 'dark' | 'system')}
-                                                        className="capitalize"
+                                                        className="capitalize text-xs sm:text-sm"
                                                     >
                                                         {t === 'light' && <Sun className="w-3 h-3 mr-1" />}
                                                         {t === 'dark' && <Moon className="w-3 h-3 mr-1" />}

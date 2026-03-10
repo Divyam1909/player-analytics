@@ -16,37 +16,37 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-      <div className="container mx-auto px-6">
-        <div className="flex h-16 items-center justify-between">
+      <div className="container mx-auto px-3 sm:px-6">
+        <div className="flex h-14 sm:h-16 items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
+          <Link to="/" className="flex items-center gap-2 sm:gap-3 group">
             <div className="relative">
               <motion.div
-                className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/30 group-hover:glow-primary transition-all duration-300"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/30 group-hover:glow-primary transition-all duration-300"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <BarChart3 className="w-5 h-5 text-primary" />
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </motion.div>
               <div className="absolute -inset-1 bg-primary/20 rounded-lg blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </div>
             <div>
-              <span className="text-lg font-bold tracking-tight text-foreground">
+              <span className="text-sm sm:text-lg font-bold tracking-tight text-foreground">
                 Thinking <span className="text-primary">Engines</span>
               </span>
-              <span className="block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="hidden sm:block text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Player Analytics
               </span>
             </div>
           </Link>
 
           {/* Right Side Icons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {/* Profile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
-                  <User className="w-7 h-7" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground">
+                  <User className="w-5 h-5 sm:w-7 sm:h-7" />
                   <span className="sr-only">Profile</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -61,8 +61,8 @@ const Header = () => {
             {/* Settings */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
-                  <Settings className="w-7 h-7" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground">
+                  <Settings className="w-5 h-5 sm:w-7 sm:h-7" />
                   <span className="sr-only">Settings</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -77,7 +77,7 @@ const Header = () => {
             {/* Theme Toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={resolvedTheme}
@@ -87,9 +87,9 @@ const Header = () => {
                       transition={{ duration: 0.2 }}
                     >
                       {resolvedTheme === "dark" ? (
-                        <Moon className="w-7 h-7" />
+                        <Moon className="w-5 h-5 sm:w-7 sm:h-7" />
                       ) : (
-                        <Sun className="w-7 h-7" />
+                        <Sun className="w-5 h-5 sm:w-7 sm:h-7" />
                       )}
                     </motion.div>
                   </AnimatePresence>

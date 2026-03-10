@@ -97,8 +97,8 @@ const AuthHeader = ({ title = 'Dashboard', showBack = false, onBack, matchOption
                         {matchOptions && matchOptions.length > 0 && onMatchChange && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2 ml-2">
-                                        <span className="text-sm">
+                                    <Button variant="outline" size="sm" className="gap-1 sm:gap-2 ml-1 sm:ml-2 max-w-[140px] sm:max-w-none">
+                                        <span className="text-xs sm:text-sm truncate">
                                             {matchOptions.find(m => m.id === selectedMatchId)?.label || 'Select Match'}
                                         </span>
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

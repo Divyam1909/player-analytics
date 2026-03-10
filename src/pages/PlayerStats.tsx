@@ -431,7 +431,7 @@ const SectionNav = ({ sections, activeSection, onSectionClick, embedded }: Secti
       initial={{ opacity: 0, x: 20, y: '-50%' }}
       animate={{ opacity: 1, x: 0, y: '-50%' }}
       transition={{ delay: 0.5, duration: 0.4 }}
-      className="fixed right-3 top-[55%] z-50"
+      className="fixed right-3 top-[55%] z-50 hidden md:block"
     >
       <div className={cn(
         "flex flex-row items-stretch rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-xl",
@@ -688,31 +688,31 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
       )}
 
       <main className={cn(
-        embedded ? "pb-12 px-6" : "pt-24 pb-12 px-6 transition-all duration-300",
+        embedded ? "pb-12 px-2 sm:px-6" : "pt-20 sm:pt-24 pb-12 px-3 sm:px-6 transition-all duration-300",
         !embedded && (isCollapsed ? "md:ml-16 ml-0" : "md:ml-64 ml-0")
       )}>
         <div className="container mx-auto">
 
           {/* Player Header */}
-          <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 mb-8">
+          <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4 sm:p-6 mb-6 sm:mb-8">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full" />
+            <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full" />
 
-            <div className="relative flex flex-col lg:flex-row items-start lg:items-center gap-6">
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
               {/* Player Avatar */}
               <div className="relative flex-shrink-0">
-                <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-secondary border border-border flex items-center justify-center">
-                  <User className="w-12 h-12 lg:w-16 lg:h-16 text-muted-foreground" />
+                <div className="w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 rounded-2xl bg-secondary border border-border flex items-center justify-center">
+                  <User className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-muted-foreground" />
                 </div>
-                <div className="absolute -bottom-2 -right-2 w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-primary flex items-center justify-center text-lg lg:text-xl font-bold text-primary-foreground shadow-lg glow-primary">
+                <div className="absolute -bottom-2 -right-2 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-primary flex items-center justify-center text-sm sm:text-lg lg:text-xl font-bold text-primary-foreground shadow-lg glow-primary">
                   {currentPlayer.jerseyNumber}
                 </div>
               </div>
 
               {/* Player Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
                     {currentPlayer.name}
                   </h1>
                   <span className="px-3 py-1 rounded-lg bg-secondary text-sm font-medium text-secondary-foreground">
@@ -758,21 +758,23 @@ const PlayerStats = ({ embedded = false, defaultMatchId }: PlayerStatsProps) => 
             }}
             className="space-y-6"
           >
-            <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1 sticky top-16 z-30">
-              <TabsTrigger value="match" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Match-Wise Stats
+            <TabsList className="bg-secondary border border-border flex flex-wrap h-auto gap-1 p-1 sticky top-14 sm:top-16 z-30 w-full">
+              <TabsTrigger value="match" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm flex-1 sm:flex-none">
+                <span className="hidden sm:inline">Match-Wise Stats</span>
+                <span className="sm:hidden">Match</span>
               </TabsTrigger>
-              <TabsTrigger value="passing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1">
+              <TabsTrigger value="passing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 text-xs sm:text-sm flex-1 sm:flex-none">
                 <ArrowRightLeft className="w-3 h-3" />
-                Passing Analysis
+                <span className="hidden sm:inline">Passing Analysis</span>
+                <span className="sm:hidden">Passing</span>
               </TabsTrigger>
-              <TabsTrigger value="shots" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1">
+              <TabsTrigger value="shots" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 text-xs sm:text-sm flex-1 sm:flex-none">
                 <Crosshair className="w-3 h-3" />
-                Shot Analysis
+                Shots
               </TabsTrigger>
-              <TabsTrigger value="chances" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1">
+              <TabsTrigger value="chances" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1 text-xs sm:text-sm flex-1 sm:flex-none">
                 <Flame className="w-3 h-3" />
-                Chances Created
+                Chances
               </TabsTrigger>
             </TabsList>
 
